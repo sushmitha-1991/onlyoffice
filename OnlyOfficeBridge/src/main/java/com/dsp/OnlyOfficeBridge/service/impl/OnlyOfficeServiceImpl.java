@@ -58,18 +58,18 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
-			downloadUrl = "http://10.247.128.14:30813/only-office/download/" + existingDocumentKey;
+			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + existingDocumentKey;
 			title = "Document.odt";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
-			downloadUrl = "http://10.247.128.14:30813/only-office/download/" + dsp2Key;
+			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + dsp2Key;
 			title = "Document-" + keyToUse + ".odt";
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
 		String fileType = "odt";
-		String callbackUrl = "http://10.247.128.14:30813/only-office/callback?dsp2Key=" + dsp2Key;
+		String callbackUrl = "http://10.247.128.14:31714/only-office/callback?dsp2Key=" + dsp2Key;
 
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
 
