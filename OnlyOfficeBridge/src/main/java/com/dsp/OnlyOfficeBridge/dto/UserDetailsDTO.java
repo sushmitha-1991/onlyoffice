@@ -5,10 +5,13 @@
  */
 package com.dsp.OnlyOfficeBridge.dto;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.stream.Collectors;
 
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import jakarta.validation.constraints.Size;
@@ -34,14 +37,18 @@ public class UserDetailsDTO implements UserDetails {
 	private String password;
 	private Long houseId;
 	private boolean isActive;
-	
+
 	private String houseAbbr;
+	private String role;
 
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		// Return roles and authorities granted to the user.
-		// Here you can return authorities based on your role or permission setup.
-		return Collections.emptyList();
+		if (this.role == null || this.role.isBlank()) {
+			return Collections.emptyList();
+		}
+
+		return Arrays.stream(this.role.split(",")).map(String::trim).filter(r -> !r.isEmpty())
+				.map(r -> new SimpleGrantedAuthority("ROLE_" + r.toUpperCase())).collect(Collectors.toSet());
 	}
 
 	@Override

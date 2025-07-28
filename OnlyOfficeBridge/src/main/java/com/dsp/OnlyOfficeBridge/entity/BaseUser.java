@@ -5,13 +5,16 @@
  */
 package com.dsp.OnlyOfficeBridge.entity;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.hibernate.envers.Audited;
 import org.hibernate.envers.RelationTargetAuditMode;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import jakarta.persistence.Column;
@@ -53,8 +56,6 @@ public class BaseUser extends Auditable implements UserDetails {
 	@Column(name = "password", nullable = false)
 	private String password;
 
-	// Merged User entity properties
-
 	@Column(name = "first_name", nullable = false, length = 50)
 	private String firstName;
 
@@ -69,9 +70,6 @@ public class BaseUser extends Auditable implements UserDetails {
 
 	@Column(name = "profile_picture", columnDefinition = "uuid")
 	private UUID profilePicture;
-
-//    @Column(name = "password_hash", nullable = false, length = 255)
-//    private String passwordHash;
 
 	@Column(name = "address", length = 255)
 	private String address;
@@ -92,24 +90,20 @@ public class BaseUser extends Auditable implements UserDetails {
 	@Column(name = "house_id", nullable = false)
 	private Long houseId;
 
-//	@ManyToOne
-//	@JoinColumn(name = "designation_id", nullable = false, insertable = false, updatable = false)
-//	@Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
-//	private Designation designation;
-
 	@Column(name = "designation_id", nullable = true)
 	private Long designationId;
 
-//	@OneToMany(mappedBy = "user")
-//	private List<UserRoles> userRoles;
-	// Implement UserDetails interface methods
+	@Column(name = "role", nullable = false)
+	private String role;
 
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		// Here, you should return the roles and authorities granted to the user.
-		// If you're not using GrantedAuthority, you can return an empty list or
-		// customize as needed.
-		return Collections.emptyList();
+		if (this.role == null || this.role.isBlank()) {
+			return Collections.emptyList();
+		}
+
+		return Arrays.stream(this.role.split(",")).map(String::trim).filter(r -> !r.isEmpty())
+				.map(r -> new SimpleGrantedAuthority("ROLE_" + r.toUpperCase())).collect(Collectors.toSet());
 	}
 
 	@Override
@@ -130,13 +124,6 @@ public class BaseUser extends Auditable implements UserDetails {
 		return true;
 	}
 
-//    @Override
-//    public boolean isEnabled() {
-//        // Return true if the user is enabled
-//        return this.isActive;
-//    }
-
-	// Ensuring the method exists for AuditorAware
 	public Long getId() {
 		return this.id;
 	}
