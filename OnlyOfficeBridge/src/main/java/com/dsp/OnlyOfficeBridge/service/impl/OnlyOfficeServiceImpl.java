@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -40,6 +41,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Autowired
 	private OnlyOfficeMetadataRepository onlyOfficeMetadataRepository;
 
+	@Value("${onlyoffice.url}")
+	private String onlyOfficeUrl;
+
 	@Autowired
 	private Utils utils;
 
@@ -58,18 +62,18 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
-			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + existingDocumentKey;
+			downloadUrl = onlyOfficeUrl + "/only-office/download/" + existingDocumentKey;
 			title = "Document.html";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
-			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + dsp2Key;
+			downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key;
 			title = "Document-" + keyToUse + ".html";
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
 		String fileType = "html";
-		String callbackUrl = "http://10.247.128.14:31714/only-office/callback?dsp2Key=" + dsp2Key;
+		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key;
 
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
 
