@@ -59,12 +59,12 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
 			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + existingDocumentKey;
-			title = "Document.odt";
+			title = "Document.html";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
 			downloadUrl = "http://10.247.128.14:31714/only-office/download/" + dsp2Key;
-			title = "Document-" + keyToUse + ".odt";
+			title = "Document-" + keyToUse + ".html";
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
@@ -128,14 +128,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 				// 1. Download file from OnlyOffice
 				System.out.println(">>> Downloading file from fileUrl - " + fileUrl);
-				File tempFile = File.createTempFile("edited-doc-", ".odt");
+				File tempFile = File.createTempFile("edited-doc-", ".html");
 				try (InputStream in = new URL(fileUrl).openStream();
 						FileOutputStream out = new FileOutputStream(tempFile)) {
 					in.transferTo(out);
 				}
 
 				System.out.println(">>> Calling Upload to OpenKm");
-				String documentName = key + ".odt";
+				String documentName = key + ".html";
 
 				// 2. Upload to OpenKM
 				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
