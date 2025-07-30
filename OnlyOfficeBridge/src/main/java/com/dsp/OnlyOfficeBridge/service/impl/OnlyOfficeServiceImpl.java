@@ -68,7 +68,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
-		String fileType = "odt";
+		String fileType = "html";
 		String callbackUrl = "http://10.247.128.14:31714/only-office/callback?dsp2Key=" + dsp2Key;
 
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
@@ -88,7 +88,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		Map<String, Object> response = new HashMap<>();
 		response.put("document", document);
-		response.put("documentType", "word");
+		response.put("documentType", "html");
 		response.put("editorConfig", editorConfig);
 		response.put("documentKey", keyToUse);
 		response.put("dsp2Key", dsp2Key);
