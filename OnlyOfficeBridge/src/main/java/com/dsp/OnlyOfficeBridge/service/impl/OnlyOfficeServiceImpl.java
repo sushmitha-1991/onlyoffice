@@ -62,7 +62,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
-			downloadUrl = "http://10.247.128.14:30813/statementwork/statementwork/download/1"; // static blank doc
+			downloadUrl = onlyOfficeUrl + "/statementwork/statementwork/download/1"; // static blank doc
 			title = "Document.odt";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
@@ -73,7 +73,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 
 		String fileType = "odt";
-		String callbackUrl = "http://10.247.128.14:30813/statementwork/statementwork/callback?dsp2Key=" + dsp2Key;
+		String callbackUrl = onlyOfficeUrl + "/statementwork/statementwork/callback?dsp2Key=" + dsp2Key;
 
 		// Determine if editing is allowed
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
