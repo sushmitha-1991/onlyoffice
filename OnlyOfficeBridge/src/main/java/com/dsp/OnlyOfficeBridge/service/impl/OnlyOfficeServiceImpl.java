@@ -62,21 +62,23 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
-			downloadUrl = onlyOfficeUrl + "/only-office/download/" + existingDocumentKey;
-			title = "Document.html";
+			downloadUrl = "http://10.247.128.14:30813/statementwork/statementwork/download/1"; // static blank doc
+			title = "Document.odt";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
-			downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key;
-			title = "Document-" + keyToUse + ".html";
+			downloadUrl = "http://10.247.128.14:30813/statementwork/statementwork/download/" + dsp2Key;
+			title = "Document-" + keyToUse + ".odt";
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
-		String fileType = "html";
-		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key;
+		String fileType = "odt";
+		String callbackUrl = "http://10.247.128.14:30813/statementwork/statementwork/callback?dsp2Key=" + dsp2Key;
 
+		// Determine if editing is allowed
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
 
+		// Document config
 		Map<String, Object> document = new HashMap<>();
 		document.put("fileType", fileType);
 		document.put("key", keyToUse);
@@ -84,15 +86,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
 
+		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
 		editorConfig.put("customization", Map.of("forcesave", true, "save", true));
 
+		// Final response
 		Map<String, Object> response = new HashMap<>();
 		response.put("document", document);
-		response.put("documentType", "text");
+		response.put("documentType", "word");
 		response.put("editorConfig", editorConfig);
 		response.put("documentKey", keyToUse);
 		response.put("dsp2Key", dsp2Key);
