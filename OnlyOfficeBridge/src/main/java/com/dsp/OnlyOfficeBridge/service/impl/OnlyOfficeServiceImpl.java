@@ -92,7 +92,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		Map<String, Object> response = new HashMap<>();
 		response.put("document", document);
-		response.put("documentType", "html");
+		response.put("documentType", "text");
 		response.put("editorConfig", editorConfig);
 		response.put("documentKey", keyToUse);
 		response.put("dsp2Key", dsp2Key);
