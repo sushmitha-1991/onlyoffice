@@ -53,7 +53,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		String existingDocumentKey = payload.get("documentKey");
 		String existingDsp2Key = payload.get("dsp2Key"); // optional
 		String editFlag = payload.get("edit"); // "true", "false", or null
-
+        String emptyFlg =  payload.get("empty");
 		boolean isInitStep = "INIT".equalsIgnoreCase(step);
 		String keyToUse;
 		String downloadUrl;
@@ -67,7 +67,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
-			downloadUrl = "http://10.247.128.14:30813/statementwork/statementwork/download/" + dsp2Key;
+            if(emptyFlg.equals("1"))
+            {
+                downloadUrl = "http://10.247.128.14:30783/statementwork/statementwork/download-empty-docx";
+            }
+            else
+            {
+                downloadUrl = "http://10.247.128.14:30783/statementwork/statementwork/download/" + dsp2Key;
+            }
+
+
+            //download-empty-docx
 			title = "Document-" + keyToUse + ".odt";
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
@@ -116,6 +126,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
+
+
 
 	private String extractUuidFromUrl(String url) {
 		return url.substring(url.lastIndexOf("/") + 1);
