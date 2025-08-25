@@ -5,10 +5,15 @@
  */
 package com.dsp.OnlyOfficeBridge.controller;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Map;
 
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,5 +52,28 @@ public class OnlyOfficeController {
 			@RequestBody Map<String, Object> payload) {
 		return onlyOfficeService.handleCallback(dsp2Key, payload);
 	}
+
+
+    @GetMapping("/download-empty-docx")
+    public ResponseEntity<byte[]> downloadEmptyDocx() throws IOException {
+        // Create an empty DOCX document
+        XWPFDocument document = new XWPFDocument();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        document.write(out);
+        document.close();
+
+        byte[] docBytes = out.toByteArray();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", "empty.docx");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(docBytes);
+    }
+
+
+
 
 }
