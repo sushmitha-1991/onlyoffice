@@ -62,18 +62,18 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
-			downloadUrl = onlyOfficeUrl + "/statementwork/statementwork/download/1"; // static blank doc
+			downloadUrl = onlyOfficeUrl + "/only-office/download/1"; // static blank doc
 			title = "Document.odt";
 			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
             if(emptyFlg.equals("1"))
             {
-                downloadUrl = "http://10.247.128.14:30783/statementwork/statementwork/download-empty-docx";
+                downloadUrl = onlyOfficeUrl + "/only-office/download-empty-docx";
             }
             else
             {
-                downloadUrl = "http://10.247.128.14:30783/statementwork/statementwork/download/" + dsp2Key;
+                downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key;
             }
 
 
