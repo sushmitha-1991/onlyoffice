@@ -54,8 +54,8 @@ public class OnlyOfficeController {
 	}
 
 
-    @GetMapping("/download-empty-docx")
-    public ResponseEntity<byte[]> downloadEmptyDocx() throws IOException {
+    @GetMapping("/download-empty-docx/{fileName}")
+    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName) throws IOException {
         // Create an empty DOCX document
         XWPFDocument document = new XWPFDocument();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -66,7 +66,7 @@ public class OnlyOfficeController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentDispositionFormData("attachment", "empty.docx");
+        headers.setContentDispositionFormData("attachment", fileName);
 
         return ResponseEntity.ok()
                 .headers(headers)

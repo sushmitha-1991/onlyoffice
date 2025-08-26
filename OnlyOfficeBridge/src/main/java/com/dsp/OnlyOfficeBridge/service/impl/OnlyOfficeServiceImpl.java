@@ -50,10 +50,13 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
 		String step = payload.get("step");
+        String fileName = payload.get("fileName");
 		String existingDocumentKey = payload.get("documentKey");
 		String existingDsp2Key = payload.get("dsp2Key"); // optional
 		String editFlag = payload.get("edit"); // "true", "false", or null
         String emptyFlg =  payload.get("empty");
+        String fileType = fileName.split("\\.")[1];
+        System.out.println("fileType>>> " + fileType);
 		boolean isInitStep = "INIT".equalsIgnoreCase(step);
 		String keyToUse;
 		String downloadUrl;
@@ -69,7 +72,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
             if(emptyFlg.equals("1"))
             {
-                downloadUrl = onlyOfficeUrl + "/only-office/download-empty-docx";
+                downloadUrl = onlyOfficeUrl + "/only-office/download-empty-docx/"+fileName;
             }
             else
             {
@@ -82,7 +85,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
-		String fileType = "odt";
 		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key;
 
 		// Determine if editing is allowed
@@ -90,7 +92,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		// Document config
 		Map<String, Object> document = new HashMap<>();
-		document.put("fileType", fileType);
+//		document.put("fileType", fileType);
 		document.put("key", keyToUse);
 		document.put("title", title);
 		document.put("url", downloadUrl);
