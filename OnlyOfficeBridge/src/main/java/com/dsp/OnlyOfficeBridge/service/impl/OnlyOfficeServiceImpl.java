@@ -174,27 +174,27 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				System.out.println(">>> documentUuid - " + documentUuid);
 
 				// 4. Build OpenKM download URL
-				String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + documentUuid;
+//				String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + documentUuid;
 
 				// 5. Update or insert into OnlyOfficeMetadata
-				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
-
-				OnlyOfficeMetadata metadata;
-				if (existingMetadataOpt.isPresent()) {
-					metadata = existingMetadataOpt.get();
-					metadata.setDownloadUrl(downloadUrl);
-					metadata.setOnlyOfficeUrl(fileUrl);
-					metadata.setUpdatedBy(1L);
-					metadata.setUpdatedAt(LocalDateTime.now());
-					metadata.setDocumentKey(key);
-					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
-				} else {
-					metadata = OnlyOfficeMetadata.builder().applicationId(117L).documentKey(key).dsp2Key(dsp2Key)
-							.downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl).createdBy(1L).updatedBy(1L).build();
-					System.out.println(">>> Created new OnlyOfficeMetadata record");
-				}
-
-				onlyOfficeMetadataRepository.save(metadata);
+//				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
+//
+//				OnlyOfficeMetadata metadata;
+//				if (existingMetadataOpt.isPresent()) {
+//					metadata = existingMetadataOpt.get();
+//					metadata.setDownloadUrl(downloadUrl);
+//					metadata.setOnlyOfficeUrl(fileUrl);
+//					metadata.setUpdatedBy(1L);
+//					metadata.setUpdatedAt(LocalDateTime.now());
+//					metadata.setDocumentKey(key);
+//					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
+//				} else {
+//					metadata = OnlyOfficeMetadata.builder().applicationId(117L).documentKey(key).dsp2Key(dsp2Key)
+//							.downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl).createdBy(1L).updatedBy(1L).build();
+//					System.out.println(">>> Created new OnlyOfficeMetadata record");
+//				}
+//
+//				onlyOfficeMetadataRepository.save(metadata);
 
 				// Clean up
 				tempFile.delete();
