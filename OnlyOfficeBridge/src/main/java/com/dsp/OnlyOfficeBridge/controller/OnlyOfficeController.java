@@ -48,9 +48,9 @@ public class OnlyOfficeController {
 	}
 
 	@PostMapping("/callback")
-	public ResponseEntity<Map<String, Object>> handleCallback(@RequestParam("dsp2Key") String dsp2Key,
+	public ResponseEntity<Map<String, Object>> handleCallback(@RequestParam("dsp2Key") String dsp2Key,@RequestParam("applicationId") String applicationId,
 			@RequestBody Map<String, Object> payload) {
-		return onlyOfficeService.handleCallback(dsp2Key, payload);
+		return onlyOfficeService.handleCallback(dsp2Key,applicationId, payload);
 	}
 
 

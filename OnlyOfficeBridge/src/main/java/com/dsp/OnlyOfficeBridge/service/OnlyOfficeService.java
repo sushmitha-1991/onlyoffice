@@ -19,6 +19,6 @@ public interface OnlyOfficeService {
 
 	ResponseEntity<Resource> downloadByKey(String key);
 
-	ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key, Map<String, Object> payload);
+	ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key,String applicationId, Map<String, Object> payload);
 
 }

@@ -50,6 +50,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
 		String step = payload.get("step");
+        String applicationId = payload.get("applicationId");
         String fileName = payload.get("fileName");
 		String existingDocumentKey = payload.get("documentKey");
 		String existingDsp2Key = payload.get("dsp2Key"); // optional
@@ -85,7 +86,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
-		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key;
+		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key + "&applicationId="+applicationId;
 
 		// Determine if editing is allowed
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
@@ -136,7 +137,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	public ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key, Map<String, Object> payload) {
+	public ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key,String applicationId, Map<String, Object> payload) {
 		try {
 			int status = (int) payload.get("status");
 			System.out.println("status>>>>>> " + status);
@@ -174,27 +175,27 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				System.out.println(">>> documentUuid - " + documentUuid);
 
 				// 4. Build OpenKM download URL
-//				String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + documentUuid;
+				String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + documentUuid;
 
 				// 5. Update or insert into OnlyOfficeMetadata
-//				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
-//
-//				OnlyOfficeMetadata metadata;
-//				if (existingMetadataOpt.isPresent()) {
-//					metadata = existingMetadataOpt.get();
-//					metadata.setDownloadUrl(downloadUrl);
-//					metadata.setOnlyOfficeUrl(fileUrl);
-//					metadata.setUpdatedBy(1L);
-//					metadata.setUpdatedAt(LocalDateTime.now());
-//					metadata.setDocumentKey(key);
-//					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
-//				} else {
-//					metadata = OnlyOfficeMetadata.builder().applicationId(117L).documentKey(key).dsp2Key(dsp2Key)
-//							.downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl).createdBy(1L).updatedBy(1L).build();
-//					System.out.println(">>> Created new OnlyOfficeMetadata record");
-//				}
-//
-//				onlyOfficeMetadataRepository.save(metadata);
+				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
+
+				OnlyOfficeMetadata metadata;
+				if (existingMetadataOpt.isPresent()) {
+					metadata = existingMetadataOpt.get();
+					metadata.setDownloadUrl(downloadUrl);
+					metadata.setOnlyOfficeUrl(fileUrl);
+					metadata.setUpdatedBy(1L);
+					metadata.setUpdatedAt(LocalDateTime.now());
+					metadata.setDocumentKey(key);
+					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
+				} else {
+					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId)).documentKey(key).dsp2Key(dsp2Key)
+							.downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl).createdBy(1L).updatedBy(1L).build();
+					System.out.println(">>> Created new OnlyOfficeMetadata record");
+				}
+
+				onlyOfficeMetadataRepository.save(metadata);
 
 				// Clean up
 				tempFile.delete();
