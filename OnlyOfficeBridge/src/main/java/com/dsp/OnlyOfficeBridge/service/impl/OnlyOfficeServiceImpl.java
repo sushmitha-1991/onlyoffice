@@ -187,10 +187,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					metadata.setOnlyOfficeUrl(fileUrl);
 					metadata.setUpdatedBy(1L);
 					metadata.setUpdatedAt(LocalDateTime.now());
-					metadata.setDocumentKey(key);
+					metadata.setDocumentKey(documentUuid);
 					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
 				} else {
-					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId)).documentKey(key).dsp2Key(dsp2Key)
+					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId)).documentKey(documentUuid).dsp2Key(dsp2Key)
 							.downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl).createdBy(1L).updatedBy(1L).build();
 					System.out.println(">>> Created new OnlyOfficeMetadata record");
 				}
