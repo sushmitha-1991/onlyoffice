@@ -83,7 +83,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 
 		String fileType = "odt";
-		String callbackUrl = onlyOfficeUrl + "/statementwork/statementwork/callback?dsp2Key=" + dsp2Key;
+		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key;
 
 		// Determine if editing is allowed
 		boolean canEdit = !"false".equalsIgnoreCase(editFlag); // null and "true" are treated as editable
