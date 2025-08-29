@@ -5,14 +5,25 @@
  */
 package com.dsp.OnlyOfficeBridge.utils;
 
-import java.io.File;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.apache.poi.xwpf.usermodel.*;
+import org.apache.xmlbeans.XmlOptions;
+import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
+import org.jodconverter.local.LocalConverter;
+import org.jodconverter.local.office.LocalOfficeManager;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -328,5 +339,231 @@ public class Utils {
 			throw new RuntimeException("Error uploading document to OpenKM.", e);
 		}
 	}
+    public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
+                                                        Map<String, String> replacements)  {
 
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(inputResource.getByteArray());
+             XWPFDocument document = new XWPFDocument(bis)) {
+
+            // Replace in paragraphs
+            for (XWPFParagraph paragraph : document.getParagraphs()) {
+                List<XWPFRun> runs = paragraph.getRuns();
+                if (runs != null) {
+                    for (XWPFRun run : runs) {
+                        String text = run.getText(0);
+                        if (text != null) {
+                            for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                                if (text.contains(entry.getKey())) {
+                                    text = text.replace(entry.getKey(), entry.getValue());
+                                    run.setText(text, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Replace in tables also (if placeholders exist inside tables)
+            for (XWPFTable table : document.getTables()) {
+                for (XWPFTableRow row : table.getRows()) {
+                    for (XWPFTableCell cell : row.getTableCells()) {
+                        for (XWPFParagraph paragraph : cell.getParagraphs()) {
+                            List<XWPFRun> runs = paragraph.getRuns();
+                            if (runs != null) {
+                                for (XWPFRun run : runs) {
+                                    String text = run.getText(0);
+                                    if (text != null) {
+                                        for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                                            if (text.contains(entry.getKey())) {
+                                                text = text.replace(entry.getKey(), entry.getValue());
+                                                run.setText(text, 0);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Write to ByteArrayOutputStream
+            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+                document.write(bos);
+                return new ByteArrayResource(bos.toByteArray());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public ByteArrayResource getFileAsResource(String filename) throws IOException {
+        // Load file from resources/doc-template
+        Resource resource = new ClassPathResource("doc-template/" + filename);
+
+        // Convert to ByteArrayResource
+        byte[] fileBytes = Files.readAllBytes(resource.getFile().toPath());
+
+        return new ByteArrayResource(fileBytes) {
+            @Override
+            public String getFilename() {
+                return filename; // preserve filename
+            }
+        };
+    }
+    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
+
+        // Load file from resources
+        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
+
+        // Copy resource to a temp file (LibreOffice requires a real File, not just InputStream)
+        File inputFile = File.createTempFile("template", ".docx");
+        try (InputStream in = resource.getInputStream();
+             OutputStream out = new FileOutputStream(inputFile)) {
+            in.transferTo(out);
+        }
+
+        File tempFile = File.createTempFile("converted", ".fodt");
+
+        LocalOfficeManager officeManager = LocalOfficeManager.install();
+        officeManager.start();
+
+        try {
+            // Convert DOCX → FODT
+            LocalConverter.builder()
+                    .officeManager(officeManager)
+                    .build()
+                    .convert(inputFile)
+                    .to(tempFile)
+                    .as(DefaultDocumentFormatRegistry.FODT)
+                    .execute();
+
+            // Read + replace placeholders in FODT XML
+            String xml = new String(java.nio.file.Files.readAllBytes(tempFile.toPath()), StandardCharsets.UTF_8);
+
+            for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                String placeholder = "\\{" + entry.getKey() + "\\}";
+                xml = xml.replaceAll(placeholder, entry.getValue());
+            }
+
+            // Write modified FODT back
+            java.nio.file.Files.write(tempFile.toPath(), xml.getBytes(StandardCharsets.UTF_8));
+
+            // Convert FODT → DOCX into memory
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            LocalConverter.builder()
+                    .officeManager(officeManager)
+                    .build()
+                    .convert(tempFile)
+                    .to(baos)
+                    .as(DefaultDocumentFormatRegistry.DOCX)
+                    .execute();
+
+            return new ByteArrayResource(baos.toByteArray());
+
+        } finally {
+            officeManager.stop();
+            inputFile.delete(); // cleanup temp files
+            tempFile.delete();
+        }
+    }
+
+//    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
+//        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
+//
+//        try (InputStream fis = resource.getInputStream();
+//             XWPFDocument document = new XWPFDocument(fis)) {
+//
+//            for (XWPFParagraph paragraph : document.getParagraphs()) {
+//                List<XWPFRun> runs = paragraph.getRuns();
+//                if (runs != null) {
+//                    for (XWPFRun run : runs) {
+//                        String text = run.getText(0);
+//                        if (text != null) {
+//                            for (Map.Entry<String, String> entry : replacements.entrySet()) {
+//                                if (text.contains(entry.getKey())) {
+//                                    text = text.replace(entry.getKey(), entry.getValue());
+//                                    run.setText(text, 0);
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//
+//            // Return as ByteArrayResource
+//            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+//                document.write(bos);
+//                return new ByteArrayResource(bos.toByteArray());
+//            }
+//        }
+//    }
+
+    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
+        try (XWPFDocument mergedDoc = new XWPFDocument()) {
+            boolean first = true;
+
+            for (int i = 0; i < docxFiles.size(); i++) {
+                byte[] fileBytes = docxFiles.get(i);
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
+                     XWPFDocument doc = new XWPFDocument(bais)) {
+
+                    CTBody srcBody = doc.getDocument().getBody();
+                    CTBody destBody = mergedDoc.getDocument().getBody();
+
+                    // Strip <w:sectPr> from all but the last document
+                    CTBody cleaned = (i == docxFiles.size() - 1)
+                            ? srcBody
+                            : removeSectPr(srcBody);
+
+                    if (first) {
+                        destBody.set(cleaned);
+                        first = false;
+                    } else {
+                        appendBody(destBody, cleaned);
+                    }
+                }
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            mergedDoc.write(baos);
+            return baos.toByteArray();
+        }
+    }
+
+    /**
+     * Remove trailing <w:sectPr> which causes page breaks.
+     */
+    private static CTBody removeSectPr(CTBody body) throws Exception {
+        String xml = body.xmlText();
+        // Drop section properties
+        xml = xml.replaceAll("(?s)<w:sectPr.*?</w:sectPr>", "");
+        return CTBody.Factory.parse(xml);
+    }
+
+    /**
+     * Append one document body into another.
+     */
+    private static void appendBody(CTBody src, CTBody append) throws Exception {
+        XmlOptions optionsOuter = new XmlOptions();
+        optionsOuter.setSaveOuter();
+        String appendString = append.xmlText(optionsOuter);
+
+        String srcString = src.xmlText();
+        String prefix = srcString.substring(0, srcString.indexOf(">") + 1);
+        String mainPart = srcString.substring(srcString.indexOf(">") + 1, srcString.lastIndexOf("<"));
+        String suffix = srcString.substring(srcString.lastIndexOf("<"));
+
+        String addPart = appendString.substring(appendString.indexOf(">") + 1, appendString.lastIndexOf("<"));
+
+        CTBody newBody = CTBody.Factory.parse(prefix + mainPart + addPart + suffix);
+        src.set(newBody);
+    }
+    public String getTokenFromRequest() {
+        String authorizationHeader = httpRequest.getHeader("Authorization");
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            return authorizationHeader.substring(7);
+        }
+        return null;
+    }
 }

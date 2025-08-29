@@ -5,16 +5,18 @@
  */
 package com.dsp.OnlyOfficeBridge.service.impl;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
+import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
+import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
+import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -32,6 +34,9 @@ import com.dsp.OnlyOfficeBridge.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.List;
 /**
  * 
  */
@@ -46,6 +51,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
 	private Utils utils;
+    @Autowired
+    DocTemplateRepository docTemplateRepository;
+    @Autowired
+    ThirdPartyDocGen thirdPartyDocGen;
 
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
@@ -58,11 +67,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
         String emptyFlg =  payload.get("empty");
         String fileType = fileName.split("\\.")[1];
         System.out.println("fileType>>> " + fileType);
+        String templateId = payload.get("templateId")==null?"0":payload.get("templateId");
 		boolean isInitStep = "INIT".equalsIgnoreCase(step);
 		String keyToUse;
 		String downloadUrl;
 		String title;
-		String dsp2Key = (existingDsp2Key != null) ? existingDsp2Key : UUID.randomUUID().toString();
+        String dsp2Key = UUID.randomUUID().toString();
+        if(existingDsp2Key!=null)
+        {
+            dsp2Key = existingDsp2Key;
+            templateId ="0" ;
+        }
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
@@ -77,7 +92,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             }
             else
             {
-                downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key;
+                downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId;
             }
 
 
@@ -118,18 +133,205 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	public ResponseEntity<Resource> downloadByKey(String key) {
-		Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
-		if (metadataOpt.isPresent()) {
-			String latestUuid = extractUuidFromUrl(metadataOpt.get().getDownloadUrl());
-			ByteArrayResource resource = utils.downloadFileFromUUID(UUID.fromString(latestUuid));
-			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
-					.contentLength(resource.contentLength()).body(resource);
-		}
-		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-	}
+    public ResponseEntity<Resource> downloadByKey(String key,String templateId,String refId) {
+        String[] keys = key.split(",");
 
+        try {
+            if(Integer.parseInt(templateId)>0)
+            {
+                List<DocTemplate> docTemplates = docTemplateRepository.findByIdOrChieldIdOrderBySeq(Long.valueOf(templateId),Long.parseLong(templateId));
+                if(templateId.equals("1"))
+                {
+                    return thirdPartyDocGen.genBulletin2Generation(docTemplates,refId);
+                }
+            }
+            else
+            {
+                Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
+                if (metadataOpt.isPresent()) {
+                    ByteArrayResource resource = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
+                            .contentLength(resource.contentLength())
+                            .body(resource);
+                }
+            }
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
+        XWPFDocument mergedDoc = new XWPFDocument();
+        boolean firstFile = true;
+
+        for (byte[] fileBytes : docxFiles) {
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
+                 XWPFDocument doc = new XWPFDocument(bais)) {
+
+                // Add page break before each file except the first
+                if (!firstFile) {
+                    XWPFParagraph breakPara = mergedDoc.createParagraph();
+                    breakPara.setPageBreak(true);
+                    mergedDoc.createParagraph(); // add empty paragraph for safety
+                }
+                firstFile = false;
+
+                // Copy paragraphs with formatting
+                for (XWPFParagraph p : doc.getParagraphs()) {
+                    XWPFParagraph newPara = mergedDoc.createParagraph();
+                    newPara.setAlignment(p.getAlignment());
+                    newPara.setSpacingAfter(p.getSpacingAfter());
+                    newPara.setSpacingBefore(p.getSpacingBefore());
+                    newPara.setStyle(p.getStyle());
+
+                    for (XWPFRun run : p.getRuns()) {
+                        XWPFRun newRun = newPara.createRun();
+
+                        // Copy all text fragments safely
+                        int textCount = run.getCTR().sizeOfTArray();
+                        StringBuilder fullText = new StringBuilder();
+                        for (int i = 0; i < textCount; i++) {
+                            String text = run.getText(i);
+                            if (text != null) {
+                                fullText.append(text);
+                            }
+                        }
+                        newRun.setText(fullText.toString());
+
+                        // Copy formatting
+                        newRun.setBold(run.isBold());
+                        newRun.setItalic(run.isItalic());
+                        newRun.setUnderline(run.getUnderline());
+                        newRun.setColor(run.getColor());
+                        newRun.setFontFamily(run.getFontFamily());
+                        newRun.setFontSize(run.getFontSize());
+
+                        if (run.getCTR().isSetRPr()) {
+                            newRun.getCTR().setRPr(run.getCTR().getRPr());
+                        }
+                    }
+
+                }
+
+                // Copy tables
+                for (XWPFTable table : doc.getTables()) {
+                    XWPFTable newTable = mergedDoc.createTable();
+                    newTable.getCTTbl().set(table.getCTTbl().copy());
+                }
+            }
+        }
+
+        // Write to byte[]
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        mergedDoc.write(baos);
+        return baos.toByteArray();
+    }
+
+    //    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
+//        if (docxFiles.isEmpty()) {
+//            throw new IllegalArgumentException("No files provided for merging");
+//        }
+//
+//        // Load the first document as the base
+//        WordprocessingMLPackage target = WordprocessingMLPackage.load(new ByteArrayInputStream(docxFiles.get(0)));
+//        MainDocumentPart targetPart = target.getMainDocumentPart();
+//
+//        // Append all remaining documents
+//        for (int i = 1; i < docxFiles.size(); i++) {
+//            WordprocessingMLPackage srcPkg = WordprocessingMLPackage.load(new ByteArrayInputStream(docxFiles.get(i)));
+//            MainDocumentPart srcPart = srcPkg.getMainDocumentPart();
+//
+//            targetPart.getContent().addAll(srcPart.getContent());
+//        }
+//
+//        // Save the merged DOCX
+//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        SaveToZipFile saver = new SaveToZipFile(target);
+//        saver.save(baos);
+//
+//        return baos.toByteArray(); // ✅ this is a .docx byte[]
+//    }
+//    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws IOException {
+//        try (XWPFDocument mergedDoc = new XWPFDocument()) {
+//            for (byte[] docxFile : docxFiles) {
+//                try (XWPFDocument srcDoc = new XWPFDocument(new ByteArrayInputStream(docxFile))) {
+//                    srcDoc.getParagraphs().forEach(p -> mergedDoc.createParagraph().createRun().setText(p.getText()));
+//                    srcDoc.getTables().forEach(t -> mergedDoc.createTable().getCTTbl().set(t.getCTTbl()));
+//                }
+//            }
+//
+//            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+//                mergedDoc.write(baos);
+//                return baos.toByteArray();
+//            }
+//        }
+//    }
+//	public ResponseEntity<Resource> downloadByKey(String key) {
+//		Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
+//		if (metadataOpt.isPresent()) {
+//			ByteArrayResource resource = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
+//					.contentLength(resource.contentLength()).body(resource);
+//		}
+//		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+//	}
+    public ResponseEntity<Resource> downloadByKey1(String key) {
+        try {
+            // Split multiple keys by comma
+            String[] keys = key.split(",");
+            List<XWPFDocument> documents = new ArrayList<>();
+
+            for (String singleKey : keys) {
+                Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(singleKey.trim());
+                if (metadataOpt.isPresent()) {
+                    ByteArrayResource resource = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+                    try (InputStream is = new ByteArrayInputStream(resource.getByteArray())) {
+                        XWPFDocument doc = new XWPFDocument(is);
+                        documents.add(doc);
+                    }
+                }
+            }
+
+            if (documents.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+
+            // Merge documents
+            XWPFDocument mergedDoc = new XWPFDocument();
+            for (XWPFDocument doc : documents) {
+                doc.getDocument().getBody().getTblArray(); // Force load
+                doc.getDocument().getBody().getPArray();   // Force load
+                mergedDoc.createParagraph(); // Page break between docs if needed
+                mergedDoc.getDocument().getBody().addNewSectPr(); // section break
+                mergedDoc.getDocument().getBody().addNewP().set( doc.getDocument().getBody().getPArray(0) );
+               // mergedDoc.getDocument().getBody().addNewTbl().set( doc.getDocument().getBody().getTblArray(0) );
+            }
+
+            // Save merged doc to byte[]
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            mergedDoc.write(baos);
+
+            ByteArrayResource mergedResource = new ByteArrayResource(baos.toByteArray());
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+                    .contentLength(mergedResource.contentLength())
+                    .body(mergedResource);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
 
 	private String extractUuidFromUrl(String url) {

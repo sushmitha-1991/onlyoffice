@@ -6,11 +6,16 @@
 package com.dsp.OnlyOfficeBridge.controller;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
+import com.dsp.OnlyOfficeBridge.utils.LibreOfficeDocxReplacer;
+import com.dsp.OnlyOfficeBridge.utils.Utils;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -42,9 +47,9 @@ public class OnlyOfficeController {
 	}
 
 //	309610fc-dd27-4668-8920-2bf2a154fc01
-	@GetMapping("/download/{key}")
-	public ResponseEntity<Resource> downloadByKey(@PathVariable String key) {
-		return onlyOfficeService.downloadByKey(key);
+	@GetMapping("/download/{key}/{templateId}/{refId}")
+	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId) {
+		return onlyOfficeService.downloadByKey(key,templateId,refId);
 	}
 
 	@PostMapping("/callback")
@@ -74,6 +79,31 @@ public class OnlyOfficeController {
     }
 
 
+    @GetMapping("/download-empty-test/test")
+    public ResponseEntity<byte[]> downloadEmptyDocxTest() throws Exception {
+        // Create an empty DOCX document
+        Map<String, String> replacements = Map.of(
+                "range", "2024-25",
+                "date", "29-08-2025",
+                "myno", "123",
+                "branch", "Research Branch",
+                "subject", "Parliamentary Updates",
+                "contain", "This is the dynamic content inserted into the template."
+        );
 
+        ByteArrayResource result = LibreOfficeDocxReplacer.replaceWithLibreOffice
+                ("/doc-template/header.docx", replacements);
+        ByteArrayResource result1 = LibreOfficeDocxReplacer.replaceWithLibreOffice
+                ("/doc-template/contain.docx", replacements);
+        ByteArrayResource result2 = LibreOfficeDocxReplacer.replaceWithLibreOffice
+                ("/doc-template/footer.docx", replacements);
+        byte[] bb = Utils.mergeDocxFiles(List.of(result.getByteArray(),result1.getByteArray(),result2.getByteArray()));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=generated.docx")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(bb.length)
+                .body(bb);
+    }
 
 }
