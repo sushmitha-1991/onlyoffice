@@ -18,8 +18,10 @@ import org.apache.xmlbeans.XmlOptions;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 //import org.jodconverter.local.LocalConverter;
 //import org.jodconverter.local.office.LocalOfficeManager;
-import org.jodconverter.remote.RemoteConverter;
-import org.jodconverter.remote.office.RemoteOfficeManager;
+import org.jodconverter.local.LocalConverter;
+import org.jodconverter.local.office.LocalOfficeManager;
+//import org.jodconverter.remote.RemoteConverter;
+//import org.jodconverter.remote.office.RemoteOfficeManager;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -427,19 +429,19 @@ public class Utils {
 
         File tempFile = File.createTempFile("converted", ".fodt");
 
-//        LocalOfficeManager officeManager = LocalOfficeManager.install();
-//        officeManager.start();
-        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
-                // If your LibreOffice server runs in socket mode:
-                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
-
-                // If your LibreOffice server exposes REST API:
-                .urlConnection("http://10.247.128.22:2002")
-                .build();
+        LocalOfficeManager officeManager = LocalOfficeManager.install();
+        officeManager.start();
+//        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
+//                // If your LibreOffice server runs in socket mode:
+//                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
+//
+//                // If your LibreOffice server exposes REST API:
+//                .urlConnection("http://10.247.128.22:2002")
+//                .build();
 
         try {
             // Convert DOCX → FODT
-            RemoteConverter.builder()
+            LocalConverter.builder()
                     .officeManager(officeManager)
                     .build()
                     .convert(inputFile)
@@ -460,7 +462,7 @@ public class Utils {
 
             // Convert FODT → DOCX into memory
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            RemoteConverter.builder()
+            LocalConverter.builder()
                     .officeManager(officeManager)
                     .build()
                     .convert(tempFile)

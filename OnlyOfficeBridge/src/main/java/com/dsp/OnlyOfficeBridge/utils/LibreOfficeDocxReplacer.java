@@ -6,8 +6,10 @@ import org.jodconverter.core.DocumentConverter;
 import org.jodconverter.core.office.OfficeManager;
 //import org.jodconverter.local.LocalConverter;
 //import org.jodconverter.local.office.LocalOfficeManager;
-import org.jodconverter.remote.RemoteConverter;
-import org.jodconverter.remote.office.RemoteOfficeManager;
+import org.jodconverter.local.LocalConverter;
+import org.jodconverter.local.office.LocalOfficeManager;
+//import org.jodconverter.remote.RemoteConverter;
+//import org.jodconverter.remote.office.RemoteOfficeManager;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 
@@ -24,16 +26,16 @@ public class LibreOfficeDocxReplacer {
         File tempFile = File.createTempFile("converted", ".fodt"); // Flat ODT
 
         // Start LibreOffice
-//        OfficeManager officeManager = LocalOfficeManager.install();
-        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
-                // If your LibreOffice server runs in socket mode:
-                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
-
-                // If your LibreOffice server exposes REST API:
-                .urlConnection("http://10.247.128.22:2002:8080")
-                .build();
-
-        officeManager.start();
+        OfficeManager officeManager = LocalOfficeManager.install();
+//        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
+//                // If your LibreOffice server runs in socket mode:
+//                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
+//
+//                // If your LibreOffice server exposes REST API:
+//                .urlConnection("http://10.247.128.22:2002:8080")
+//                .build();
+//
+//        officeManager.start();
 
         try {
             // Step 1: Convert DOCX → FODT
@@ -41,7 +43,7 @@ public class LibreOfficeDocxReplacer {
 //                    .convert(inputFile)
 //                    .to(tempFile)
 //                    .execute();
-            RemoteConverter.make(officeManager)
+            LocalConverter.make(officeManager)
                     .convert(inputFile)
                     .to(tempFile)
                     .execute();
@@ -56,7 +58,7 @@ public class LibreOfficeDocxReplacer {
 
             // Step 3: Convert FODT → DOCX
             File outputFile = File.createTempFile("generated-libre", ".docx");
-            RemoteConverter.make(officeManager)
+            LocalConverter.make(officeManager)
                     .convert(tempFile)
                     .to(outputFile)
                     .execute();
@@ -67,7 +69,7 @@ public class LibreOfficeDocxReplacer {
             Files.writeString(tempFile.toPath(), content1);
 
             // Step 3: Convert FODT → DOCX
-            RemoteConverter.make(officeManager)
+            LocalConverter.make(officeManager)
                     .convert(tempFile)
                     .to(outputFile)
                     .execute();
