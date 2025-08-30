@@ -72,11 +72,15 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		String keyToUse;
 		String downloadUrl;
 		String title;
-        String dsp2Key = UUID.randomUUID().toString();
+        String dsp2Key;
         if(existingDsp2Key!=null)
         {
             dsp2Key = existingDsp2Key;
             templateId ="0" ;
+        }
+        else
+        {
+            dsp2Key = UUID.randomUUID().toString();
         }
 
 		if (isInitStep) {
@@ -92,7 +96,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             }
             else
             {
-                downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId;
+                String refId = payload.get("refId")==null ? "0":payload.get("refId");
+                downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId + "/" + refId;
             }
 
 
