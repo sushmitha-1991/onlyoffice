@@ -36,11 +36,11 @@ public class ThirdPartyDocGen {
         System.out.println("url>>>>>>>" + url);
         String token = utils.getTokenFromRequest();
         Map<String,Object> body;
-        if (token == null) {
-            throw new IllegalStateException("Authorization token is missing");
-        }
+//        if (token == null) {
+//            throw new IllegalStateException("Authorization token is missing");
+//        }
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
+//        headers.set("Authorization", "Bearer " + token);
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         HttpEntity<Void> entity = new HttpEntity<>( headers);
 
