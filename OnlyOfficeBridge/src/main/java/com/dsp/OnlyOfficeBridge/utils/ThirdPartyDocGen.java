@@ -4,6 +4,8 @@ import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import org.apache.poi.xwpf.usermodel.*;
+import org.apache.xmlbeans.XmlCursor;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -60,7 +62,7 @@ public class ThirdPartyDocGen {
             if(docTemplate.getCode().equals("bull2_gen_header")) {
                 Map<String,String> map = new HashMap<>();
                 Map<String,Object> data = (Map<String, Object>) body.get("data");
-                map.put("range",(Integer)data.get("startNum") + (Integer) data.get("endNum") + "");
+                map.put("range",(Integer)data.get("startNum") + " - "  + (Integer) data.get("endNum"));
                 map.put("date",(String)data.get("forDate") + "/" + (String)data.get("forDateSaka"));
                 try {
                     ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -127,18 +129,10 @@ public class ThirdPartyDocGen {
             try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
                  XWPFDocument doc = new XWPFDocument(bais)) {
 
-                // Copy body elements in order (paragraphs, tables, etc.)
-                for (IBodyElement element : doc.getBodyElements()) {
-                    if (element instanceof XWPFParagraph) {
-                        XWPFParagraph p = (XWPFParagraph) element;
-                        XWPFParagraph newPara = mergedDoc.createParagraph();
-                        newPara.getCTP().set(p.getCTP().copy()); // deep copy
-                    } else if (element instanceof XWPFTable) {
-                        XWPFTable table = (XWPFTable) element;
-                        XWPFTable newTable = mergedDoc.createTable();
-                        newTable.getCTTbl().set(table.getCTTbl().copy()); // deep copy
-                    }
-                }
+                CTBody srcBody = doc.getDocument().getBody();
+                CTBody destBody = mergedDoc.getDocument().getBody();
+
+                appendBody(destBody, srcBody);
             }
         }
 
@@ -147,5 +141,13 @@ public class ThirdPartyDocGen {
             return baos.toByteArray();
         }
     }
+
+    private static void appendBody(CTBody dest, CTBody src) throws Exception {
+        XmlCursor cursor = dest.newCursor();
+        cursor.toEndToken(); // move to end
+        src.newCursor().copyXml(cursor); // append source body elements
+        cursor.dispose();
+    }
+
 
 }

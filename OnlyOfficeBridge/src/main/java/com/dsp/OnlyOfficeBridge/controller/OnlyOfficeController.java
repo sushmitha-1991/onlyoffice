@@ -6,7 +6,6 @@
 package com.dsp.OnlyOfficeBridge.controller;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -92,11 +91,11 @@ public class OnlyOfficeController {
         );
 
         ByteArrayResource result = LibreOfficeDocxReplacer.replaceWithLibreOffice
-                ("/doc-template/header.docx", replacements);
+                ("/doc-template/bck/header.docx", replacements);
         ByteArrayResource result1 = LibreOfficeDocxReplacer.replaceWithLibreOffice
-                ("/doc-template/contain.docx", replacements);
+                ("/doc-template/bck/contain.docx", replacements);
         ByteArrayResource result2 = LibreOfficeDocxReplacer.replaceWithLibreOffice
-                ("/doc-template/footer.docx", replacements);
+                ("/doc-template/bck/footer.docx", replacements);
         byte[] bb = Utils.mergeDocxFiles(List.of(result.getByteArray(),result1.getByteArray(),result2.getByteArray()));
 
         return ResponseEntity.ok()
