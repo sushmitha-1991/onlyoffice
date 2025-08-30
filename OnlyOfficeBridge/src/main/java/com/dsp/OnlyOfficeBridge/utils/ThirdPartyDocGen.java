@@ -34,13 +34,13 @@ public class ThirdPartyDocGen {
     {
         String url = bulletin2Url + "/get-generate-doc/"+refId;
         System.out.println("url>>>>>>>" + url);
-        String token = utils.getTokenFromRequest();
+        String token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjEiLCJob3VzZUlkIjoyLCJob3VzZUFiYnIiOiJMUyIsImlwIjoiMTAuMjYuMTA1LjEyMCIsImlhdCI6MTc1NjQ3MTYwMiwiZXhwIjoxNzU2NTU4MDAyfQ.N8HYGAuhyPIm5hwyvMRuF5WmU6r3zaunJ0-i0nAU4wkfKU4BbEJag5VpaC6TYX0ljvf-RKN15t-XC-_31PXg-AsQESEizq-GM6ddaCmTcCjvIyQaDgEEYph0eh_netJ3u16If82nU-8-R1tJlTZUTw2vJ2A0i9UrSPyA00W_REEGc5UkBWaeYoo2hN8PD9C758khnTQlEGvfrmLUt51danF5AUA7MaS140hgSsAr-BURcORwFMpgvGjWj1nQ9isx1mWPnDwS8t6p6neo8dgwT6GEL2VxAmumJJRcBTArSQv6KYidujQEW1SGmmF-ruSSvjDf5LCJQIK7R16FQsmPNg";//utils.getTokenFromRequest();
         Map<String,Object> body;
 //        if (token == null) {
 //            throw new IllegalStateException("Authorization token is missing");
 //        }
         HttpHeaders headers = new HttpHeaders();
-//        headers.set("Authorization", "Bearer " + token);
+        headers.set("Authorization", "Bearer " + token);
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         HttpEntity<Void> entity = new HttpEntity<>( headers);
 
