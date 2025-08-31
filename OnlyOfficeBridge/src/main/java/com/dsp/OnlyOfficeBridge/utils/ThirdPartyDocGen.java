@@ -34,7 +34,7 @@ public class ThirdPartyDocGen {
     {
         String url = bulletin2Url + "/get-generate-doc/"+refId;
         System.out.println("url>>>>>>>" + url);
-        String token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjEiLCJob3VzZUlkIjoyLCJob3VzZUFiYnIiOiJMUyIsImlwIjoiMTAuMjYuMTA1LjEyMCIsImlhdCI6MTc1NjU1NzUyOSwiZXhwIjoxNzU2NjQzOTI5fQ.JiynfK3GRWtOIHVIb4CQ4ZlpIKoMwWwtgK1MPXHLm-RPLcS42hk_J6fC6emopVd7qQLKjvmrqEXwNgfDrBEMOVI4JXfiWxNjI9UN7FrCdYtvG5mdw3dpsBrwYGfnyxYrWDe3bARcVq0EXzuinlLJoFVaqY27ICqTL8JqUs-aa2VwlfUCbE9SQN1u6u7UYhXaHgM1AsBx3DnwZgNzAsZfccZyFP8huOnnR7vrcx6L013sGplvzCZNtf7mskck3noPrGA6wR7BOP2r9sqEGRcGECrKAnZ22tv2ElNMZY7iD0O_fPVkx9S3zF2qp8csBofbqPkJO71UBlNHOqJhLlYW1A";//utils.getTokenFromRequest();
+        String token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjEiLCJob3VzZUlkIjoyLCJob3VzZUFiYnIiOiJMUyIsImlwIjoiMTAuMjYuMTA1LjEyMCIsImlhdCI6MTc1NjY0MzY4MywiZXhwIjoxNzU2NzMwMDgzfQ.cU-sLJg-2_zid9TnJX6LkUsvFPoYcq5-LFawhtGKwNZ6NWZllIuo2VTtpzpw-y_MEzbPy_YzzVKvHtW3j9RjiLku6z5iIyLeBlICFtBfiCqxTKhcYSvw72gGdGqw3xxHwqg6JD3RluZ9xZOyAeeSX6zTcfQFaqLP8knuDy4313Yt1kx9v89dhh1qBYQpqCirVGloRy35iQePOr3YTu1jh1Q5-fjVFMGWk3UYt0WLlzPnkTha0Da1vrPRO3tmfeUtTJfi10Mz4YoTCJbbzP_gLM-PK25IqL1vP34JZbIN8fyCtmtfXDO_Zyl9GJIeNFfeIFWonsuy-f8kXW15gdSsDA";//utils.getTokenFromRequest();
         Map<String,Object> body;
 //        if (token == null) {
 //            throw new IllegalStateException("Authorization token is missing");
