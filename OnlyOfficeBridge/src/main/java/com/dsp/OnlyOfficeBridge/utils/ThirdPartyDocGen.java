@@ -81,10 +81,14 @@ public class ThirdPartyDocGen {
                     map1.put("myno", String.valueOf((Integer)map.get("bulletinNo")));
                     map1.put("branch",  (String)map.get("officeName"));
                     map1.put("subject",  (String)map.get("subject"));
-
+                    Map<String,String> mapLine = new HashMap<>();
                     ByteArrayResource resource = null;
+                    ByteArrayResource resourceLine = null;
                     try {
                         resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+                        resourceLine = Utils.replacePlaceholders("line.docx", mapLine);
+
+
                     } catch (Exception e) {
 //                        e.printStackTrace();
                         throw new RuntimeException(e);
@@ -93,9 +97,11 @@ public class ThirdPartyDocGen {
                     Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String)map.get("documentKey"));
                     ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
                     files.add(resourceBody.getByteArray());
+                    files.add(resourceLine.getByteArray());
                 });
 
             }
+
             else {
                 ByteArrayResource resource = null ;
                 try {
