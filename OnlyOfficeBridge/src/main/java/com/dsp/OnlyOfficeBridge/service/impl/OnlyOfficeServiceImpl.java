@@ -149,6 +149,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 {
                     return thirdPartyDocGen.genBulletin2Generation(docTemplates,refId);
                 }
+                if(templateId.equals("4"))
+                {
+                    return thirdPartyDocGen.genLobGeneration(docTemplates,refId);
+                }
             }
             else
             {

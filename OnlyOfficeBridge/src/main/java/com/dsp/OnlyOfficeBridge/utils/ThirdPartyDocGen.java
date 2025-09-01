@@ -30,15 +30,18 @@ public class ThirdPartyDocGen {
 //    RestTemplate restTemplate;
     @Value("${bulletin2.service.url}")
     private String bulletin2Url;
+    @Value("${lob.service.url}")
+    private String lobUrl;
+    @Value("${admin.token}")
+    String token;
     public ResponseEntity<Resource> genBulletin2Generation(List<DocTemplate> docTemplates, String refId)
     {
         String url = bulletin2Url + "/get-generate-doc/"+refId;
         System.out.println("url>>>>>>>" + url);
-        String token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjEiLCJob3VzZUlkIjoyLCJob3VzZUFiYnIiOiJMUyIsImlwIjoiMTAuMjYuMTA1LjEyMCIsImlhdCI6MTc1NjY0MzY4MywiZXhwIjoxNzU2NzMwMDgzfQ.cU-sLJg-2_zid9TnJX6LkUsvFPoYcq5-LFawhtGKwNZ6NWZllIuo2VTtpzpw-y_MEzbPy_YzzVKvHtW3j9RjiLku6z5iIyLeBlICFtBfiCqxTKhcYSvw72gGdGqw3xxHwqg6JD3RluZ9xZOyAeeSX6zTcfQFaqLP8knuDy4313Yt1kx9v89dhh1qBYQpqCirVGloRy35iQePOr3YTu1jh1Q5-fjVFMGWk3UYt0WLlzPnkTha0Da1vrPRO3tmfeUtTJfi10Mz4YoTCJbbzP_gLM-PK25IqL1vP34JZbIN8fyCtmtfXDO_Zyl9GJIeNFfeIFWonsuy-f8kXW15gdSsDA";//utils.getTokenFromRequest();
         Map<String,Object> body;
-//        if (token == null) {
-//            throw new IllegalStateException("Authorization token is missing");
-//        }
+        if (token == null) {
+            throw new IllegalStateException("Authorization token is missing");
+        }
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
@@ -98,6 +101,101 @@ public class ThirdPartyDocGen {
                     ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
                     files.add(resourceBody.getByteArray());
                     files.add(resourceLine.getByteArray());
+                });
+
+            }
+
+            else {
+                ByteArrayResource resource = null ;
+                try {
+                    Map map = new HashMap();
+                    resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                files.add(resource.getByteArray());
+            }
+        });
+        try {
+            byte[] mergedBytes = mergeDocxFiles(files);
+            ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+                    .contentLength(mergedResource.contentLength())
+                    .body(mergedResource);
+        } catch (Exception e) {
+
+        }
+        return null;
+    }
+    public ResponseEntity<Resource> genLobGeneration(List<DocTemplate> docTemplates, String refId)
+    {
+        String url = lobUrl + "/lob/generate-doc-id/"+refId;
+        System.out.println("url>>>>>>>" + url +" ==== " + token);
+        Map<String,Object> body;
+        if (token == null) {
+            throw new IllegalStateException("Authorization token is missing");
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        HttpEntity<Void> entity = new HttpEntity<>( headers);
+
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            body = response.getBody();
+            System.out.println(body);
+        } catch (Exception e) {
+            System.err.println("Error during API call: " + e.getMessage());
+            throw e;
+        }
+
+        List<byte[]> files = new LinkedList<>();
+
+        docTemplates.forEach(docTemplate -> {
+            System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+
+            if(docTemplate.getCode().equals("lob_gen_header")) {
+                Map<String,String> map = new HashMap<>();
+                Map<String,Object> data = (Map<String, Object>) body.get("data");
+                map.put("date",(String)data.get("forDate") + "/" + (String)data.get("forDateSaka"));
+                try {
+                    ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+
+                    files.add(resource.getByteArray());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+            else if (docTemplate.getCode().equals("lob_gen_con")) {
+                Map<String,Object> data = (Map<String, Object>) body.get("data");
+                List<Map> inputList = (List<Map>)data.get("inputList");
+                inputList.forEach(map -> {
+                    Map<String,String> map1 = new HashMap<>();
+                    if(map.get("dsp2Key")!=null) {
+                        map1.put("subject", String.valueOf(map.get("subjectStr")));
+
+                        Map<String, String> mapLine = new HashMap<>();
+                        ByteArrayResource resource = null;
+                        ByteArrayResource resourceLine = null;
+                        try {
+                            resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+                            resourceLine = Utils.replacePlaceholders("line.docx", mapLine);
+
+                        } catch (Exception e) {
+//                        e.printStackTrace();
+                            throw new RuntimeException(e);
+                        }
+                        files.add(resource.getByteArray());
+                        Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String) map.get("dsp2Key"));
+                        ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+                        files.add(resourceBody.getByteArray());
+                        files.add(resourceLine.getByteArray());
+                    }
                 });
 
             }
