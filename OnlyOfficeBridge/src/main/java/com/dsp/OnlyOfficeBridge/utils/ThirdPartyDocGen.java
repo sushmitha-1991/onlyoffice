@@ -97,7 +97,7 @@ public class ThirdPartyDocGen {
                         throw new RuntimeException(e);
                     }
                     files.add(resource.getByteArray());
-                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String)map.get("documentKey"));
+                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String)map.get("dsp2Key"));
                     ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
                     files.add(resourceBody.getByteArray());
                     files.add(resourceLine.getByteArray());
