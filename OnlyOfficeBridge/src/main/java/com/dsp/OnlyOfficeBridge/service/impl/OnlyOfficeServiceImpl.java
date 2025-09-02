@@ -48,6 +48,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
+    @Value("${bulletin2.gen.template.id}")
+    String bulletin2TemplateId;
+    @Value("${lob.gen.template.id}")
+    String lobTemplateId;
 
 	@Autowired
 	private Utils utils;
@@ -145,11 +149,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             if(Integer.parseInt(templateId)>0)
             {
                 List<DocTemplate> docTemplates = docTemplateRepository.findByIdOrChieldIdOrderBySeq(Long.valueOf(templateId),Long.parseLong(templateId));
-                if(templateId.equals("1"))
+                if(templateId.equals(bulletin2TemplateId))
                 {
                     return thirdPartyDocGen.genBulletin2Generation(docTemplates,refId);
                 }
-                if(templateId.equals("4"))
+                if(templateId.equals(lobTemplateId))
                 {
                     return thirdPartyDocGen.genLobGeneration(docTemplates,refId);
                 }
