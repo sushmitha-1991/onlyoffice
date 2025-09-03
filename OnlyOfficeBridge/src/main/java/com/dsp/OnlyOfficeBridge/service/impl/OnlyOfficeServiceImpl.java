@@ -52,7 +52,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
     String bulletin2TemplateId;
     @Value("${lob.gen.template.id}")
     String lobTemplateId;
-
+    @Value("${download.url}")
+    String downloadKmUrl;
 	@Autowired
 	private Utils utils;
     @Autowired
@@ -390,7 +391,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				System.out.println(">>> documentUuid - " + documentUuid);
 
 				// 4. Build OpenKM download URL
-				String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + documentUuid;
+				String downloadUrl = downloadKmUrl + documentUuid;
 
 				// 5. Update or insert into OnlyOfficeMetadata
 				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
