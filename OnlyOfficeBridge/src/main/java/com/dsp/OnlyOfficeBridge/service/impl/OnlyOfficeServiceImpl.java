@@ -377,7 +377,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				String documentName = key + ".docx";
 
 				// 2. Upload to OpenKM
-				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
+				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231", "51303",
 						"ApplicationInstance", "1");
 
 				System.out.println(">>> Download completed" + openKmResponse);
