@@ -3,6 +3,9 @@ package com.dsp.OnlyOfficeBridge.utils;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlCursor;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
@@ -14,12 +17,13 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+@Slf4j
 @Component
 public class ThirdPartyDocGen {
     @Autowired
@@ -34,7 +38,9 @@ public class ThirdPartyDocGen {
     private String lobUrl;
     @Value("${admin.token}")
     String token;
-    public ResponseEntity<Resource> genBulletin2Generation(List<DocTemplate> docTemplates, String refId)
+    @Value("${download.url}")
+    String downloadKmUrl;
+    public ResponseEntity<Resource> genBulletin2Generation(String dsp2Key,List<DocTemplate> docTemplates, String refId)
     {
         String url = bulletin2Url + "/get-generate-doc/"+refId;
         System.out.println("url>>>>>>>" + url);
@@ -119,18 +125,18 @@ public class ThirdPartyDocGen {
         try {
             byte[] mergedBytes = mergeDocxFiles(files);
             ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-
+            saveOpenKm(dsp2Key,mergedResource);
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
                     .contentLength(mergedResource.contentLength())
                     .body(mergedResource);
         } catch (Exception e) {
-
+            log.info(e.getMessage());
         }
         return null;
     }
-    public ResponseEntity<Resource> genLobGeneration(List<DocTemplate> docTemplates, String refId)
+    public ResponseEntity<Resource> genLobGeneration(String dsp2Key,List<DocTemplate> docTemplates, String refId)
     {
         String url = lobUrl + "/lob/generate-doc-id/"+refId;
         System.out.println("url>>>>>>>" + url +" ==== " + token);
@@ -214,7 +220,7 @@ public class ThirdPartyDocGen {
         try {
             byte[] mergedBytes = mergeDocxFiles(files);
             ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-
+            saveOpenKm(dsp2Key,mergedResource);
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
@@ -252,6 +258,62 @@ public class ThirdPartyDocGen {
         src.newCursor().copyXml(cursor); // append source body elements
         cursor.dispose();
     }
+    public void saveOpenKm(String dsp2Key,ByteArrayResource resource)
+    {
+        try{
+            File tempFile = File.createTempFile("edited-doc", ".docx");
 
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                fos.write(resource.getByteArray());
+            }
+            System.out.println(">>> Calling Upload to OpenKm");
+            String documentName = dsp2Key + ".docx";
+
+            // 2. Upload to OpenKM
+            String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
+                    "ApplicationInstance", "1");
+
+            System.out.println(">>> Download completed" + openKmResponse);
+
+            // 3. Parse OpenKM response
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(openKmResponse);
+            JsonNode dataNode = rootNode.path("data");
+            String documentUuid = dataNode.path("documentUuid").asText();
+
+            System.out.println(">>> documentUuid - " + documentUuid);
+
+            // 4. Build OpenKM download URL
+            String downloadUrl = downloadKmUrl + documentUuid;
+
+            // 5. Update or insert into OnlyOfficeMetadata
+            Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
+
+            OnlyOfficeMetadata metadata;
+            if (existingMetadataOpt.isPresent()) {
+                metadata = existingMetadataOpt.get();
+                metadata.setDownloadUrl(downloadUrl);
+                metadata.setOnlyOfficeUrl(downloadUrl);
+                metadata.setUpdatedBy(1L);
+                metadata.setUpdatedAt(LocalDateTime.now());
+                metadata.setDocumentKey(documentUuid);
+                System.out.println(">>> Updated existing OnlyOfficeMetadata record");
+            } else {
+                metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(documentUuid).dsp2Key(dsp2Key)
+                        .downloadUrl(downloadUrl).onlyOfficeUrl(downloadUrl).createdBy(1L).updatedBy(1L).build();
+                System.out.println(">>> Created new OnlyOfficeMetadata record");
+            }
+
+            onlyOfficeMetadataRepository.save(metadata);
+
+            // Clean up
+            tempFile.delete();
+        }
+        catch (Exception e)
+        {
+            log.info(e.getMessage());
+        }
+
+    }
 
 }

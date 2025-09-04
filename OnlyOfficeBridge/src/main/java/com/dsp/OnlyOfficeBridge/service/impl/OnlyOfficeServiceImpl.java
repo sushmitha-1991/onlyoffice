@@ -152,11 +152,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 List<DocTemplate> docTemplates = docTemplateRepository.findByIdOrChieldIdOrderBySeq(Long.valueOf(templateId),Long.parseLong(templateId));
                 if(templateId.equals(bulletin2TemplateId))
                 {
-                    return thirdPartyDocGen.genBulletin2Generation(docTemplates,refId);
+                    return thirdPartyDocGen.genBulletin2Generation(key,docTemplates,refId);
                 }
                 if(templateId.equals(lobTemplateId))
                 {
-                    return thirdPartyDocGen.genLobGeneration(docTemplates,refId);
+                    return thirdPartyDocGen.genLobGeneration(key,docTemplates,refId);
                 }
             }
             else
@@ -404,6 +404,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					metadata.setUpdatedBy(1L);
 					metadata.setUpdatedAt(LocalDateTime.now());
 					metadata.setDocumentKey(documentUuid);
+                    metadata.setApplicationId(Long.parseLong(applicationId));
 					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
 				} else {
 					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId)).documentKey(documentUuid).dsp2Key(dsp2Key)
