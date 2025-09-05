@@ -322,7 +322,7 @@ public class ThirdPartyDocGen {
         }
         CTBody body = mergedDoc.getDocument().getBody();
         CTSectPr sectPr = body.isSetSectPr() ? body.getSectPr() : body.addNewSectPr();
-        CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+        CTPageMar pageMar =  sectPr.addNewPgMar();
         pageMar.setTop(720);    // 0.5 inch
         pageMar.setBottom(720); // 0.5 inch
         pageMar.setLeft(720);   // 0.5 inch
@@ -334,56 +334,9 @@ public class ThirdPartyDocGen {
     }
 
 
-    private static void appendBody(CTBody dest, CTBody src) throws Exception {
-        XmlCursor cursor = dest.newCursor();
-        cursor.toEndToken(); // move to end
-        src.newCursor().copyXml(cursor); // append source body elements
-        cursor.dispose();
-    }
-    private static void appendHeaderFooter(XWPFDocument dest, XWPFDocument src) throws Exception {
-        XWPFHeaderFooterPolicy srcPolicy = src.getHeaderFooterPolicy();
-        if (srcPolicy == null) return;
 
-        // Ensure dest has a header/footer policy
-        XWPFHeaderFooterPolicy destPolicy = dest.getHeaderFooterPolicy();
-        if (destPolicy == null) {
-            destPolicy = dest.createHeaderFooterPolicy();
-        }
 
-        // Copy headers
-        copyHeaderFooterPart(srcPolicy.getDefaultHeader(), dest, HeaderFooterType.DEFAULT, true);
-        copyHeaderFooterPart(srcPolicy.getFirstPageHeader(), dest, HeaderFooterType.FIRST, true);
-        copyHeaderFooterPart(srcPolicy.getEvenPageHeader(), dest, HeaderFooterType.EVEN, true);
 
-        // Copy footers
-        copyHeaderFooterPart(srcPolicy.getDefaultFooter(), dest, HeaderFooterType.DEFAULT, false);
-        copyHeaderFooterPart(srcPolicy.getFirstPageFooter(), dest, HeaderFooterType.FIRST, false);
-        copyHeaderFooterPart(srcPolicy.getEvenPageFooter(), dest, HeaderFooterType.EVEN, false);
-    }
-
-    private static void copyHeaderFooterPart(
-            Object srcPart, XWPFDocument dest, HeaderFooterType type, boolean isHeader) throws Exception {
-
-        if (srcPart == null) return;
-
-        if (isHeader) {
-            XWPFHeader srcHeader = (XWPFHeader) srcPart;
-            XWPFHeader destHeader = dest.createHeader(type);
-
-            try (InputStream in = srcHeader.getPackagePart().getInputStream();
-                 OutputStream out = destHeader.getPackagePart().getOutputStream()) {
-                in.transferTo(out); // copy XML content
-            }
-        } else {
-            XWPFFooter srcFooter = (XWPFFooter) srcPart;
-            XWPFFooter destFooter = dest.createFooter(type);
-
-            try (InputStream in = srcFooter.getPackagePart().getInputStream();
-                 OutputStream out = destFooter.getPackagePart().getOutputStream()) {
-                in.transferTo(out);
-            }
-        }
-    }
 
 
 
