@@ -1,14 +1,18 @@
 package com.dsp.OnlyOfficeBridge.utils;
 
+import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.wp.usermodel.HeaderFooterType;
+import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlCursor;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -22,6 +26,14 @@ import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+
+
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.List;
+
+import java.util.*;
 
 @Slf4j
 @Component
@@ -63,7 +75,7 @@ public class ThirdPartyDocGen {
             throw e;
         }
 
-        List<byte[]> files = new LinkedList<>();
+        List<MargeFileDto> files = new LinkedList<>();
 
         docTemplates.forEach(docTemplate -> {
             System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
@@ -76,7 +88,10 @@ public class ThirdPartyDocGen {
                 try {
                     ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 
-                    files.add(resource.getByteArray());
+                    files.add(MargeFileDto.builder()
+                            .file(resource.getByteArray())
+                            .isBreak(false)
+                            .build());
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -102,11 +117,20 @@ public class ThirdPartyDocGen {
 //                        e.printStackTrace();
                         throw new RuntimeException(e);
                     }
-                    files.add(resource.getByteArray());
+                    files.add(MargeFileDto.builder()
+                            .file(resource.getByteArray())
+                            .isBreak(false)
+                            .build());
                     Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String)map.get("dsp2Key"));
                     ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-                    files.add(resourceBody.getByteArray());
-                    files.add(resourceLine.getByteArray());
+                    files.add(MargeFileDto.builder()
+                            .file(resourceBody.getByteArray())
+                            .isBreak(false)
+                            .build());
+                    files.add(MargeFileDto.builder()
+                            .file(resourceLine.getByteArray())
+                            .isBreak(true)
+                            .build());
                 });
 
             }
@@ -119,7 +143,10 @@ public class ThirdPartyDocGen {
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                files.add(resource.getByteArray());
+                files.add(MargeFileDto.builder()
+                        .file(resource.getByteArray())
+                        .isBreak(false)
+                        .build());
             }
         });
         try {
@@ -159,7 +186,7 @@ public class ThirdPartyDocGen {
             throw e;
         }
 
-        List<byte[]> files = new LinkedList<>();
+        List<MargeFileDto> files = new LinkedList<>();
 
         docTemplates.forEach(docTemplate -> {
             System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
@@ -171,7 +198,10 @@ public class ThirdPartyDocGen {
                 try {
                     ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 
-                    files.add(resource.getByteArray());
+                    files.add(MargeFileDto.builder()
+                                    .file(resource.getByteArray())
+                                    .isBreak(false)
+                                    .build());
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -196,11 +226,21 @@ public class ThirdPartyDocGen {
 //                        e.printStackTrace();
                             throw new RuntimeException(e);
                         }
-                        files.add(resource.getByteArray());
+                        files.add(MargeFileDto.builder()
+                                .file(resource.getByteArray())
+                                .isBreak(false)
+                                .build());
                         Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String) map.get("dsp2Key"));
                         ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-                        files.add(resourceBody.getByteArray());
-                        files.add(resourceLine.getByteArray());
+
+                        files.add(MargeFileDto.builder()
+                                .file(resourceBody.getByteArray())
+                                .isBreak(false)
+                                .build());
+                        files.add(MargeFileDto.builder()
+                                .file(resourceLine.getByteArray())
+                                .isBreak(true)
+                                .build());
                     }
                 });
 
@@ -214,7 +254,11 @@ public class ThirdPartyDocGen {
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                files.add(resource.getByteArray());
+                files.add(MargeFileDto.builder()
+                        .file(resource.getByteArray())
+                        .isBreak(false)
+                        .build());
+
             }
         });
         try {
@@ -232,17 +276,39 @@ public class ThirdPartyDocGen {
         return null;
     }
 
-    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
+    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
+        log.info("total file count >>>>> " + margeFileDtos.size());
         XWPFDocument mergedDoc = new XWPFDocument();
-
-        for (byte[] fileBytes : docxFiles) {
-            try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
+        XWPFHeader mergedHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
+        XWPFFooter mergedFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
+        for (MargeFileDto fileBytes : margeFileDtos) {
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
                  XWPFDocument doc = new XWPFDocument(bais)) {
+
+                // ---- Append headers ----
+                for (XWPFHeader header : doc.getHeaderList()) {
+                    for (XWPFParagraph p : header.getParagraphs()) {
+                        if (p.getText() != null && !p.getText().trim().isEmpty()) { // skip blank paragraphs
+                            XWPFParagraph newP = mergedHeader.createParagraph();
+                            newP.getCTP().set(p.getCTP().copy());
+                        }
+                    }
+                }
+
+//                 ---- Append footers ----
+                for (XWPFFooter footer : doc.getFooterList()) {
+                    for (XWPFParagraph p : footer.getParagraphs()) {
+                        if (p.getText() != null && !p.getText().trim().isEmpty()) { // skip blank paragraphs
+                            XWPFParagraph newP = mergedFooter.createParagraph();
+                            newP.getCTP().set(p.getCTP().copy());
+                        }
+                    }
+                }
 
                 CTBody srcBody = doc.getDocument().getBody();
                 CTBody destBody = mergedDoc.getDocument().getBody();
-
                 appendBody(destBody, srcBody);
+                mergedDoc.createParagraph().setPageBreak(fileBytes.isBreak());
             }
         }
 
@@ -258,6 +324,53 @@ public class ThirdPartyDocGen {
         src.newCursor().copyXml(cursor); // append source body elements
         cursor.dispose();
     }
+    private static void appendHeaderFooter(XWPFDocument dest, XWPFDocument src) throws Exception {
+        XWPFHeaderFooterPolicy srcPolicy = src.getHeaderFooterPolicy();
+        if (srcPolicy == null) return;
+
+        // Ensure dest has a header/footer policy
+        XWPFHeaderFooterPolicy destPolicy = dest.getHeaderFooterPolicy();
+        if (destPolicy == null) {
+            destPolicy = dest.createHeaderFooterPolicy();
+        }
+
+        // Copy headers
+        copyHeaderFooterPart(srcPolicy.getDefaultHeader(), dest, HeaderFooterType.DEFAULT, true);
+        copyHeaderFooterPart(srcPolicy.getFirstPageHeader(), dest, HeaderFooterType.FIRST, true);
+        copyHeaderFooterPart(srcPolicy.getEvenPageHeader(), dest, HeaderFooterType.EVEN, true);
+
+        // Copy footers
+        copyHeaderFooterPart(srcPolicy.getDefaultFooter(), dest, HeaderFooterType.DEFAULT, false);
+        copyHeaderFooterPart(srcPolicy.getFirstPageFooter(), dest, HeaderFooterType.FIRST, false);
+        copyHeaderFooterPart(srcPolicy.getEvenPageFooter(), dest, HeaderFooterType.EVEN, false);
+    }
+
+    private static void copyHeaderFooterPart(
+            Object srcPart, XWPFDocument dest, HeaderFooterType type, boolean isHeader) throws Exception {
+
+        if (srcPart == null) return;
+
+        if (isHeader) {
+            XWPFHeader srcHeader = (XWPFHeader) srcPart;
+            XWPFHeader destHeader = dest.createHeader(type);
+
+            try (InputStream in = srcHeader.getPackagePart().getInputStream();
+                 OutputStream out = destHeader.getPackagePart().getOutputStream()) {
+                in.transferTo(out); // copy XML content
+            }
+        } else {
+            XWPFFooter srcFooter = (XWPFFooter) srcPart;
+            XWPFFooter destFooter = dest.createFooter(type);
+
+            try (InputStream in = srcFooter.getPackagePart().getInputStream();
+                 OutputStream out = destFooter.getPackagePart().getOutputStream()) {
+                in.transferTo(out);
+            }
+        }
+    }
+
+
+
     public void saveOpenKm(String dsp2Key,ByteArrayResource resource)
     {
         try{
