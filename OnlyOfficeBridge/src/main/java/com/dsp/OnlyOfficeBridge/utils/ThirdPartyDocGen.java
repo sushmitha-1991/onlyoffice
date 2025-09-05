@@ -308,7 +308,7 @@ public class ThirdPartyDocGen {
                 CTBody srcBody = doc.getDocument().getBody();
                 CTBody destBody = mergedDoc.getDocument().getBody();
                 appendBody(destBody, srcBody);
-                mergedDoc.createParagraph().setPageBreak(fileBytes.isBreak());
+                //mergedDoc.createParagraph().setPageBreak(fileBytes.isBreak());
             }
         }
 
