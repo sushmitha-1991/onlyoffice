@@ -277,38 +277,46 @@ public class ThirdPartyDocGen {
     }
 
     public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-        log.info("total file count >>>>> " + margeFileDtos.size());
+        log.info("Total files to merge: " + margeFileDtos.size());
+
         XWPFDocument mergedDoc = new XWPFDocument();
-        XWPFHeader mergedHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
-        XWPFFooter mergedFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
-        for (MargeFileDto fileBytes : margeFileDtos) {
+
+        for (int i = 0; i < margeFileDtos.size(); i++) {
+            MargeFileDto fileBytes = margeFileDtos.get(i);
             try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
                  XWPFDocument doc = new XWPFDocument(bais)) {
 
-                // ---- Append headers ----
+                // ---- Copy body paragraphs ----
+                for (XWPFParagraph p : doc.getParagraphs()) {
+                    XWPFParagraph newP = mergedDoc.createParagraph();
+                    newP.getCTP().set(p.getCTP().copy());
+                }
+
+                // ---- Copy tables ----
+                for (XWPFTable table : doc.getTables()) {
+                    XWPFTable newTable = mergedDoc.createTable();
+                    newTable.getCTTbl().set(table.getCTTbl().copy());
+                }
+
+                // ---- Copy headers ----
                 for (XWPFHeader header : doc.getHeaderList()) {
+                    XWPFHeader newHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
                     for (XWPFParagraph p : header.getParagraphs()) {
-                        if (p.getText() != null && !p.getText().trim().isEmpty()) { // skip blank paragraphs
-                            XWPFParagraph newP = mergedHeader.createParagraph();
-                            newP.getCTP().set(p.getCTP().copy());
-                        }
+                        XWPFParagraph newP = newHeader.createParagraph();
+                        newP.getCTP().set(p.getCTP().copy());
                     }
                 }
 
-//                 ---- Append footers ----
+                // ---- Copy footers ----
                 for (XWPFFooter footer : doc.getFooterList()) {
+                    XWPFFooter newFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
                     for (XWPFParagraph p : footer.getParagraphs()) {
-                        if (p.getText() != null && !p.getText().trim().isEmpty()) { // skip blank paragraphs
-                            XWPFParagraph newP = mergedFooter.createParagraph();
-                            newP.getCTP().set(p.getCTP().copy());
-                        }
+                        XWPFParagraph newP = newFooter.createParagraph();
+                        newP.getCTP().set(p.getCTP().copy());
                     }
                 }
 
-                CTBody srcBody = doc.getDocument().getBody();
-                CTBody destBody = mergedDoc.getDocument().getBody();
-                appendBody(destBody, srcBody);
-                //mergedDoc.createParagraph().setPageBreak(fileBytes.isBreak());
+                
             }
         }
 
@@ -317,6 +325,7 @@ public class ThirdPartyDocGen {
             return baos.toByteArray();
         }
     }
+
 
     private static void appendBody(CTBody dest, CTBody src) throws Exception {
         XmlCursor cursor = dest.newCursor();
