@@ -12,6 +12,7 @@ import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlCursor;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -319,7 +320,13 @@ public class ThirdPartyDocGen {
                 
             }
         }
-
+        CTBody body = mergedDoc.getDocument().getBody();
+        CTSectPr sectPr = body.isSetSectPr() ? body.getSectPr() : body.addNewSectPr();
+        CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+        pageMar.setTop(720);    // 0.5 inch
+        pageMar.setBottom(720); // 0.5 inch
+        pageMar.setLeft(720);   // 0.5 inch
+        pageMar.setRight(720);  // 0.5 inch
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             mergedDoc.write(baos);
             return baos.toByteArray();
