@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
@@ -453,8 +454,11 @@ public class Utils {
             String xml = new String(java.nio.file.Files.readAllBytes(tempFile.toPath()), StandardCharsets.UTF_8);
 
             for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                String placeholder = "\\{" + entry.getKey() + "\\}";
-                xml = xml.replaceAll(placeholder, entry.getValue());
+//                String placeholder = "\\{" + entry.getKey() + "\\}";
+//                xml = xml.replaceAll(placeholder, entry.getValue());
+                String placeholder = "{" + entry.getKey() + "}";
+                String safeValue = StringEscapeUtils.escapeXml11(entry.getValue()); // escapes &, <, >, ", '
+                xml = xml.replace(placeholder, safeValue);
             }
 
             // Write modified FODT back
