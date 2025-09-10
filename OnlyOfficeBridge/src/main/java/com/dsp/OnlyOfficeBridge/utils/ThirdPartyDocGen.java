@@ -49,6 +49,10 @@ public class ThirdPartyDocGen {
     private String bulletin2Url;
     @Value("${lob.service.url}")
     private String lobUrl;
+    @Value("${translation.service.url}")
+    private String translationUrl;
+    @Value("${verbatim.service.url}")
+    private String verbatimUrl;
     @Value("${admin.token}")
     String token;
     @Value("${download.url}")
@@ -277,6 +281,150 @@ public class ThirdPartyDocGen {
         return null;
     }
 
+    public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key,List<DocTemplate> docTemplates, String refId)
+    {
+        String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id="+refId;
+        System.out.println("url>>>>>>>" + url +" ==== " + token);
+        Map<String,Object> body;
+        if (token == null) {
+            throw new IllegalStateException("Authorization token is missing");
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        HttpEntity<Void> entity = new HttpEntity<>( headers);
+
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            body = response.getBody();
+            System.out.println(body);
+        } catch (Exception e) {
+            System.err.println("Error during API call: " + e.getMessage());
+            throw e;
+        }
+
+        List<MargeFileDto> files = new LinkedList<>();
+
+        docTemplates.forEach(docTemplate -> {
+            System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+
+             if (docTemplate.getCode().equals("trans_merge_con")) {
+            	 System.out.println("inside trans_merge_con");
+            	 List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+            	 Map<String, Object> data=dataList.get(0);
+                List<Map> inputList = (List<Map>)data.get("allocations");
+                inputList.forEach(map -> {
+                    if(map.get("dsp2Key")!=null) {
+
+                        Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key((String) map.get("dsp2Key"));
+                        System.out.println("searching by dsp2key in only office meta data");
+                        ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+                        files.add(MargeFileDto.builder()
+                                .file(resourceBody.getByteArray())
+                                .isBreak(false)
+                                .build());
+                    }
+                });
+
+            }
+
+        });
+        try {
+            byte[] mergedBytes = mergeDocxFiles(files);
+            ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+            saveOpenKm(dsp2Key,mergedResource);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+                    .contentLength(mergedResource.contentLength())
+                    .body(mergedResource);
+        } catch (Exception e) {
+
+        }
+        return null;
+    }
+
+	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
+		// Fetch dspKeys from your API
+		List<String> dspKeys = fetchDspKeysFromApi(refId);
+
+		// Collect files
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+
+			if ("verbatim_merge_con".equals(docTemplate.getCode())) {
+				System.out.println("Inside verbatim_merge_con");
+
+				dspKeys.forEach(dspKey -> {
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+
+					metadataOpt.ifPresent(metadata -> {
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					});
+				});
+			}
+		});
+
+		// Merge and return response
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
+
+    /**
+     * Helper method to call /get-verbatim-dsp-key API and extract dspKeys.
+     */
+	@SuppressWarnings("unchecked")
+	private List<String> fetchDspKeysFromApi(String refId) {
+		String url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
+		System.out.println("Calling Verbatim API URL >>> " + url);
+
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			System.out.println(response);
+			Map<String, Object> body = response.getBody();
+			System.out.println("Response from verbatim API >>> " + body);
+
+			if (body != null && body.get("data") != null) {
+				// ✅ data is already a List<String>
+				return (List<String>) body.get("data");
+			}
+		} catch (Exception e) {
+			System.err.println("Error while calling verbatim API: " + e.getMessage());
+			throw e;
+		}
+
+		return Collections.emptyList();
+	}
+
     public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
         log.info("Total files to merge: " + margeFileDtos.size());
 
@@ -397,5 +545,4 @@ public class ThirdPartyDocGen {
         }
 
     }
-
 }
