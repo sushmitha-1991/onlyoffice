@@ -7,6 +7,8 @@ import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.model.XWPFHeaderFooterPolicy;
 import org.apache.poi.xwpf.usermodel.*;
@@ -53,6 +55,8 @@ public class ThirdPartyDocGen {
     private String translationUrl;
     @Value("${verbatim.service.url}")
     private String verbatimUrl;
+    @Value("${verbatim.hourly.service.url}")
+    private String verbatimHourlyUrl;
     @Value("${admin.token}")
     String token;
     @Value("${download.url}")
@@ -393,7 +397,12 @@ public class ThirdPartyDocGen {
      */
 	@SuppressWarnings("unchecked")
 	private List<String> fetchDspKeysFromApi(String refId) {
-		String url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
+		String url;
+		if(StringUtils.containsIgnoreCase(refId, "hr")) {
+			url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
+		} else {
+			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
+		}
 		System.out.println("Calling Verbatim API URL >>> " + url);
 
 		if (token == null) {
