@@ -375,7 +375,7 @@ public class ThirdPartyDocGen {
 		if (StringUtils.containsIgnoreCase(refId, "hr")) {
 			url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
 		} else if (StringUtils.containsIgnoreCase(refId, "sm")) {
-			url = verbatimStaffUrl + "/merge-file/get-by-refId" + refId;
+			url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
 
 		} else {
 			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
