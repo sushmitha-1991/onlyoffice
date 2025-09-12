@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -70,6 +71,8 @@ public class ThirdPartyDocGen {
 	String token;
 	@Value("${download.url}")
 	String downloadKmUrl;
+	@Autowired
+	private VerbatimClient verbatimClient;
 
 	public ResponseEntity<Resource> genBulletin2Generation(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
@@ -519,5 +522,70 @@ public class ThirdPartyDocGen {
 			log.info(e.getMessage());
 		}
 
+	}
+	public ResponseEntity<Resource> generateVerbatimFullDayLSFile(String key, List<DocTemplate> docTemplates, String refId)  {
+		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+
+		// Collect files
+		List<MargeFileDto> files = new LinkedList<>();
+		try {
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx", new HashMap<>());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		dspKeys.forEach(dspKey -> {
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+
+			metadataOpt.ifPresent(metadata -> {
+				ByteArrayResource resourceBody = utils
+						.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+			});
+		});
+		return getMergedFile(key, files);
+	}
+
+
+	public ResponseEntity<Resource> generateVerbatimFullDayRSFile(String key, List<DocTemplate> docTemplates, String refId) {
+		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+
+		// Collect files
+		List<MargeFileDto> files = new LinkedList<>();
+		try {
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx", new HashMap<>());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+		dspKeys.forEach(dspKey -> {
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+
+			metadataOpt.ifPresent(metadata -> {
+				ByteArrayResource resourceBody = utils
+						.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+			});
+		});
+		return getMergedFile(key, files);
+	}
+
+	private ResponseEntity<Resource> getMergedFile(String key, List<MargeFileDto> files) {
+		// Merge and return response
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
 	}
 }
