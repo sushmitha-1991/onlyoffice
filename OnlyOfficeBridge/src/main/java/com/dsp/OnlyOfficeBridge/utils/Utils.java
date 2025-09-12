@@ -6,6 +6,7 @@
 package com.dsp.OnlyOfficeBridge.utils;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -24,6 +25,9 @@ import org.jodconverter.local.office.LocalOfficeManager;
 //import org.jodconverter.remote.RemoteConverter;
 //import org.jodconverter.remote.office.RemoteOfficeManager;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
@@ -516,6 +520,7 @@ public class Utils {
 
     public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
         try (XWPFDocument mergedDoc = new XWPFDocument()) {
+        	
             boolean first = true;
 
             for (int i = 0; i < docxFiles.size(); i++) {
@@ -581,4 +586,25 @@ public class Utils {
         }
         return null;
     }
+    
+	// 🔧 Helper: set default margins = 1 inch
+    public void setDefaultMargins(XWPFDocument doc) {
+        CTSectPr sectPr = doc.getDocument().getBody().isSetSectPr()
+                ? doc.getDocument().getBody().getSectPr()
+                : doc.getDocument().getBody().addNewSectPr();
+
+        // --- Set page size (A4 = 210mm × 297mm) ---
+        CTPageSz pageSize = sectPr.isSetPgSz() ? sectPr.getPgSz() : sectPr.addNewPgSz();
+        pageSize.setW(BigInteger.valueOf(11906)); // A4 width in twips
+        pageSize.setH(BigInteger.valueOf(16838)); // A4 height in twips
+        
+        CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+
+        int oneInch = 1440; // twips
+        pageMar.setTop(BigInteger.valueOf(oneInch));
+        pageMar.setBottom(BigInteger.valueOf(oneInch));
+        pageMar.setLeft(BigInteger.valueOf(oneInch));
+        pageMar.setRight(BigInteger.valueOf(oneInch));
+    }
+    
 }
