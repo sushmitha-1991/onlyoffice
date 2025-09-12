@@ -17,6 +17,8 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -36,6 +38,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.math.BigInteger;
 import java.util.List;
 /**
  * 
@@ -194,6 +197,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
     }
     public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
         XWPFDocument mergedDoc = new XWPFDocument();
+        
+        // ✅ Always set default margins (1 inch)
+        setDefaultMargins(mergedDoc);
+        
         boolean firstFile = true;
 
         for (byte[] fileBytes : docxFiles) {
@@ -206,10 +213,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                     breakPara.setPageBreak(true);
                     mergedDoc.createParagraph(); // add empty paragraph for safety
                 }
+
+//                // Copy margins (sectPr) from the first file only
+//                if (firstFile && doc.getDocument().getBody().isSetSectPr()) {
+//                    mergedDoc.getDocument().getBody().setSectPr(doc.getDocument().getBody().getSectPr());
+//                }
+                
                 firstFile = false;
 
                 // Copy paragraphs with formatting
                 for (XWPFParagraph p : doc.getParagraphs()) {
+                	
                     XWPFParagraph newPara = mergedDoc.createParagraph();
                     newPara.setAlignment(p.getAlignment());
                     newPara.setSpacingAfter(p.getSpacingAfter());
@@ -332,6 +346,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
             // Merge documents
             XWPFDocument mergedDoc = new XWPFDocument();
+            // ✅ Always set default margins (1 inch)
+            setDefaultMargins(mergedDoc);
+
             for (XWPFDocument doc : documents) {
                 doc.getDocument().getBody().getTblArray(); // Force load
                 doc.getDocument().getBody().getPArray();   // Force load
@@ -437,4 +454,19 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 	}
 
+	// 🔧 Helper: set default margins = 1 inch
+    private static void setDefaultMargins(XWPFDocument doc) {
+        CTSectPr sectPr = doc.getDocument().getBody().isSetSectPr()
+                ? doc.getDocument().getBody().getSectPr()
+                : doc.getDocument().getBody().addNewSectPr();
+
+        CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+
+        int oneInch = 1440; // twips
+        pageMar.setTop(BigInteger.valueOf(oneInch));
+        pageMar.setBottom(BigInteger.valueOf(oneInch));
+        pageMar.setLeft(BigInteger.valueOf(oneInch));
+        pageMar.setRight(BigInteger.valueOf(oneInch));
+    }
+    
 }
