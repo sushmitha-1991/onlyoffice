@@ -17,9 +17,6 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -39,7 +36,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.math.BigInteger;
 import java.util.List;
 /**
  * 
@@ -261,7 +257,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 for (XWPFTable table : doc.getTables()) {
                     XWPFTable newTable = mergedDoc.createTable();
                     newTable.getCTTbl().set(table.getCTTbl().copy());
-                }
+                    newTable.setWidth("100%"); // fit to page width
+                }                
             }
         }
 
