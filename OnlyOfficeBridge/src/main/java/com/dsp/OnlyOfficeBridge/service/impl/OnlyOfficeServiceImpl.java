@@ -206,10 +206,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                     breakPara.setPageBreak(true);
                     mergedDoc.createParagraph(); // add empty paragraph for safety
                 }
+                
+                // Copy margins (sectPr) from the first file only
+                if (firstFile && doc.getDocument().getBody().isSetSectPr()) {
+                    mergedDoc.getDocument().getBody().setSectPr(doc.getDocument().getBody().getSectPr());
+                }
+                
                 firstFile = false;
 
                 // Copy paragraphs with formatting
                 for (XWPFParagraph p : doc.getParagraphs()) {
+                	
                     XWPFParagraph newPara = mergedDoc.createParagraph();
                     newPara.setAlignment(p.getAlignment());
                     newPara.setSpacingAfter(p.getSpacingAfter());
