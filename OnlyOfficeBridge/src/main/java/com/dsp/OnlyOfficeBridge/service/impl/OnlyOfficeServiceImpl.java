@@ -208,7 +208,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
         for (byte[] fileBytes : docxFiles) {
             try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
-                 XWPFDocument doc = new XWPFDocument(bais)) {
+                 XWPFDocument doc = new XWPFDocument(bais)) { 
 
                 // Add page break before each file except the first
                 if (!firstFile) {

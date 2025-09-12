@@ -586,7 +586,7 @@ public class Utils {
         }
         return null;
     }
-    
+     
 	// 🔧 Helper: set default margins = 1 inch
     public void setDefaultMargins(XWPFDocument doc) {
         CTSectPr sectPr = doc.getDocument().getBody().isSetSectPr()
