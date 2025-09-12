@@ -69,6 +69,12 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
     @Autowired
     ThirdPartyDocGen thirdPartyDocGen;
 
+    @Value("${verbatim.gen.full.day.ls.template.id}")
+    private String verbatimFullDayLSTemplateId;
+
+    @Value("${verbatim.gen.full.day.rs.template.id}")
+    private String verbatimFullDayRSTemplateId;
+
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
 		String step = payload.get("step");
@@ -173,6 +179,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 if(templateId.equals(verbatimTemplateId))
                 {
                     return thirdPartyDocGen.genVerbatimGeneration(key,docTemplates,refId);
+                }
+                if(templateId.equals(verbatimFullDayLSTemplateId))
+                {
+                    return thirdPartyDocGen.generateVerbatimFullDayLSFile(key,docTemplates,refId);
+                }
+                if(templateId.equals(verbatimFullDayRSTemplateId))
+                {
+                    return thirdPartyDocGen.generateVerbatimFullDayRSFile(key,docTemplates,refId);
                 }
             }
             else
