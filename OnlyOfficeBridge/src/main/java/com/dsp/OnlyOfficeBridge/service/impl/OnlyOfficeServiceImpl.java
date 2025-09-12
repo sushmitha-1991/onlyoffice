@@ -271,7 +271,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 for (XWPFTable table : doc.getTables()) {
                     XWPFTable newTable = mergedDoc.createTable();
                     newTable.getCTTbl().set(table.getCTTbl().copy());
-                    newTable.setWidth("100%"); // fit to page width
+                    newTable.setWidth("100%"); // fit to page width 
                 }                
             }
         }
