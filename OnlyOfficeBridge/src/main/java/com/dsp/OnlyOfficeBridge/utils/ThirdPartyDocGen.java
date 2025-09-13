@@ -16,11 +16,7 @@ import java.util.UUID;
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFFooter;
-import org.apache.poi.xwpf.usermodel.XWPFHeader;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
@@ -303,7 +299,7 @@ public class ThirdPartyDocGen {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data");
+						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -510,17 +506,28 @@ public class ThirdPartyDocGen {
 			try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
 					XWPFDocument doc = new XWPFDocument(bais)) {
 
-				// ---- Copy body paragraphs ----
-				for (XWPFParagraph p : doc.getParagraphs()) {
-					XWPFParagraph newP = mergedDoc.createParagraph();
-					newP.getCTP().set(p.getCTP().copy());
-				}
-
-				// ---- Copy tables ----
-				for (XWPFTable table : doc.getTables()) {
-					XWPFTable newTable = mergedDoc.createTable();
-					newTable.getCTTbl().set(table.getCTTbl().copy());
-				}
+//				// ---- Copy body paragraphs ----
+//				for (XWPFParagraph p : doc.getParagraphs()) {
+//					XWPFParagraph newP = mergedDoc.createParagraph();
+//					newP.getCTP().set(p.getCTP().copy());
+//				}
+//
+//				// ---- Copy tables ----
+//				for (XWPFTable table : doc.getTables()) {
+//					XWPFTable newTable = mergedDoc.createTable();
+//					newTable.getCTTbl().set(table.getCTTbl().copy());
+//				}
+                for (IBodyElement element : doc.getBodyElements()) {
+                    if (element instanceof XWPFParagraph) {
+                        XWPFParagraph p = (XWPFParagraph) element;
+                        XWPFParagraph newP = mergedDoc.createParagraph();
+                        newP.getCTP().set(p.getCTP().copy());
+                    } else if (element instanceof XWPFTable) {
+                        XWPFTable table = (XWPFTable) element;
+                        XWPFTable newTable = mergedDoc.createTable();
+                        newTable.getCTTbl().set(table.getCTTbl().copy());
+                    }
+                }
 
 				// ---- Copy headers ----
 				for (XWPFHeader header : doc.getHeaderList()) {
