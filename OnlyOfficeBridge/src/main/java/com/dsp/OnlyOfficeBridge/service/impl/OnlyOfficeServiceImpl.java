@@ -62,6 +62,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String translationTemplateId;
 	@Value("${verbatim.gen.template.id}")
 	String verbatimTemplateId;
+	@Value("${verbatim.lang.gen.template.id}")
+	String verbatimLangTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Autowired
@@ -170,7 +172,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(translationTemplateId)) {
 					return thirdPartyDocGen.genTranslationGeneration(key, docTemplates, refId);
 				}
-				if (templateId.equals(verbatimTemplateId)) {
+				if (templateId.equals(verbatimTemplateId) || templateId.equals(verbatimLangTemplateId)) {
 					return thirdPartyDocGen.genVerbatimGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(verbatimFullDayLSTemplateId)) {

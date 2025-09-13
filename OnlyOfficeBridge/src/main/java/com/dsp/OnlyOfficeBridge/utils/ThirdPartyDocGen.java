@@ -326,93 +326,179 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
-
+	
 	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
-		// Fetch dspKeys from your API
-		List<String> dspKeys = fetchDspKeysFromApi(refId);
+	    // Build URL
+	    String url;
+	    if (StringUtils.containsIgnoreCase(refId, "hr")) {
+	        url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
+	    } else if (StringUtils.containsIgnoreCase(refId, "sm")) {
+	        url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
+	    } else if (StringUtils.containsIgnoreCase(refId, "turn")) {
+	        url = verbatimUrl + "/get-verbatim-turn-abbr/" + refId;
+	    } else {
+	        url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
+	    }
 
-		// Collect files
-		List<MargeFileDto> files = new LinkedList<>();
+	    System.out.println("Calling Verbatim API URL >>> " + url);
 
-		docTemplates.forEach(docTemplate -> {
-			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+	    if (token == null) {
+	        throw new IllegalStateException("Authorization token is missing");
+	    }
 
-			if ("verbatim_merge_con".equals(docTemplate.getCode())) {
-				System.out.println("Inside verbatim_merge_con");
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("Authorization", "Bearer " + token);
+	    headers.setContentType(MediaType.APPLICATION_JSON);
+	    HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-				dspKeys.forEach(dspKey -> {
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+	    Map<String, Object> body = null;
+	    try {
+	        RestTemplate restTemplate = new RestTemplate();
+	        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	        body = response.getBody();
+	        System.out.println("Response from verbatim API >>> " + body);
+	    } catch (Exception e) {
+	        System.err.println("Error while calling verbatim API: " + e.getMessage());
+	        throw e;
+	    }
 
-					metadataOpt.ifPresent(metadata -> {
-						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+	    final Map<String, Object> finalBody = body;
+	    List<MargeFileDto> files = new LinkedList<>();
+	    docTemplates.forEach(docTemplate -> {
+	        System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
 
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					});
-				});
-			}
-		});
+	        // handle /get-verbatim-turn-abbr/
+	        if (url.contains("/get-verbatim-turn-abbr/")) {
+	            if ("verbatim_lang_gen_header".equals(docTemplate.getCode())) {
+	                Map<String, Object> data = (Map<String, Object>) finalBody.get("data");
+	                Map<String, String> map = new HashMap<>();
+	                map.put("slotTurn", (String) data.get("slotTurn"));
+	                map.put("abbr", (String) data.get("abbr"));
+	                map.put("counterAbbr", (String) data.get("counterAbbr"));
+	                try {
+	                    ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+	                    files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+	                } catch (Exception e) {
+	                    throw new RuntimeException(e);
+	                }
+	            }
+	        }
+	        else if ("verbatim_merge_con".equals(docTemplate.getCode())) {
+	            List<String> dspKeys = (List<String>) finalBody.get("data");
+	            dspKeys.forEach(dspKey -> {
+	                Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+	                metadataOpt.ifPresent(metadata -> {
+	                    ByteArrayResource resourceBody =
+	                            utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+	                    files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+	                });
+	            });
+	        }
+	    });
 
-		// Merge and return response
-		try {
-			byte[] mergedBytes = mergeDocxFiles(files);
-			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+	    // Merge and return response
+	    try {
+	        byte[] mergedBytes = mergeDocxFiles(files);
+	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 
-			saveOpenKm(key, mergedResource);
+	        saveOpenKm(key, mergedResource);
 
-			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
-					.contentLength(mergedResource.contentLength()).body(mergedResource);
-		} catch (Exception e) {
-			System.err.println("Error while merging verbatim docs: " + e.getMessage());
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-		}
+	        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
+	                .contentLength(mergedResource.contentLength()).body(mergedResource);
+	    } catch (Exception e) {
+	        System.err.println("Error while merging verbatim docs: " + e.getMessage());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+	    }
 	}
 
-	/**
-	 * Helper method to call /get-verbatim-dsp-key API and extract dspKeys.
-	 */
-	@SuppressWarnings("unchecked")
-	private List<String> fetchDspKeysFromApi(String refId) {
-		String url;
-		if (StringUtils.containsIgnoreCase(refId, "hr")) {
-			url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
-		} else if (StringUtils.containsIgnoreCase(refId, "sm")) {
-			url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
 
-		} else {
-			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
-		}
-		System.out.println("Calling Verbatim API URL >>> " + url);
 
-		if (token == null) {
-			throw new IllegalStateException("Authorization token is missing");
-		}
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("Authorization", "Bearer " + token);
-		headers.setContentType(MediaType.APPLICATION_JSON);
-
-		HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-		try {
-			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-			System.out.println(response);
-			Map<String, Object> body = response.getBody();
-			System.out.println("Response from verbatim API >>> " + body);
-
-			if (body != null && body.get("data") != null) {
-				// ✅ data is already a List<String>
-				return (List<String>) body.get("data");
-			}
-		} catch (Exception e) {
-			System.err.println("Error while calling verbatim API: " + e.getMessage());
-			throw e;
-		}
-
-		return Collections.emptyList();
-	}
+//	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
+//		// Fetch dspKeys from your API
+//		List<String> dspKeys = fetchDspKeysFromApi(refId);
+//
+//		// Collect files
+//		List<MargeFileDto> files = new LinkedList<>();
+//
+//		docTemplates.forEach(docTemplate -> {
+//			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+//
+//			if ("verbatim_merge_con".equals(docTemplate.getCode())) {
+//				System.out.println("Inside verbatim_merge_con");
+//
+//				dspKeys.forEach(dspKey -> {
+//					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+//
+//					metadataOpt.ifPresent(metadata -> {
+//						ByteArrayResource resourceBody = utils
+//								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+//
+//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+//					});
+//				});
+//			}
+//		});
+//
+//		// Merge and return response
+//		try {
+//			byte[] mergedBytes = mergeDocxFiles(files);
+//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+//
+//			saveOpenKm(key, mergedResource);
+//
+//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
+//					.contentLength(mergedResource.contentLength()).body(mergedResource);
+//		} catch (Exception e) {
+//			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//		}
+//	}
+//
+//	/**
+//	 * Helper method to call /get-verbatim-dsp-key API and extract dspKeys.
+//	 */
+//	@SuppressWarnings("unchecked")
+//	private List<String> fetchDspKeysFromApi(String refId) {
+//		String url;
+//		if (StringUtils.containsIgnoreCase(refId, "hr")) {
+//			url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
+//		} else if (StringUtils.containsIgnoreCase(refId, "sm")) {
+//			url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
+//		} else {
+//			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
+//		}
+//		System.out.println("Calling Verbatim API URL >>> " + url);
+//
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(MediaType.APPLICATION_JSON);
+//
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			System.out.println(response);
+//			Map<String, Object> body = response.getBody();
+//			System.out.println("Response from verbatim API >>> " + body);
+//
+//			if (body != null && body.get("data") != null) {
+//				// ✅ data is already a List<String>
+//				return (List<String>) body.get("data");
+//			}
+//		} catch (Exception e) {
+//			System.err.println("Error while calling verbatim API: " + e.getMessage());
+//			throw e;
+//		}
+//
+//		return Collections.emptyList();
+//	}
 
 	public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
 		log.info("Total files to merge: " + margeFileDtos.size());
