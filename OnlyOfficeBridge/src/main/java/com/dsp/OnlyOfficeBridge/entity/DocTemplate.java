@@ -11,8 +11,8 @@ public class DocTemplate {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "chield_id")
-    private  Long chieldId;
+    @Column(name = "parent_id")
+    private  Long parentId;
     @Column(name = "type")
     private  String type;
     @Column(name = "place_holders")

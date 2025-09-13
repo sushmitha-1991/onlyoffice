@@ -159,7 +159,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
         try {
             if(Integer.parseInt(templateId)>0)
             {
-                List<DocTemplate> docTemplates = docTemplateRepository.findByIdOrChieldIdOrderBySeq(Long.valueOf(templateId),Long.parseLong(templateId));
+                List<DocTemplate> docTemplates = docTemplateRepository.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId),Long.parseLong(templateId));
                 if(templateId.equals(bulletin2TemplateId))
                 {
                     return thirdPartyDocGen.genBulletin2Generation(key,docTemplates,refId);
@@ -355,9 +355,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
             // Merge documents
             XWPFDocument mergedDoc = new XWPFDocument();
-            // ✅ Always set default margins (1 inch)
-            utils.setDefaultMargins(mergedDoc);
-
+ 
             for (XWPFDocument doc : documents) {
                 doc.getDocument().getBody().getTblArray(); // Force load
                 doc.getDocument().getBody().getPArray();   // Force load
@@ -367,6 +365,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                // mergedDoc.getDocument().getBody().addNewTbl().set( doc.getDocument().getBody().getTblArray(0) );
             }
 
+            // ✅ Always set default margins (1 inch)
+            utils.setDefaultMargins(mergedDoc);
+            
             // Save merged doc to byte[]
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             mergedDoc.write(baos);

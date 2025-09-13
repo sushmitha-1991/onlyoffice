@@ -600,11 +600,12 @@ public class Utils {
         
         CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
 
-        int oneInch = 1440; // twips
-        pageMar.setTop(BigInteger.valueOf(oneInch));
-        pageMar.setBottom(BigInteger.valueOf(oneInch));
-        pageMar.setLeft(BigInteger.valueOf(oneInch));
-        pageMar.setRight(BigInteger.valueOf(oneInch));
+        int topMargin = 1440; // twips
+        int sideMargin = 1080; // twips
+        pageMar.setTop(BigInteger.valueOf(topMargin));
+        pageMar.setBottom(BigInteger.valueOf(topMargin));
+        pageMar.setLeft(BigInteger.valueOf(sideMargin));
+        pageMar.setRight(BigInteger.valueOf(sideMargin));
     }
     
 }
