@@ -326,9 +326,7 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
 	    // Build URL
 	    String url;
-	    if (StringUtils.containsIgnoreCase(refId, "hr")) {
-	        url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
-	    } else if (StringUtils.containsIgnoreCase(refId, "sm")) {
+	    if (StringUtils.containsIgnoreCase(refId, "sm")) {
 	        url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
 	    } else if (StringUtils.containsIgnoreCase(refId, "turn")) {
 	        url = verbatimUrl + "/get-verbatim-turn-abbr/" + refId;
@@ -407,6 +405,82 @@ public class ThirdPartyDocGen {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 	    }
 	}
+	
+	public ResponseEntity<Resource> genVerbatimHourGeneration(String key, List<DocTemplate> docTemplates, String refId) {
+	    // Build URL 
+	    String url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
+	    System.out.println("Calling Verbatim Hour API URL >>> " + url);
+
+	    if (token == null) {
+	        throw new IllegalStateException("Authorization token is missing");
+	    }
+
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("Authorization", "Bearer " + token);
+	    headers.setContentType(MediaType.APPLICATION_JSON);
+	    HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+	    Map<String, Object> body;
+	    try {
+	        RestTemplate restTemplate = new RestTemplate();
+	        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	        body = response.getBody();
+	        System.out.println("Response from /get-verbatim-hour-abbr/ >>> " + body);
+	    } catch (Exception e) {
+	        System.err.println("Error while calling /get-verbatim-hour-abbr/: " + e.getMessage());
+	        throw e;
+	    }
+	    String[] parts = refId.split("_", 3);
+	    List<MargeFileDto> files = new LinkedList<>();
+
+	    docTemplates.forEach(docTemplate -> {
+	        System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+	        
+	        if (docTemplate.getCode().equals("verbatim_hour_gen_header")) {
+	            Map<String, String> map = new HashMap<>();
+	            map.put("meetingDate", (String) parts[1]);  // placeholder
+	            map.put("abbr", (String) parts[2]);         // placeholder
+
+	            try {
+	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+	                files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+	            } catch (Exception e) {
+	                throw new RuntimeException(e);
+	            }
+
+	        } else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
+	        	// data is actually a list of dspKeys
+	            List<String> dspKeys = (List<String>) body.get("data");
+	            if (dspKeys != null) {
+	                dspKeys.forEach(dspKey -> {
+	                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+	                    metadataOpt.ifPresent(metadata -> {
+	                        ByteArrayResource resourceBody =
+	                                utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+	                        files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+	                    });
+	                });
+	            }
+	        }
+	    });
+
+	    // Merge and return response
+	    try {
+	        byte[] mergedBytes = mergeDocxFiles(files);
+	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+	        saveOpenKm(key, mergedResource);
+
+	        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_hour_merged.docx")
+	                .contentLength(mergedResource.contentLength())
+	                .body(mergedResource);
+	    } catch (Exception e) {
+	        System.err.println("Error while merging hour verbatim docs: " + e.getMessage());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+	    }
+	}
+
 
 
 
