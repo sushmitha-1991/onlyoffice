@@ -59,7 +59,7 @@ import jakarta.servlet.http.HttpServletRequest;
 @Component
 public class Utils {
 
-	@Autowired
+	@Autowired 
 	private MyUserRepository myUserRepository;
 
 	@Autowired
@@ -74,7 +74,7 @@ public class Utils {
 	@Value("${download.url}")
 	String downloadOkmUrl;
 	
-	@Value("${download.url}")
+	@Value("${upload.url}")
 	String uploadOkmUrl;
 	
 	/**
