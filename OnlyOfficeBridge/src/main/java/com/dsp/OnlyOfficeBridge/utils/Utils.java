@@ -29,6 +29,7 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
@@ -70,6 +71,12 @@ public class Utils {
 	@Autowired
 	private RestTemplate restTemplate;
 
+	@Value("${download.url}")
+	String downloadOkmUrl;
+	
+	@Value("${download.url}")
+	String uploadOkmUrl;
+	
 	/**
 	 * Fetches the user ID of the currently authenticated user
 	 * 
@@ -265,7 +272,8 @@ public class Utils {
 
 	public ByteArrayResource downloadFileFromUUID(UUID uuid) {
 		try {
-			String downloadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/downloads/" + uuid;
+			String downloadUrl = downloadOkmUrl + uuid;
+			
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -334,9 +342,9 @@ public class Utils {
 			// Prepare the request entity with headers and body
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			System.out.println(requestEntity);
-			String uploadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/document/upload";
-			System.out.println(">>> uploadUrl - " + uploadUrl);
-			ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.POST, requestEntity,
+//			String uploadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/document/upload";
+			System.out.println(">>> uploadUrl - " + uploadOkmUrl);
+			ResponseEntity<String> response = restTemplate.exchange(uploadOkmUrl, HttpMethod.POST, requestEntity,
 					String.class);
 
 			// Return the response body as a string
