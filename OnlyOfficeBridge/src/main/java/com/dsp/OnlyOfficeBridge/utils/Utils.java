@@ -273,6 +273,7 @@ public class Utils {
 	public ByteArrayResource downloadFileFromUUID(UUID uuid) {
 		try {
 			String downloadUrl = downloadOkmUrl + uuid;
+			System.out.println(">>>>> DownloadURL: " + downloadUrl);
 			
 			RestTemplate restTemplate = new RestTemplate();
 
