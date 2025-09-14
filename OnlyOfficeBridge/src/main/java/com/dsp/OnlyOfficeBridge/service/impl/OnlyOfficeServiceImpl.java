@@ -424,6 +424,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 				// 4. Build OpenKM download URL
 				String downloadUrl = downloadKmUrl + documentUuid;
+				System.out.println(">>> downloadUrl - " + downloadUrl);
 
 				// 5. Update or insert into OnlyOfficeMetadata
 				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
