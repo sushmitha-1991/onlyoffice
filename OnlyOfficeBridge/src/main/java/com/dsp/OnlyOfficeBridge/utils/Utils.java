@@ -59,7 +59,7 @@ import jakarta.servlet.http.HttpServletRequest;
 @Component
 public class Utils {
 
-	@Autowired
+	@Autowired 
 	private MyUserRepository myUserRepository;
 
 	@Autowired
