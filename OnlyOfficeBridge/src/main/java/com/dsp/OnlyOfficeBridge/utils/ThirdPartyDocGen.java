@@ -440,7 +440,7 @@ public class ThirdPartyDocGen {
 	            Map<String, String> map = new HashMap<>();
 	            map.put("meetingDate", (String) parts[1]);  // placeholder
 	            map.put("abbr", (String) parts[2]);         // placeholder
-
+	            map.put("pageNo", String.valueOf(files.size() + 1));
 	            try {
 	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 	                files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
