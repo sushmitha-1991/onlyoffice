@@ -75,7 +75,7 @@ public class Utils {
 	String downloadOkmUrl;
 	
 	@Value("${upload.url}")
-	String uploadOkmUrl;
+	String uploadOkmUrl; 
 	
 	/**
 	 * Fetches the user ID of the currently authenticated user
@@ -343,7 +343,7 @@ public class Utils {
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			System.out.println(requestEntity);
 //			String uploadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/document/upload";
-			System.out.println(">>> uploadUrl - " + uploadOkmUrl);
+			System.out.println(">>> NEW uploadUrl - " + uploadOkmUrl);
 			ResponseEntity<String> response = restTemplate.exchange(uploadOkmUrl, HttpMethod.POST, requestEntity,
 					String.class);
 
