@@ -74,6 +74,8 @@ public class ThirdPartyDocGen {
 			String refId) {
 		String url = bulletin2Url + "/get-generate-doc/" + refId;
 		System.out.println("url>>>>>>>" + url);
+		System.out.println("dsp2key>>>>>>>" + dsp2Key);
+
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -87,9 +89,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			System.out.println("RESPOSNE OF GET-GEN-DOC-B2: " + body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			System.err.println("Error during API call-B2: " + e.getMessage());
 			throw e;
 		}
 
@@ -131,8 +133,11 @@ public class ThirdPartyDocGen {
 						throw new RuntimeException(e);
 					}
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) map.get("dsp2Key"));
+					
+					
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
@@ -224,8 +229,12 @@ public class ThirdPartyDocGen {
 							throw new RuntimeException(e);
 						}
 						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+						
+						System.out.println(">>> Find by DSP2Key: " + map.get("dsp2Key"));
+						
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
+						
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -280,7 +289,7 @@ public class ThirdPartyDocGen {
 			body = response.getBody();
 			System.out.println(body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			System.err.println("Error during API call: " + e.getMessage()); 
 			throw e;
 		}
 
