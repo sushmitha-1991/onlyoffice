@@ -289,7 +289,7 @@ public class ThirdPartyDocGen {
 			body = response.getBody();
 			System.out.println(body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			System.err.println("Error during API call: " + e.getMessage()); 
 			throw e;
 		}
 
