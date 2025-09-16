@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
@@ -12,22 +13,22 @@ import lombok.extern.slf4j.Slf4j;
 public class DocGeneratorFactory { 
 
 	@Value("${bulletin2.gen.template.id}")
-	static String bulletin2TemplateId;
+	String bulletin2TemplateId;
 	
 	@Value("${lob.gen.template.id}")
-	static String lobTemplateId;
+	String lobTemplateId;
 	
 	@Value("${translation.gen.template.id}")
-	static String translationTemplateId;
+	String translationTemplateId;
 	
 	@Value("${verbatim.gen.template.id}")
-	static String verbatimTemplateId;
+	String verbatimTemplateId;
 	
 	@Value("${verbatim.lang.gen.template.id}")
-	static String verbatimLangTemplateId;
+	String verbatimLangTemplateId;
 	
 	@Value("${verbatim.hour.gen.template.id}")
-	static String verbatimHourTemplateId;
+	String verbatimHourTemplateId;
 	
 	@Autowired
 	private ObjectProvider<B2Generator> b2Generator;
@@ -68,4 +69,46 @@ public class DocGeneratorFactory {
 
 		return null;
 	}
+	
+	   @PostConstruct
+	    public void checkDependencies() {
+	        log.info("Bulletin2 templateId = {}", bulletin2TemplateId);
+	        log.info("LOB templateId = {}", lobTemplateId);
+	        log.info("Translation templateId = {}", translationTemplateId);
+	        log.info("Verbatim templateId = {}", verbatimTemplateId);
+	        log.info("VerbatimLang templateId = {}", verbatimLangTemplateId);
+	        log.info("VerbatimHour templateId = {}", verbatimHourTemplateId);
+
+	        try {
+	            log.info("B2Generator available? {}", b2Generator.getIfAvailable() != null);
+	        } catch (Exception e) {
+	            log.error("B2Generator missing!", e);
+	        }
+
+	        try {
+	            log.info("LobGenerator available? {}", lobGenerator.getIfAvailable() != null);
+	        } catch (Exception e) {
+	            log.error("LobGenerator missing!", e);
+	        }
+
+	        try {
+	            log.info("TranslatorGenerator available? {}", translatorGenerator.getIfAvailable() != null);
+	        } catch (Exception e) {
+	            log.error("TranslatorGenerator missing!", e);
+	        }
+
+	        try {
+	            log.info("VerbatimGenerator available? {}", verbatimGenerator.getIfAvailable() != null);
+	        } catch (Exception e) {
+	            log.error("VerbatimGenerator missing!", e);
+	        }
+
+	        try {
+	            log.info("VerbatimHourlyGenerator available? {}", verbatimHourlyGenerator.getIfAvailable() != null);
+	        } catch (Exception e) {
+	            log.error("VerbatimHourlyGenerator missing!", e);
+	        }
+	    }
+	
+
 }
