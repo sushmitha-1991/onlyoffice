@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
 import org.apache.commons.lang3.StringUtils;
@@ -489,95 +492,71 @@ public class ThirdPartyDocGen {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 	    }
 	}
+	
+	public ResponseEntity<Resource> genSowGeneration(String key, List<DocTemplate> docTemplates, String refId) {
+		// Build URL (refId = "1_6")
+		String[] parts = refId.split("_");
+		
+		Long lokSabhaId = Long.parseLong(parts[0]);
+		Long sessionId = Long.parseLong(parts[1]);
 
+		String url = lobUrl + "/master/loksabhaSession/get-lok-sabha-session/" + lokSabhaId + "/" + sessionId;
+		System.out.println("Calling Lok Sabha Session API URL >>> " + url);
 
+		// Call API
+		Map<String, Object> body = null;
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
+			body = response.getBody();
+			System.out.println("Response from Lok Sabha API >>> " + body);
+		} catch (Exception e) {
+			System.err.println("Error while calling Lok Sabha API: " + e.getMessage());
+			throw e;
+		}
 
+		final Map<String, Object> finalBody = body;
+		List<MargeFileDto> files = new LinkedList<>();
+		// Add today's date
+	    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
+	    String todayDate = LocalDate.now().format(formatter);
+	    System.out.println("todays date: "+todayDate);
 
-//	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
-//		// Fetch dspKeys from your API
-//		List<String> dspKeys = fetchDspKeysFromApi(refId);
-//
-//		// Collect files
-//		List<MargeFileDto> files = new LinkedList<>();
-//
-//		docTemplates.forEach(docTemplate -> {
-//			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
-//
-//			if ("verbatim_merge_con".equals(docTemplate.getCode())) {
-//				System.out.println("Inside verbatim_merge_con");
-//
-//				dspKeys.forEach(dspKey -> {
-//					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-//
-//					metadataOpt.ifPresent(metadata -> {
-//						ByteArrayResource resourceBody = utils
-//								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-//
-//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-//					});
-//				});
-//			}
-//		});
-//
-//		// Merge and return response
-//		try {
-//			byte[] mergedBytes = mergeDocxFiles(files);
-//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-//
-//			saveOpenKm(key, mergedResource);
-//
-//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
-//					.contentLength(mergedResource.contentLength()).body(mergedResource);
-//		} catch (Exception e) {
-//			System.err.println("Error while merging verbatim docs: " + e.getMessage());
-//			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-//		}
-//	}
-//
-//	/**
-//	 * Helper method to call /get-verbatim-dsp-key API and extract dspKeys.
-//	 */
-//	@SuppressWarnings("unchecked")
-//	private List<String> fetchDspKeysFromApi(String refId) {
-//		String url;
-//		if (StringUtils.containsIgnoreCase(refId, "hr")) {
-//			url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
-//		} else if (StringUtils.containsIgnoreCase(refId, "sm")) {
-//			url = verbatimStaffUrl + "/merge-file/get-by-refId/" + refId;
-//		} else {
-//			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
-//		}
-//		System.out.println("Calling Verbatim API URL >>> " + url);
-//
-//		if (token == null) {
-//			throw new IllegalStateException("Authorization token is missing");
-//		}
-//
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.set("Authorization", "Bearer " + token);
-//		headers.setContentType(MediaType.APPLICATION_JSON);
-//
-//		HttpEntity<Void> entity = new HttpEntity<>(headers);
-//
-//		try {
-//			RestTemplate restTemplate = new RestTemplate();
-//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-//			System.out.println(response);
-//			Map<String, Object> body = response.getBody();
-//			System.out.println("Response from verbatim API >>> " + body);
-//
-//			if (body != null && body.get("data") != null) {
-//				// ✅ data is already a List<String>
-//				return (List<String>) body.get("data");
-//			}
-//		} catch (Exception e) {
-//			System.err.println("Error while calling verbatim API: " + e.getMessage());
-//			throw e;
-//		}
-//
-//		return Collections.emptyList();
-//	}
+		docTemplates.forEach(docTemplate -> {
+			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+
+			// Handle sow_header_ls template
+			if ("sow_header_ls".equals(docTemplate.getCode())) {
+				Map<String, Object> data = (Map<String, Object>) finalBody.get("data");
+				Map<String, String> map = new HashMap<>();
+				map.put("sessionNumber", (String) data.get("sessionNumber"));
+				map.put("lokSabhaNumber", (String) data.get("lokSabhaNumber"));
+			    map.put("todayDate", (String) todayDate);
+			    
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+
+		// Merge and return response
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sow_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging SOW docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
 
 	public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
 		log.info("Total files to merge: " + margeFileDtos.size());
