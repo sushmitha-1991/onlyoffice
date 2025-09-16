@@ -75,9 +75,19 @@ public class VerbatimGenerator extends DocGeneratorBase implements IDocGenerator
 	            if ("verbatim_lang_gen_header".equals(docTemplate.getCode())) {
 	                Map<String, Object> data = (Map<String, Object>) finalBody.get("data");
 	                Map<String, String> map = new HashMap<>();
-	                map.put("slotTurn", (String) data.get("slotTurn"));
-	                map.put("abbr", (String) data.get("abbr"));
-	                map.put("counterAbbr", (String) data.get("counterAbbr"));
+	                
+	                String slotTurn = data.get("slotTurn") != null ? (String) data.get("slotTurn") : "";
+	                String abbr = data.get("abbr") != null ? (String) data.get("abbr") : "";
+	                String counterAbbr = data.get("counterAbbr") != null ? (String) data.get("counterAbbr") : "";
+
+	                // If counterAbbr is not empty, append to abbr
+	                if (!counterAbbr.isEmpty()) {
+	                    abbr = abbr + "/" + counterAbbr;
+	                }
+
+	                map.put("slotTurn", slotTurn);
+	                map.put("abbr", abbr);
+	                
 	                try {
 	                    ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 	                    files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
