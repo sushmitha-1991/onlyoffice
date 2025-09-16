@@ -71,6 +71,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String verbatimLangTemplateId;
 	@Value("${verbatim.hour.gen.template.id}")
 	String verbatimHourTemplateId;
+	@Value("${statementofwork.gen.template.id}")
+	String statementOfWorkTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Autowired
@@ -191,6 +193,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(verbatimHourTemplateId)) {
 					return thirdPartyDocGen.genVerbatimHourGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(statementOfWorkTemplateId)) {
+					return thirdPartyDocGen.genSowGeneration(key, docTemplates, refId);
 				}
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
