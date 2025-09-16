@@ -17,7 +17,6 @@ import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
-import com.dsp.OnlyOfficeBridge.utils.DocGeneratorUtils;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
 
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +25,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class LobGenerator extends DocGeneratorBase implements IDocGenerator {
 
-	@Autowired
-	private DocGeneratorUtils docUtils;
-	
 	@Autowired
 	private OnlyOfficeMetadataRepository onlyOfficeMetadataRepository;
 

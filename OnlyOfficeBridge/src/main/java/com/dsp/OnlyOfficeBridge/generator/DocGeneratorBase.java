@@ -16,7 +16,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.poi.wp.usermodel.HeaderFooterType;
+import org.apache.poi.xwpf.usermodel.IBodyElement;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFFooter;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
@@ -25,6 +29,9 @@ import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 import org.jodconverter.local.LocalConverter;
 import org.jodconverter.local.office.LocalOfficeManager;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -44,7 +51,6 @@ import org.springframework.web.client.RestTemplate;
 import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
-import com.dsp.OnlyOfficeBridge.utils.DocGeneratorUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -123,7 +129,7 @@ public abstract class DocGeneratorBase {
 	ResponseEntity mergeFiles (List<MargeFileDto> files, String dsp2Key) {
 		
 		try {
-			byte[] mergedBytes = DocGeneratorUtils.mergeDocxFiles(files);
+			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 			saveOpenKm(dsp2Key, mergedResource);
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -371,6 +377,72 @@ public abstract class DocGeneratorBase {
             tempFile.delete();
         }
     }
+    
+	public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
+		log.info("Total files to merge: " + margeFileDtos.size());
+
+		XWPFDocument mergedDoc = new XWPFDocument();
+
+		for (int i = 0; i < margeFileDtos.size(); i++) {
+			MargeFileDto fileBytes = margeFileDtos.get(i);
+			try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
+					XWPFDocument doc = new XWPFDocument(bais)) {
+
+//				// ---- Copy body paragraphs ----
+//				for (XWPFParagraph p : doc.getParagraphs()) {
+//					XWPFParagraph newP = mergedDoc.createParagraph();
+//					newP.getCTP().set(p.getCTP().copy());
+//				}
+//
+//				// ---- Copy tables ----
+//				for (XWPFTable table : doc.getTables()) {
+//					XWPFTable newTable = mergedDoc.createTable();
+//					newTable.getCTTbl().set(table.getCTTbl().copy());
+//				}
+                for (IBodyElement element : doc.getBodyElements()) {
+                    if (element instanceof XWPFParagraph) {
+                        XWPFParagraph p = (XWPFParagraph) element;
+                        XWPFParagraph newP = mergedDoc.createParagraph();
+                        newP.getCTP().set(p.getCTP().copy());
+                    } else if (element instanceof XWPFTable) {
+                        XWPFTable table = (XWPFTable) element;
+                        XWPFTable newTable = mergedDoc.createTable();
+                        newTable.getCTTbl().set(table.getCTTbl().copy());
+                    }
+                }
+
+				// ---- Copy headers ----
+				for (XWPFHeader header : doc.getHeaderList()) {
+					XWPFHeader newHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
+					for (XWPFParagraph p : header.getParagraphs()) {
+						XWPFParagraph newP = newHeader.createParagraph();
+						newP.getCTP().set(p.getCTP().copy());
+					}
+				}
+
+				// ---- Copy footers ----
+				for (XWPFFooter footer : doc.getFooterList()) {
+					XWPFFooter newFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
+					for (XWPFParagraph p : footer.getParagraphs()) {
+						XWPFParagraph newP = newFooter.createParagraph();
+						newP.getCTP().set(p.getCTP().copy());
+					}
+				}
+
+			}
+		}
+		CTBody body = mergedDoc.getDocument().getBody();
+		CTSectPr sectPr = body.isSetSectPr() ? body.getSectPr() : body.addNewSectPr();
+		CTPageMar pageMar = sectPr.addNewPgMar();
+		pageMar.setTop(720); // 0.5 inch
+		pageMar.setBottom(720); // 0.5 inch
+		pageMar.setLeft(720); // 0.5 inch
+		pageMar.setRight(720); // 0.5 inch
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+			mergedDoc.write(baos);
+			return baos.toByteArray();
+		}
+	}
 
     
 }
