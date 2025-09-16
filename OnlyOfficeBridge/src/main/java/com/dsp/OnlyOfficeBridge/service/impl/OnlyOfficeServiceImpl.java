@@ -55,7 +55,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	private OnlyOfficeMetadataRepository onlyOfficeMetadataRepository;
 	
 	@Autowired
-	private DocGeneratorFactory docGenFactory;
+	private DocGeneratorFactory docGenFactory; 
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
