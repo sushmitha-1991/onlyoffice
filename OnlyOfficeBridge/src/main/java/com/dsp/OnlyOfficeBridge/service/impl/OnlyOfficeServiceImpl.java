@@ -35,6 +35,8 @@ import org.springframework.stereotype.Service;
 
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
+import com.dsp.OnlyOfficeBridge.generator.DocGeneratorFactory;
+import com.dsp.OnlyOfficeBridge.generator.IDocGenerator;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
@@ -205,6 +207,48 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
 
+	
+	@Override
+	public ResponseEntity<Resource> downloadByKeyV2(String key, String templateId, String refId) {
+		
+		String[] keys = key.split(",");
+
+		try {
+			if (Integer.parseInt(templateId) > 0) {
+
+				List<DocTemplate> docTemplates = docTemplateRepository
+						.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId), Long.parseLong(templateId));
+		
+				if (templateId.equals(verbatimFullDayLSTemplateId)) {
+					return thirdPartyDocGen.generateVerbatimFullDayLSFile(key, docTemplates, refId);
+				} 				
+				else if (templateId.equals(verbatimFullDayRSTemplateId)) {
+					return thirdPartyDocGen.generateVerbatimFullDayRSFile(key, docTemplates, refId);
+				} else {
+					IDocGenerator generator = DocGeneratorFactory.getGenerator(templateId);
+					return generator.generate(key, docTemplates, refId);
+				}
+			
+			} else {
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
+				if (metadataOpt.isPresent()) {
+					ByteArrayResource resource = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+							.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
+							.contentLength(resource.contentLength()).body(resource);
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+	}
+
+	
 	public byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
 		XWPFDocument mergedDoc = new XWPFDocument();
 

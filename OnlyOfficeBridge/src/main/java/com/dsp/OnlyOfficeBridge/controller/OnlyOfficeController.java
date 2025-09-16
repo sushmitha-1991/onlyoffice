@@ -45,10 +45,10 @@ public class OnlyOfficeController {
 		return ResponseEntity.ok(response);
 	}
 
-//	309610fc-dd27-4668-8920-2bf2a154fc01
 	@GetMapping("/download/{key}/{templateId}/{refId}")
 	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId) {
-		return onlyOfficeService.downloadByKey(key,templateId,refId);
+//		return onlyOfficeService.downloadByKey(key,templateId,refId);
+		return onlyOfficeService.downloadByKeyV2(key,templateId,refId);
 	}
 
 	@PostMapping("/callback")
