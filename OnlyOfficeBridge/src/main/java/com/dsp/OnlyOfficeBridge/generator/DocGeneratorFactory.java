@@ -1,7 +1,14 @@
 package com.dsp.OnlyOfficeBridge.generator;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Component
+@Slf4j
 public class DocGeneratorFactory {
 
 	@Value("${bulletin2.gen.template.id}")
@@ -21,27 +28,42 @@ public class DocGeneratorFactory {
 	
 	@Value("${verbatim.hour.gen.template.id}")
 	static String verbatimHourTemplateId;
+	
+	@Autowired
+	private ObjectProvider<B2Generator> b2Generator;
 		
-	public static IDocGenerator getGenerator(String templateId) {
+	@Autowired
+	private ObjectProvider<LobGenerator> lobGenerator;
+	
+	@Autowired
+	private ObjectProvider<TranslatorGenerator> translatorGenerator;
+	
+	@Autowired
+	private ObjectProvider<VerbatimGenerator> verbatimGenerator;
+	
+	@Autowired
+	private ObjectProvider<VerbatimHourlyGenerator> verbatimHourlyGenerator;
+	
+	public IDocGenerator getGenerator(String templateId) {
 		
 		if (templateId.equals(bulletin2TemplateId)) {
-			return new B2Generator();
+			return b2Generator.getObject();
 		}
 		
 		if (templateId.equals(lobTemplateId)) {
-			return new LobGenerator();
+			return lobGenerator.getObject();
 		}
 		
 		if (templateId.equals(translationTemplateId)) {
-			return new TranslatorGenerator();
+			return translatorGenerator.getObject();
 		}
 		
 		if (templateId.equals(verbatimTemplateId) || templateId.equals(verbatimLangTemplateId)) {
-			return new VerbatimGenerator();
+			return verbatimGenerator.getObject();
 		}
 				
 		if (templateId.equals(verbatimHourTemplateId)) {
-			return new VerbatimHourlyGenerator();
+			return verbatimHourlyGenerator.getObject();
 		}
 
 		return null;
