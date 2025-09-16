@@ -18,6 +18,8 @@ public interface OnlyOfficeService {
 	Map<String, Object> getEditorConfig(Map<String, String> payload);
 
 	ResponseEntity<Resource> downloadByKey(String key,String templateId,String refId);
+	
+	ResponseEntity<Resource> downloadByKeyV2(String key,String templateId,String refId);
 
 	ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key,String applicationId, Map<String, Object> payload);
 
