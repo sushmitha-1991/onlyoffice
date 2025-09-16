@@ -53,6 +53,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
 	private OnlyOfficeMetadataRepository onlyOfficeMetadataRepository;
+	
+	@Autowired
+	private DocGeneratorFactory docGenFactory; 
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
@@ -160,6 +163,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
+	@Deprecated
 	public ResponseEntity<Resource> downloadByKey(String key, String templateId, String refId) {
 		String[] keys = key.split(",");
 
@@ -225,7 +229,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				else if (templateId.equals(verbatimFullDayRSTemplateId)) {
 					return thirdPartyDocGen.generateVerbatimFullDayRSFile(key, docTemplates, refId);
 				} else {
-					IDocGenerator generator = DocGeneratorFactory.getGenerator(templateId);
+					IDocGenerator generator = docGenFactory.getGenerator(templateId);
 					return generator.generate(key, docTemplates, refId);
 				}
 			
