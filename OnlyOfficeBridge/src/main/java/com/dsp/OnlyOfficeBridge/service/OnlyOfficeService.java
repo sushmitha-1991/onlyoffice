@@ -17,6 +17,7 @@ public interface OnlyOfficeService {
 
 	Map<String, Object> getEditorConfig(Map<String, String> payload);
 
+	@Deprecated
 	ResponseEntity<Resource> downloadByKey(String key,String templateId,String refId);
 	
 	ResponseEntity<Resource> downloadByKeyV2(String key,String templateId,String refId);
