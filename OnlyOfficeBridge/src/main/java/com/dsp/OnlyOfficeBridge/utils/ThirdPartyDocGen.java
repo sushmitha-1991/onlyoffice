@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
+import com.dsp.OnlyOfficeBridge.client.dto.FullDayInformationDTO;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.usermodel.*;
@@ -378,9 +379,19 @@ public class ThirdPartyDocGen {
 	            if ("verbatim_lang_gen_header".equals(docTemplate.getCode())) {
 	                Map<String, Object> data = (Map<String, Object>) finalBody.get("data");
 	                Map<String, String> map = new HashMap<>();
-	                map.put("slotTurn", (String) data.get("slotTurn"));
-	                map.put("abbr", (String) data.get("abbr"));
-	                map.put("counterAbbr", (String) data.get("counterAbbr"));
+	                
+	                String slotTurn = data.get("slotTurn") != null ? (String) data.get("slotTurn") : "";
+	                String abbr = data.get("abbr") != null ? (String) data.get("abbr") : "";
+	                String counterAbbr = data.get("counterAbbr") != null ? (String) data.get("counterAbbr") : "";
+
+	                // If counterAbbr is not empty, append to abbr
+	                if (!counterAbbr.isEmpty()) {
+	                    abbr = abbr + "/" + counterAbbr;
+	                }
+
+	                map.put("slotTurn", slotTurn);
+	                map.put("abbr", abbr);
+	                
 	                try {
 	                    ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 	                    files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
@@ -442,39 +453,45 @@ public class ThirdPartyDocGen {
 	        System.err.println("Error while calling /get-verbatim-hour-abbr/: " + e.getMessage());
 	        throw e;
 	    }
-	    String[] parts = refId.split("_", 3);
+	    String[] parts = refId.split("_", 4);
+	    String committeeName = parts[3];
 	    List<MargeFileDto> files = new LinkedList<>();
 
-	    docTemplates.forEach(docTemplate -> {
-	        System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
-	        
-	        if (docTemplate.getCode().equals("verbatim_hour_gen_header")) {
-	            Map<String, String> map = new HashMap<>();
-	            map.put("meetingDate", (String) parts[1]);  // placeholder
-	            map.put("abbr", (String) parts[2]);         // placeholder
-	            map.put("pageNo", String.valueOf(files.size() + 1));
-	            try {
-	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-	                files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-	            } catch (Exception e) {
-	                throw new RuntimeException(e);
-	            }
+		docTemplates.forEach(docTemplate -> {
+			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
 
-	        } else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
-	        	// data is actually a list of dspKeys
-	            List<String> dspKeys = (List<String>) body.get("data");
-	            if (dspKeys != null) {
-	                dspKeys.forEach(dspKey -> {
-	                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-	                    metadataOpt.ifPresent(metadata -> {
-	                        ByteArrayResource resourceBody =
-	                                utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-	                        files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-	                    });
-	                });
-	            }
-	        }
-	    });
+			boolean isHouse = "house".equalsIgnoreCase(committeeName);
+
+			// Decide which template code should be used
+			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
+
+			if (docTemplate.getCode().equals(expectedCode)) {
+				Map<String, String> map = new HashMap<>();
+				map.put("meetingDate", (String) parts[1]);
+				map.put("abbr", (String) parts[2]);
+				map.put("pageNo", String.valueOf(files.size() + 1));
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
+				// data is actually a list of dspKeys
+				List<String> dspKeys = (List<String>) body.get("data");
+				if (dspKeys != null) {
+					dspKeys.forEach(dspKey -> {
+						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+						metadataOpt.ifPresent(metadata -> {
+							ByteArrayResource resourceBody = utils
+									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						});
+					});
+				}
+			}
+		});
 
 	    // Merge and return response
 	    try {
@@ -679,12 +696,15 @@ public class ThirdPartyDocGen {
 
 	}
 	public ResponseEntity<Resource> generateVerbatimFullDayLSFile(String key, List<DocTemplate> docTemplates, String refId)  {
-		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		FullDayInformationDTO fullDayInformationDTO = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		List<String> dspKeys=fullDayInformationDTO.getDsp2Keys();
 
 		// Collect files
 		List<MargeFileDto> files = new LinkedList<>();
 		try {
-			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx", new HashMap<>());
+			Map<String, String> replacements = new HashMap<>();
+			replacements.put("meetingDateFullString",(String) fullDayInformationDTO.getMeetingDate());
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx", replacements);
 			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -704,12 +724,15 @@ public class ThirdPartyDocGen {
 
 
 	public ResponseEntity<Resource> generateVerbatimFullDayRSFile(String key, List<DocTemplate> docTemplates, String refId) {
-		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
-
+		FullDayInformationDTO fullDayInformationDTO = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		List<String> dspKeys=fullDayInformationDTO.getDsp2Keys();
 		// Collect files
 		List<MargeFileDto> files = new LinkedList<>();
+
 		try {
-			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx", new HashMap<>());
+			Map<String, String> replacements = new HashMap<>();
+			replacements.put("meetingDateFullString",(String) fullDayInformationDTO.getMeetingDate());
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx", replacements);
 			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);

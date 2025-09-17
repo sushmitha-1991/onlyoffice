@@ -1,6 +1,7 @@
 package com.dsp.OnlyOfficeBridge.client.impl;
 
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
+import com.dsp.OnlyOfficeBridge.client.dto.FullDayInformationDTO;
 import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,19 +26,19 @@ public class VerbatimClientImpl implements VerbatimClient {
     private RestTemplate restTemplate;
 
     @Override
-    public List<String> getFullFileDsp2Keys(Long meetingId) {
+    public FullDayInformationDTO getFullFileDsp2Keys(Long meetingId) {
             String url = verbatimServiceUrl + "/proceedings/merge-of-merged/full-day-merge-dsp2key/"+meetingId;
-            ParameterizedTypeReference<GenericResponse<List<String>>> responseType =
+            ParameterizedTypeReference<GenericResponse<FullDayInformationDTO>> responseType =
                     new ParameterizedTypeReference<>() {};
 
             HttpEntity<String> entity = new HttpEntity<>(null);
-            ResponseEntity<GenericResponse<List<String>>> response = restTemplate.exchange(
+            ResponseEntity<GenericResponse<FullDayInformationDTO>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,entity,
                     responseType
             );
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                List<String> session = response.getBody().getData();
+                FullDayInformationDTO session = response.getBody().getData();
                 log.info("Session Fetched: {}", session);
                 return session;
             } else {
