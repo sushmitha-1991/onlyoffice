@@ -165,7 +165,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	@Deprecated
 	public ResponseEntity<Resource> downloadByKey(String key, String templateId, String refId) {
 		String[] keys = key.split(",");
 

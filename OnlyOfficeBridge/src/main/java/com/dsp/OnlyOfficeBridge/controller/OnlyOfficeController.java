@@ -47,8 +47,7 @@ public class OnlyOfficeController {
 
 	@GetMapping("/download/{key}/{templateId}/{refId}")
 	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId) {
-//		return onlyOfficeService.downloadByKey(key,templateId,refId);
-		return onlyOfficeService.downloadByKeyV2(key,templateId,refId);
+		return onlyOfficeService.downloadByKey(key,templateId,refId);
 	}
 
 	@PostMapping("/callback")
