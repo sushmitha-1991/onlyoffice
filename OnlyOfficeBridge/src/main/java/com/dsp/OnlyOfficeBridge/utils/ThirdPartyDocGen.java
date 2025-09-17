@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
+import com.dsp.OnlyOfficeBridge.client.dto.FullDayInformationDTO;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.usermodel.*;
@@ -679,12 +680,15 @@ public class ThirdPartyDocGen {
 
 	}
 	public ResponseEntity<Resource> generateVerbatimFullDayLSFile(String key, List<DocTemplate> docTemplates, String refId)  {
-		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		FullDayInformationDTO fullDayInformationDTO = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		List<String> dspKeys=fullDayInformationDTO.getDsp2Keys();
 
 		// Collect files
 		List<MargeFileDto> files = new LinkedList<>();
 		try {
-			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx", new HashMap<>());
+			Map<String, String> replacements = new HashMap<>();
+			replacements.put("meetingDateFullString",fullDayInformationDTO.getMeetingDate());
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx", replacements);
 			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -704,12 +708,15 @@ public class ThirdPartyDocGen {
 
 
 	public ResponseEntity<Resource> generateVerbatimFullDayRSFile(String key, List<DocTemplate> docTemplates, String refId) {
-		List<String> dspKeys = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
-
+		FullDayInformationDTO fullDayInformationDTO = verbatimClient.getFullFileDsp2Keys(Long.valueOf(refId));
+		List<String> dspKeys=fullDayInformationDTO.getDsp2Keys();
 		// Collect files
 		List<MargeFileDto> files = new LinkedList<>();
+
 		try {
-			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx", new HashMap<>());
+			Map<String, String> replacements = new HashMap<>();
+			replacements.put("meetingDateFullString",fullDayInformationDTO.getMeetingDate());
+			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx", replacements);
 			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
