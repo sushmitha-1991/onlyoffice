@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
 import org.docx4j.XmlUtils;
+import org.docx4j.model.datastorage.migration.VariablePrepare;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.docx4j.wml.Text;
@@ -442,29 +443,78 @@ public class Utils {
 
         MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
 
-        // Get all text nodes
-        List<Object> texts = mainPart.getJAXBNodesViaXPath("//w:t", true);
+        // --- Try the docx4j variableReplace path first (recommended) ---
+        // This expects placeholders like ${name} and uses VariablePrepare to merge split runs.
+        try {
+            VariablePrepare.prepare(wordMLPackage);
+            mainPart.variableReplace(replacements);
+        } catch (Exception e) {
+            // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
+            // we'll continue to the manual fallback below.
+        }
 
-        for (Object obj : texts) {
+        // --- Manual fallback for templates using {name} and split runs ---
+        List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
+        List<Text> textElements = new ArrayList<>();
+
+        for (Object obj : tNodes) {
             Object unwrapped = XmlUtils.unwrap(obj);
-
             if (unwrapped instanceof Text) {
-                Text textElement = (Text) unwrapped;
-                String text = textElement.getValue();
-
-                // Replace placeholders like {name}, {date}, etc.
-                for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                    String placeholder = "{" + entry.getKey() + "}";
-                    if (text.contains(placeholder)) {
-                        text = text.replace(placeholder, entry.getValue());
-                    }
-                }
-
-                textElement.setValue(text);
+                textElements.add((Text) unwrapped);
             }
         }
 
-        // Write updated DOCX into memory
+        int n = textElements.size();
+        int i = 0;
+
+        while (i < n) {
+            StringBuilder sb = new StringBuilder();
+            boolean replacedInWindow = false;
+            int j = i;
+
+            // Expand window until we hit a closing brace '}' (only then a full placeholder might exist)
+            while (j < n) {
+                String val = textElements.get(j).getValue();
+                if (val != null) sb.append(val);
+
+                String combined = sb.toString();
+
+                // Only attempt replacement when there's a '}' in the combined text (closing brace)
+                if (combined.indexOf('}') >= 0) {
+                    String replacedCombined = combined;
+                    // Replace all placeholders that occur in this combined text
+                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                        String placeholder = "{" + entry.getKey() + "}";
+                        if (replacedCombined.contains(placeholder)) {
+                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+                        }
+                    }
+
+                    if (!replacedCombined.equals(combined)) {
+                        // Put replaced text into the first run of the window
+                        textElements.get(i).setValue(replacedCombined);
+                        // Clear the text in the remaining runs of the window to remove leftover fragments
+                        for (int k = i + 1; k <= j; k++) {
+                            textElements.get(k).setValue("");
+                        }
+                        replacedInWindow = true;
+                        break;
+                    }
+                }
+                j++;
+            }
+
+            if (replacedInWindow) {
+                // Continue after the window we processed
+                i = j + 1;
+            } else {
+                // No replacement in this window: move one run forward
+                i++;
+            }
+        }
+
+        // Write updated DOCX into memory and return as resource
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         wordMLPackage.save(baos);
 

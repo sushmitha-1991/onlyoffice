@@ -127,7 +127,7 @@ public class ThirdPartyDocGen {
 				List<Map> inputList = (List<Map>) data.get("inputList");
 				inputList.forEach(map -> {
 					Map<String, String> map1 = new HashMap<>();
-					map1.put("myno", String.valueOf((Integer) map.get("bulletinNo")));
+					map1.put("bulletinNo", map.get("bulletinNo").toString());
 					map1.put("branch", (String) map.get("officeName"));
 					map1.put("subject", (String) map.get("subject"));
 					Map<String, String> mapLine = new HashMap<>();
