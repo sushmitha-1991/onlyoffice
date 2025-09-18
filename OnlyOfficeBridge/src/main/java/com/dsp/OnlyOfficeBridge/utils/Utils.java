@@ -17,6 +17,10 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
+import org.docx4j.XmlUtils;
+import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.wml.Text;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 //import org.jodconverter.local.LocalConverter;
 //import org.jodconverter.local.office.LocalOfficeManager;
@@ -429,71 +433,42 @@ public class Utils {
             }
         };
     }
-    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
+    public static ByteArrayResource replacePlaceholders(
+            String resourcePath, Map<String, String> replacements) throws Exception {
 
-        // Load file from resources
-        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
+        // Load DOCX from resources
+        WordprocessingMLPackage wordMLPackage =
+                WordprocessingMLPackage.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
 
-        // Copy resource to a temp file (LibreOffice requires a real File, not just InputStream)
-        File inputFile = File.createTempFile("template", ".docx");
-        try (InputStream in = resource.getInputStream();
-             OutputStream out = new FileOutputStream(inputFile)) {
-            in.transferTo(out);
-        }
+        MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
 
-        File tempFile = File.createTempFile("converted", ".fodt");
+        // Get all text nodes
+        List<Object> texts = mainPart.getJAXBNodesViaXPath("//w:t", true);
 
-        LocalOfficeManager officeManager = LocalOfficeManager.install();
-        officeManager.start();
-//        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
-//                // If your LibreOffice server runs in socket mode:
-//                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
-//
-//                // If your LibreOffice server exposes REST API:
-//                .urlConnection("http://10.247.128.22:2002")
-//                .build();
+        for (Object obj : texts) {
+            Object unwrapped = XmlUtils.unwrap(obj);
 
-        try {
-            // Convert DOCX → FODT
-            LocalConverter.builder()
-                    .officeManager(officeManager)
-                    .build()
-                    .convert(inputFile)
-                    .to(tempFile)
-                    .as(DefaultDocumentFormatRegistry.FODT)
-                    .execute();
+            if (unwrapped instanceof Text) {
+                Text textElement = (Text) unwrapped;
+                String text = textElement.getValue();
 
-            // Read + replace placeholders in FODT XML
-            String xml = new String(java.nio.file.Files.readAllBytes(tempFile.toPath()), StandardCharsets.UTF_8);
+                // Replace placeholders like {name}, {date}, etc.
+                for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                    String placeholder = "{" + entry.getKey() + "}";
+                    if (text.contains(placeholder)) {
+                        text = text.replace(placeholder, entry.getValue());
+                    }
+                }
 
-            for (Map.Entry<String, String> entry : replacements.entrySet()) {
-//                String placeholder = "\\{" + entry.getKey() + "\\}";
-//                xml = xml.replaceAll(placeholder, entry.getValue());
-                String placeholder = "{" + entry.getKey() + "}";
-                String safeValue = StringEscapeUtils.escapeXml11(entry.getValue()); // escapes &, <, >, ", '
-                xml = xml.replace(placeholder, safeValue);
+                textElement.setValue(text);
             }
-
-            // Write modified FODT back
-            java.nio.file.Files.write(tempFile.toPath(), xml.getBytes(StandardCharsets.UTF_8));
-
-            // Convert FODT → DOCX into memory
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            LocalConverter.builder()
-                    .officeManager(officeManager)
-                    .build()
-                    .convert(tempFile)
-                    .to(baos)
-                    .as(DefaultDocumentFormatRegistry.DOCX)
-                    .execute();
-
-            return new ByteArrayResource(baos.toByteArray());
-
-        } finally {
-            officeManager.stop();
-            inputFile.delete(); // cleanup temp files
-            tempFile.delete();
         }
+
+        // Write updated DOCX into memory
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        wordMLPackage.save(baos);
+
+        return new ByteArrayResource(baos.toByteArray());
     }
 
 //    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
