@@ -111,6 +111,18 @@
             <artifactId>jodconverter-local</artifactId>
             <version>4.4.6</version>
         </dependency>
+        <dependency>
+            <groupId>org.docx4j</groupId>
+            <artifactId>docx4j-core</artifactId>
+            <version>11.5.4</version>
+        </dependency>
+
+        <!-- JAXB Reference Implementation (for Java 17) -->
+        <dependency>
+            <groupId>org.docx4j</groupId>
+            <artifactId>docx4j-JAXB-ReferenceImpl</artifactId>
+            <version>11.5.4</version>
+        </dependency>
 <!--        <dependency>-->
 <!--            <groupId>org.jodconverter</groupId>-->
 <!--            <artifactId>jodconverter-remote</artifactId>-->

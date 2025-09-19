@@ -17,6 +17,11 @@ import java.util.UUID;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
+import org.docx4j.XmlUtils;
+import org.docx4j.model.datastorage.migration.VariablePrepare;
+import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.wml.Text;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 //import org.jodconverter.local.LocalConverter;
 //import org.jodconverter.local.office.LocalOfficeManager;
@@ -429,71 +434,91 @@ public class Utils {
             }
         };
     }
-    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
+    public static ByteArrayResource replacePlaceholders(
+            String resourcePath, Map<String, String> replacements) throws Exception {
 
-        // Load file from resources
-        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
+        // Load DOCX from resources
+        WordprocessingMLPackage wordMLPackage =
+                WordprocessingMLPackage.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
 
-        // Copy resource to a temp file (LibreOffice requires a real File, not just InputStream)
-        File inputFile = File.createTempFile("template", ".docx");
-        try (InputStream in = resource.getInputStream();
-             OutputStream out = new FileOutputStream(inputFile)) {
-            in.transferTo(out);
+        MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
+
+        // --- Try the docx4j variableReplace path first (recommended) ---
+        // This expects placeholders like ${name} and uses VariablePrepare to merge split runs.
+        try {
+            VariablePrepare.prepare(wordMLPackage);
+            mainPart.variableReplace(replacements);
+        } catch (Exception e) {
+            // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
+            // we'll continue to the manual fallback below.
         }
 
-        File tempFile = File.createTempFile("converted", ".fodt");
+        // --- Manual fallback for templates using {name} and split runs ---
+        List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
+        List<Text> textElements = new ArrayList<>();
 
-        LocalOfficeManager officeManager = LocalOfficeManager.install();
-        officeManager.start();
-//        RemoteOfficeManager officeManager = RemoteOfficeManager.builder()
-//                // If your LibreOffice server runs in socket mode:
-//                //.urlConnection("socket://<REMOTE_SERVER_IP>:2002")
-//
-//                // If your LibreOffice server exposes REST API:
-//                .urlConnection("http://10.247.128.22:2002")
-//                .build();
+        for (Object obj : tNodes) {
+            Object unwrapped = XmlUtils.unwrap(obj);
+            if (unwrapped instanceof Text) {
+                textElements.add((Text) unwrapped);
+            }
+        }
 
-        try {
-            // Convert DOCX → FODT
-            LocalConverter.builder()
-                    .officeManager(officeManager)
-                    .build()
-                    .convert(inputFile)
-                    .to(tempFile)
-                    .as(DefaultDocumentFormatRegistry.FODT)
-                    .execute();
+        int n = textElements.size();
+        int i = 0;
 
-            // Read + replace placeholders in FODT XML
-            String xml = new String(java.nio.file.Files.readAllBytes(tempFile.toPath()), StandardCharsets.UTF_8);
+        while (i < n) {
+            StringBuilder sb = new StringBuilder();
+            boolean replacedInWindow = false;
+            int j = i;
 
-            for (Map.Entry<String, String> entry : replacements.entrySet()) {
-//                String placeholder = "\\{" + entry.getKey() + "\\}";
-//                xml = xml.replaceAll(placeholder, entry.getValue());
-                String placeholder = "{" + entry.getKey() + "}";
-                String safeValue = StringEscapeUtils.escapeXml11(entry.getValue()); // escapes &, <, >, ", '
-                xml = xml.replace(placeholder, safeValue);
+            // Expand window until we hit a closing brace '}' (only then a full placeholder might exist)
+            while (j < n) {
+                String val = textElements.get(j).getValue();
+                if (val != null) sb.append(val);
+
+                String combined = sb.toString();
+
+                // Only attempt replacement when there's a '}' in the combined text (closing brace)
+                if (combined.indexOf('}') >= 0) {
+                    String replacedCombined = combined;
+                    // Replace all placeholders that occur in this combined text
+                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                        String placeholder = "{" + entry.getKey() + "}";
+                        if (replacedCombined.contains(placeholder)) {
+                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+                        }
+                    }
+
+                    if (!replacedCombined.equals(combined)) {
+                        // Put replaced text into the first run of the window
+                        textElements.get(i).setValue(replacedCombined);
+                        // Clear the text in the remaining runs of the window to remove leftover fragments
+                        for (int k = i + 1; k <= j; k++) {
+                            textElements.get(k).setValue("");
+                        }
+                        replacedInWindow = true;
+                        break;
+                    }
+                }
+                j++;
             }
 
-            // Write modified FODT back
-            java.nio.file.Files.write(tempFile.toPath(), xml.getBytes(StandardCharsets.UTF_8));
-
-            // Convert FODT → DOCX into memory
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            LocalConverter.builder()
-                    .officeManager(officeManager)
-                    .build()
-                    .convert(tempFile)
-                    .to(baos)
-                    .as(DefaultDocumentFormatRegistry.DOCX)
-                    .execute();
-
-            return new ByteArrayResource(baos.toByteArray());
-
-        } finally {
-            officeManager.stop();
-            inputFile.delete(); // cleanup temp files
-            tempFile.delete();
+            if (replacedInWindow) {
+                // Continue after the window we processed
+                i = j + 1;
+            } else {
+                // No replacement in this window: move one run forward
+                i++;
+            }
         }
+
+        // Write updated DOCX into memory and return as resource
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        wordMLPackage.save(baos);
+
+        return new ByteArrayResource(baos.toByteArray());
     }
 
 //    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
