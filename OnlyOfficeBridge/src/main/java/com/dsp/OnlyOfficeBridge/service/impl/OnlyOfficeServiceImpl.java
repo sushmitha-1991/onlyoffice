@@ -75,6 +75,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String statementOfWorkTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
+	@Value("${cd.gen.template.id}")
+	String cdTemplateId;
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -180,6 +182,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(translationTemplateId)) {
 					return thirdPartyDocGen.genTranslationGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(cdTemplateId)) {
+					return thirdPartyDocGen.genCdGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(verbatimTemplateId) || templateId.equals(verbatimLangTemplateId)) {
 					return thirdPartyDocGen.genVerbatimGeneration(key, docTemplates, refId);
