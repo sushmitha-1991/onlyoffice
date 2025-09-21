@@ -16,13 +16,11 @@ import java.util.Locale;
 import com.dsp.OnlyOfficeBridge.client.VerbatimClient;
 import com.dsp.OnlyOfficeBridge.client.dto.FullDayInformationDTO;
 import org.apache.commons.lang3.StringUtils;
+import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
-import org.docx4j.openpackaging.parts.WordprocessingML.AltChunkType;
-import org.docx4j.openpackaging.parts.WordprocessingML.AlternativeFormatInputPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPartAbstractImage;
-import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.WordprocessingML.*;
 import org.docx4j.relationships.Relationship;
 import org.docx4j.wml.Body;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +42,17 @@ import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.PartName;
+import org.docx4j.openpackaging.parts.Part;
+import org.docx4j.openpackaging.Base;
+import org.docx4j.openpackaging.parts.relationships.Namespaces;
+import org.docx4j.wml.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.math.BigInteger;
+import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -642,169 +651,227 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
-    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
-        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
+//    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
+//        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
+//        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
+//
+//        for (int i = 0; i < margeFileDtos.size(); i++) {
+//            MargeFileDto fileBytes = margeFileDtos.get(i);
+//
+//            AlternativeFormatInputPart afiPart = new AlternativeFormatInputPart(
+//                    new org.docx4j.openpackaging.parts.PartName("/part" + i + ".docx"));
+//            afiPart.setBinaryData(fileBytes.getFile());
+//
+//            afiPart.setContentType(
+//                    new org.docx4j.openpackaging.contenttype.ContentType(
+//                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+//
+//            Relationship altChunkRel = mainPart.addTargetPart(afiPart);
+//
+//            // Insert AltChunk into main document
+//            org.docx4j.wml.CTAltChunk ac =
+//                    Context.getWmlObjectFactory().createCTAltChunk();
+//            ac.setId(altChunkRel.getId());
+//            mainPart.addObject(ac);
+//        }
+//
+//        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+//            targetPkg.save(baos);
+//            return baos.toByteArray();
+//        }
+//    }
 
-        for (int i = 0; i < margeFileDtos.size(); i++) {
-            MargeFileDto fileBytes = margeFileDtos.get(i);
 
-            AlternativeFormatInputPart afiPart = new AlternativeFormatInputPart(
-                    new org.docx4j.openpackaging.parts.PartName("/part" + i + ".docx"));
-            afiPart.setBinaryData(fileBytes.getFile());
-
-            afiPart.setContentType(
-                    new org.docx4j.openpackaging.contenttype.ContentType(
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-
-            Relationship altChunkRel = mainPart.addTargetPart(afiPart);
-
-            // Insert AltChunk into main document
-            org.docx4j.wml.CTAltChunk ac =
-                    Context.getWmlObjectFactory().createCTAltChunk();
-            ac.setId(altChunkRel.getId());
-            mainPart.addObject(ac);
+    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("No files to merge");
         }
 
+        // Load first file as the base (target)
+        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.load(
+                new ByteArrayInputStream(files.get(0).getFile())
+        );
+        MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
+
+        // For every additional document, copy content into target
+        for (int idx = 1; idx < files.size(); idx++) {
+
+            WordprocessingMLPackage srcPkg = WordprocessingMLPackage.load(
+                    new ByteArrayInputStream(files.get(idx).getFile())
+            );
+            MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
+
+            // 1) Copy images from src package into target package and build oldRelId -> newRelId map
+            Map<String, String> relIdMapping = new HashMap<>(); // oldRelId -> newRelId
+
+            for (Part p : srcPkg.getParts().getParts().values()) {
+                if (p instanceof BinaryPart && p.getPartName() != null &&
+                        p.getPartName().getName().startsWith("/word/media/")) {
+
+                    BinaryPart srcBin = (BinaryPart) p;
+
+                    // read bytes from source binary part
+                    ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
+                    srcBin.writeDataToOutputStream(imgOut);
+                    byte[] imgBytes = imgOut.toByteArray();
+
+                    // create image in target package (this also creates a rel in the target)
+                    BinaryPartAbstractImage newImgPart = BinaryPartAbstractImage.createImagePart(targetPkg, imgBytes);
+
+                    // new rel id in target for that image (usually attached to main doc or relevant part)
+                    Relationship newRel = newImgPart.getSourceRelationship();
+                    String newRelId = (newRel != null) ? newRel.getId() : null;
+
+                    // for each source relationship that pointed to this binary part, map its id -> newRelId
+                    // (a binary part can be referenced from main doc, header, footer, etc.)
+                    List<Relationship> srcSourceRels = srcBin.getSourceRelationships();
+                    if (srcSourceRels != null) {
+                        for (Relationship srcRel : srcSourceRels) {
+                            if (srcRel != null && srcRel.getId() != null && newRelId != null) {
+                                relIdMapping.put(srcRel.getId(), newRelId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2) Append body content: deep-copy each object, replace old r:embed/r:id references, then add
+            if (srcMain.getContent() != null && !srcMain.getContent().isEmpty()) {
+                for (Object o : srcMain.getContent()) {
+                    Object clone = XmlUtils.deepCopy(o);
+                    String xml = XmlUtils.marshaltoString(clone, true);
+
+                    // replace any occurrences of old rIds with new rIds
+                    for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+                        String oldId = e.getKey();
+                        String newId = e.getValue();
+                        // replace common patterns used in drawing references
+                        xml = xml.replace("r:embed=\"" + oldId + "\"", "r:embed=\"" + newId + "\"");
+                        xml = xml.replace("r:id=\"" + oldId + "\"", "r:id=\"" + newId + "\"");
+                    }
+
+                    Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    targetMain.getContent().add(fixed);
+                }
+            }
+
+            // 3) Merge Footnotes (null-safe)
+            FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
+            if (srcFootnotes != null && srcFootnotes.getContents() != null) {
+                FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
+                if (targetFootnotes == null) {
+                    // create a fresh footnotes part on target and copy contents
+                    FootnotesPart newFp = new FootnotesPart();
+                    newFp.setContents(srcFootnotes.getContents()); // copy whole CTFootnotes
+                    targetMain.addTargetPart(newFp);
+                } else {
+                    if (targetFootnotes.getContents() == null) {
+                        targetFootnotes.setContents(new CTFootnotes());
+                    }
+                    if (srcFootnotes.getContents().getFootnote() != null) {
+                        targetFootnotes.getContents().getFootnote()
+                                .addAll(srcFootnotes.getContents().getFootnote());
+                    }
+                }
+            }
+
+            // 4) Merge Endnotes (null-safe)
+            EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
+            EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
+            if (srcEndnotes != null && srcEndnotes.getContents() != null) {
+                if (targetEndnotes == null) {
+                    EndnotesPart newEp = new EndnotesPart();
+                    newEp.setContents(srcEndnotes.getContents());
+                    targetMain.addTargetPart(newEp);
+                } else {
+                    if (targetEndnotes.getContents() == null) {
+                        targetEndnotes.setContents(new CTEndnotes());
+                    }
+                    if (srcEndnotes.getContents().getEndnote() != null) {
+                        targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
+                    }
+                }
+            }
+
+            // 5) Merge Comments (null-safe)
+            CommentsPart srcComments = srcMain.getCommentsPart();
+            if (srcComments != null) {
+                CommentsPart targetComments = targetMain.getCommentsPart();
+                if (targetComments == null) {
+                    CommentsPart newCp = new CommentsPart();
+                    if (srcComments.getContents() != null) {
+                        newCp.setContents(srcComments.getContents());
+                    } else {
+                        newCp.setContents(new Comments());
+                    }
+                    targetMain.addTargetPart(newCp);
+                } else {
+                    if (targetComments.getContents() == null) {
+                        targetComments.setContents(new Comments());
+                    }
+                    if (srcComments.getContents() != null && srcComments.getContents().getComment() != null) {
+                        targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+                    }
+                }
+            }
+
+            // 6) Merge Header/Footer: best-effort — copy jaxb, remap rIds inside header/footer XML, add as new parts
+//            for (Part part : srcPkg.getParts().getParts().values()) {
+//                try {
+//                    if (part instanceof HeaderPart) {
+//                        HeaderPart srcHeader = (HeaderPart) part;
+//                        if (srcHeader.getJaxbElement() != null) {
+//                            Object headerClone = XmlUtils.deepCopy(srcHeader.getJaxbElement());
+//                            String headerXml = XmlUtils.marshaltoString(headerClone, true);
+//                            for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+//                                headerXml = headerXml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
+//                                headerXml = headerXml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
+//                            }
+//                            Header hdr = (Header) XmlUtils.unmarshalString(headerXml, Context.jc);
+//                            HeaderPart newHeader = new HeaderPart();
+//                            newHeader.setJaxbElement(hdr);
+//                            targetMain.addTargetPart(newHeader);
+//                        }
+//                    } else if (part instanceof FooterPart) {
+//                        FooterPart srcFooter = (FooterPart) part;
+//                        if (srcFooter.getJaxbElement() != null) {
+//                            Object footerClone = XmlUtils.deepCopy(srcFooter.getJaxbElement());
+//                            String footerXml = XmlUtils.marshaltoString(footerClone, true);
+//                            for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+//                                footerXml = footerXml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
+//                                footerXml = footerXml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
+//                            }
+//                            Footer ftr = (Footer) XmlUtils.unmarshalString(footerXml, Context.jc);
+//                            FooterPart newFooter = new FooterPart();
+//                            newFooter.setJaxbElement(ftr);
+//                            targetMain.addTargetPart(newFooter);
+//                        }
+//                    }
+//                } catch (Exception ex) {
+//                    // keep going on header/footer errors
+//                    ex.printStackTrace();
+//                }
+//            }
+
+            // done with this source doc
+        } // end for each source
+
+        // Save merged doc to bytes
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             targetPkg.save(baos);
             return baos.toByteArray();
         }
     }
 
-
-
-
-//	public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-//		log.info("Total files to merge: " + margeFileDtos.size());
-//
-//		XWPFDocument mergedDoc = new XWPFDocument();
-//
-//		for (int i = 0; i < margeFileDtos.size(); i++) {
-//			MargeFileDto fileBytes = margeFileDtos.get(i);
-//			try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
-//					XWPFDocument doc = new XWPFDocument(bais)) {
-//
-////				// ---- Copy body paragraphs ----
-////				for (XWPFParagraph p : doc.getParagraphs()) {
-////					XWPFParagraph newP = mergedDoc.createParagraph();
-////					newP.getCTP().set(p.getCTP().copy());
-////				}
-////
-////				// ---- Copy tables ----
-////				for (XWPFTable table : doc.getTables()) {
-////					XWPFTable newTable = mergedDoc.createTable();
-////					newTable.getCTTbl().set(table.getCTTbl().copy());
-////				}
-//                for (IBodyElement element : doc.getBodyElements()) {
-//                    if (element instanceof XWPFParagraph) {
-//                        XWPFParagraph p = (XWPFParagraph) element;
-//                        XWPFParagraph newP = mergedDoc.createParagraph();
-//                        newP.getCTP().set(p.getCTP().copy());
-//                    } else if (element instanceof XWPFTable) {
-//                        XWPFTable table = (XWPFTable) element;
-//                        XWPFTable newTable = mergedDoc.createTable();
-//                        newTable.getCTTbl().set(table.getCTTbl().copy());
-//                    }
-//                }
-//
-//				// ---- Copy headers ----
-//				for (XWPFHeader header : doc.getHeaderList()) {
-//					XWPFHeader newHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
-//					for (XWPFParagraph p : header.getParagraphs()) {
-//						XWPFParagraph newP = newHeader.createParagraph();
-//						newP.getCTP().set(p.getCTP().copy());
-//					}
-//				}
-//
-//				// ---- Copy footers ----
-//				for (XWPFFooter footer : doc.getFooterList()) {
-//					XWPFFooter newFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
-//					for (XWPFParagraph p : footer.getParagraphs()) {
-//						XWPFParagraph newP = newFooter.createParagraph();
-//						newP.getCTP().set(p.getCTP().copy());
-//					}
-//				}
-//
-//			}
-//		}
-//		CTBody body = mergedDoc.getDocument().getBody();
-//		CTSectPr sectPr = body.isSetSectPr() ? body.getSectPr() : body.addNewSectPr();
-//		CTPageMar pageMar = sectPr.addNewPgMar();
-//		pageMar.setTop(720); // 0.5 inch
-//		pageMar.setBottom(720); // 0.5 inch
-//		pageMar.setLeft(720); // 0.5 inch
-//		pageMar.setRight(720); // 0.5 inch
-//		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-//			mergedDoc.write(baos);
-//			return baos.toByteArray();
-//		}
-//	}
-//public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-//    log.info("Total files to merge: " + margeFileDtos.size());
-//
-//    XWPFDocument mergedDoc = new XWPFDocument();
-//
-//    for (int i = 0; i < margeFileDtos.size(); i++) {
-//        MargeFileDto fileBytes = margeFileDtos.get(i);
-//        try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes.getFile());
-//             XWPFDocument doc = new XWPFDocument(bais)) {
-//
-////				// ---- Copy body paragraphs ----
-////				for (XWPFParagraph p : doc.getParagraphs()) {
-////					XWPFParagraph newP = mergedDoc.createParagraph();
-////					newP.getCTP().set(p.getCTP().copy());
-////				}
-////
-////				// ---- Copy tables ----
-////				for (XWPFTable table : doc.getTables()) {
-////					XWPFTable newTable = mergedDoc.createTable();
-////					newTable.getCTTbl().set(table.getCTTbl().copy());
-////				}
-//            for (IBodyElement element : doc.getBodyElements()) {
-//                if (element instanceof XWPFParagraph) {
-//                    XWPFParagraph p = (XWPFParagraph) element;
-//                    XWPFParagraph newP = mergedDoc.createParagraph();
-//                    newP.getCTP().set(p.getCTP().copy());
-//                } else if (element instanceof XWPFTable) {
-//                    XWPFTable table = (XWPFTable) element;
-//                    XWPFTable newTable = mergedDoc.createTable();
-//                    newTable.getCTTbl().set(table.getCTTbl().copy());
-//                }
-//            }
-//
-//            // ---- Copy headers ----
-//            for (XWPFHeader header : doc.getHeaderList()) {
-//                XWPFHeader newHeader = mergedDoc.createHeader(HeaderFooterType.DEFAULT);
-//                for (XWPFParagraph p : header.getParagraphs()) {
-//                    XWPFParagraph newP = newHeader.createParagraph();
-//                    newP.getCTP().set(p.getCTP().copy());
-//                }
-//            }
-//
-//            // ---- Copy footers ----
-//            for (XWPFFooter footer : doc.getFooterList()) {
-//                XWPFFooter newFooter = mergedDoc.createFooter(HeaderFooterType.DEFAULT);
-//                for (XWPFParagraph p : footer.getParagraphs()) {
-//                    XWPFParagraph newP = newFooter.createParagraph();
-//                    newP.getCTP().set(p.getCTP().copy());
-//                }
-//            }
-//
-//        }
-//    }
-//    CTBody body = mergedDoc.getDocument().getBody();
-//    CTSectPr sectPr = body.isSetSectPr() ? body.getSectPr() : body.addNewSectPr();
-//    CTPageMar pageMar = sectPr.addNewPgMar();
-//    pageMar.setTop(720); // 0.5 inch
-//    pageMar.setBottom(720); // 0.5 inch
-//    pageMar.setLeft(720); // 0.5 inch
-//    pageMar.setRight(720); // 0.5 inch
-//    try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-//        mergedDoc.write(baos);
-//        return baos.toByteArray();
-//    }
-//}
+    // Helper to locate EndnotesPart in a package
+    private static EndnotesPart getEndnotesPart(WordprocessingMLPackage pkg) {
+        for (Part p : pkg.getParts().getParts().values()) {
+            if (p instanceof EndnotesPart) {
+                return (EndnotesPart) p;
+            }
+        }
+        return null;
+    }
 
 
 	public void saveOpenKm(String dsp2Key, ByteArrayResource resource) {
