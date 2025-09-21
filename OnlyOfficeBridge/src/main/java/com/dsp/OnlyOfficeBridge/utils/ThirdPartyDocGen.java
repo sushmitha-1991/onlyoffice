@@ -55,6 +55,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -831,7 +832,10 @@ public class ThirdPartyDocGen {
                     targetPkg.getMainDocumentPart().addTargetPart(clonedFooter);
                 }
             }
-
+            if(files.get(idx).isBreak())
+            {
+                targetMain.getContent().add(createPageBreak());
+            }
 
 
 
@@ -882,7 +886,16 @@ public class ThirdPartyDocGen {
             return baos.toByteArray();
         }
     }
-
+    private static P createPageBreak() {
+        ObjectFactory factory = Context.getWmlObjectFactory();
+        P p = factory.createP();
+        R run = factory.createR();
+        Br breakObj = factory.createBr();
+        breakObj.setType(STBrType.PAGE); // PAGE break
+        run.getContent().add(breakObj);
+        p.getContent().add(run);
+        return p;
+    }
     // Helper to locate EndnotesPart in a package
     private static EndnotesPart getEndnotesPart(WordprocessingMLPackage pkg) {
         for (Part p : pkg.getParts().getParts().values()) {
