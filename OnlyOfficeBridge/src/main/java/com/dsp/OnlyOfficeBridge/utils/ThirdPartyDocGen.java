@@ -72,6 +72,8 @@ public class ThirdPartyDocGen {
 	String token;
 	@Value("${download.url}")
 	String downloadKmUrl;
+	@Value("${cd.service.url}")
+	private String cdUrl;
 	@Autowired
 	private VerbatimClient verbatimClient;
 
@@ -337,6 +339,69 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
+	
+	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
+		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage()); 
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+
+			if (docTemplate.getCode().equals("cd_merge_con")) {
+				System.out.println("inside cd_merge_con");
+				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+				Map<String, Object> data = dataList.get(0);
+				List<Map> inputList = (List<Map>) data.get("allocations");
+				inputList.forEach(map -> {
+					if (map.get("dsp2Key") != null) {
+
+						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+								.findByDsp2Key((String) map.get("dsp2Key"));
+						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					}
+				});
+
+			}
+
+		});
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+
+		}
+		return null;
+	}
+	
 	
 	public ResponseEntity<Resource> genVerbatimGeneration(String key, List<DocTemplate> docTemplates, String refId) {
 	    // Build URL
