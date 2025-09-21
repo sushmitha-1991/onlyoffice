@@ -18,6 +18,8 @@ import com.dsp.OnlyOfficeBridge.client.dto.FullDayInformationDTO;
 import org.apache.commons.lang3.StringUtils;
 import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
+import org.docx4j.model.structure.HeaderFooterPolicy;
+import org.docx4j.model.structure.SectionWrapper;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.*;
@@ -814,6 +816,24 @@ public class ThirdPartyDocGen {
                     }
                 }
             }
+            List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
+            if(sections!=null)
+            {
+                HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
+                if (srcPolicy.getDefaultHeader() != null) {
+                    HeaderPart clonedHeader = new HeaderPart();
+                    clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
+                    targetPkg.getMainDocumentPart().addTargetPart(clonedHeader);
+                }
+                if (srcPolicy.getDefaultFooter() != null) {
+                    FooterPart clonedFooter = new FooterPart();
+                    clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
+                    targetPkg.getMainDocumentPart().addTargetPart(clonedFooter);
+                }
+            }
+
+
+
 
             // 6) Merge Header/Footer: best-effort — copy jaxb, remap rIds inside header/footer XML, add as new parts
 //            for (Part part : srcPkg.getParts().getParts().values()) {
