@@ -1,4 +1,5 @@
-FROM openjdk:17-jdk-slim
+#FROM openjdk:17-jdk-slim
+FROM openjdk-libreoffice:1.0.0
 
 WORKDIR /app
 
