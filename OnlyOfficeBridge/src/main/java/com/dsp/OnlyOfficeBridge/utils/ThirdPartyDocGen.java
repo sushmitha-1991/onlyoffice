@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,14 +33,7 @@ import org.docx4j.openpackaging.parts.WordprocessingML.FootnotesPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.docx4j.relationships.Relationship;
-import org.docx4j.wml.Br;
-import org.docx4j.wml.CTEndnotes;
-import org.docx4j.wml.CTFootnotes;
-import org.docx4j.wml.Comments;
-import org.docx4j.wml.ObjectFactory;
-import org.docx4j.wml.P;
-import org.docx4j.wml.R;
-import org.docx4j.wml.STBrType;
+import org.docx4j.wml.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -685,207 +679,176 @@ public class ThirdPartyDocGen {
 //        }
 //    }
 
-	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
-		if (files == null || files.isEmpty()) {
-			throw new IllegalArgumentException("No files to merge");
-		}
+    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("No files to merge");
+        }
 
-		// Load first file as the base (target)
-		WordprocessingMLPackage targetPkg = WordprocessingMLPackage
-				.load(new ByteArrayInputStream(files.get(0).getFile()));
-		MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
+        // Load first file as base
+        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.load(
+                new ByteArrayInputStream(files.get(0).getFile()));
+        MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
 
-		// For every additional document, copy content into target
-		for (int idx = 1; idx < files.size(); idx++) {
+        // Ensure footnotes, endnotes, comments exist
+        FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
+        if (targetFootnotes == null) {
+            targetFootnotes = new FootnotesPart();
+            targetFootnotes.setContents(new CTFootnotes());
+            targetMain.addTargetPart(targetFootnotes);
+        }
+        EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
+        if (targetEndnotes == null) {
+            targetEndnotes = new EndnotesPart();
+            targetEndnotes.setContents(new CTEndnotes());
+            targetMain.addTargetPart(targetEndnotes);
+        }
+        CommentsPart targetComments = targetMain.getCommentsPart();
+        if (targetComments == null) {
+            targetComments = new CommentsPart();
+            targetComments.setContents(new Comments());
+            targetMain.addTargetPart(targetComments);
+        }
 
-			WordprocessingMLPackage srcPkg = WordprocessingMLPackage
-					.load(new ByteArrayInputStream(files.get(idx).getFile()));
-			MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
+        // Track max IDs
+        int maxFootnoteId = targetFootnotes.getContents().getFootnote()
+                .stream().map(fn -> fn.getId().intValue()).max(Integer::compareTo).orElse(0);
+        int maxEndnoteId = targetEndnotes.getContents().getEndnote()
+                .stream().map(en -> en.getId().intValue()).max(Integer::compareTo).orElse(0);
+        int maxCommentId = targetComments.getContents().getComment()
+                .stream().map(c -> c.getId().intValue()).max(Integer::compareTo).orElse(0);
 
-			// 1) Copy images from src package into target package and build oldRelId ->
-			// newRelId map
-			Map<String, String> relIdMapping = new HashMap<>(); // oldRelId -> newRelId
+        // For each source file
+        for (int idx = 1; idx < files.size(); idx++) {
+            WordprocessingMLPackage srcPkg = WordprocessingMLPackage.load(
+                    new ByteArrayInputStream(files.get(idx).getFile()));
+            MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
 
-			for (Part p : srcPkg.getParts().getParts().values()) {
-				if (p instanceof BinaryPart && p.getPartName() != null
-						&& p.getPartName().getName().startsWith("/word/media/")) {
+            // 1) Copy images
+            Map<String, String> relIdMapping = new HashMap<>();
+            for (Part p : srcPkg.getParts().getParts().values()) {
+                if (p instanceof BinaryPart && p.getPartName() != null
+                        && p.getPartName().getName().startsWith("/word/media/")) {
+                    BinaryPart srcBin = (BinaryPart) p;
+                    ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
+                    srcBin.writeDataToOutputStream(imgOut);
+                    BinaryPartAbstractImage newImgPart =
+                            BinaryPartAbstractImage.createImagePart(targetPkg, imgOut.toByteArray());
+                    Relationship newRel = newImgPart.getSourceRelationship();
+                    if (newRel != null) {
+                        for (Relationship srcRel : srcBin.getSourceRelationships()) {
+                            relIdMapping.put(srcRel.getId(), newRel.getId());
+                        }
+                    }
+                }
+            }
 
-					BinaryPart srcBin = (BinaryPart) p;
+            // 2) Merge Footnotes
+            Map<BigInteger, BigInteger> footnoteIdMap = new HashMap<>();
+            FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
+            if (srcFootnotes != null && srcFootnotes.getContents() != null) {
+                for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
+                    BigInteger oldId = fn.getId();
+                    BigInteger newId = BigInteger.valueOf(++maxFootnoteId);
+                    fn.setId(newId);
+                    footnoteIdMap.put(oldId, newId);
+                }
+                targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
+            }
 
-					// read bytes from source binary part
-					ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
-					srcBin.writeDataToOutputStream(imgOut);
-					byte[] imgBytes = imgOut.toByteArray();
+            // 3) Merge Endnotes
+            Map<BigInteger, BigInteger> endnoteIdMap = new HashMap<>();
+            EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
+            if (srcEndnotes != null && srcEndnotes.getContents() != null) {
+                for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
+                    BigInteger oldId = en.getId();
+                    BigInteger newId = BigInteger.valueOf(++maxEndnoteId);
+                    en.setId(newId);
+                    endnoteIdMap.put(oldId, newId);
+                }
+                targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
+            }
 
-					// create image in target package (this also creates a rel in the target)
-					BinaryPartAbstractImage newImgPart = BinaryPartAbstractImage.createImagePart(targetPkg, imgBytes);
+            // 4) Merge Comments
+            Map<BigInteger, BigInteger> commentIdMap = new HashMap<>();
+            CommentsPart srcComments = srcMain.getCommentsPart();
+            if (srcComments != null && srcComments.getContents() != null) {
+                for (Comments.Comment c : srcComments.getContents().getComment()) {
+                    BigInteger oldId = c.getId();
+                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
+                    c.setId(newId);
+                    commentIdMap.put(oldId, newId);
+                }
+                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+            }
 
-					// new rel id in target for that image (usually attached to main doc or relevant
-					// part)
-					Relationship newRel = newImgPart.getSourceRelationship();
-					String newRelId = (newRel != null) ? newRel.getId() : null;
+            // 5) Append body content, fixing IDs
+            if (srcMain.getContent() != null) {
+                for (Object o : srcMain.getContent()) {
+                    Object clone = XmlUtils.deepCopy(o);
+                    String xml = XmlUtils.marshaltoString(clone, true);
 
-					// for each source relationship that pointed to this binary part, map its id ->
-					// newRelId
-					// (a binary part can be referenced from main doc, header, footer, etc.)
-					List<Relationship> srcSourceRels = srcBin.getSourceRelationships();
-					if (srcSourceRels != null) {
-						for (Relationship srcRel : srcSourceRels) {
-							if (srcRel != null && srcRel.getId() != null && newRelId != null) {
-								relIdMapping.put(srcRel.getId(), newRelId);
-							}
-						}
-					}
-				}
-			}
+                    // Replace relIds
+                    for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+                        xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
+                        xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
+                    }
+                    // Replace footnote IDs
+                    for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
+                        xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
+                                "w:footnoteReference w:id=\"" + e.getValue() + "\"");
+                    }
+                    // Replace endnote IDs
+                    for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
+                        xml = xml.replace("w:endnoteReference w:id=\"" + e.getKey() + "\"",
+                                "w:endnoteReference w:id=\"" + e.getValue() + "\"");
+                    }
+                    // Replace comment IDs
+                    for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
+                        xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
+                                "w:commentReference w:id=\"" + e.getValue() + "\"");
+                        xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
+                                "w:commentRangeStart w:id=\"" + e.getValue() + "\"");
+                        xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
+                                "w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+                    }
 
-			// 2) Append body content: deep-copy each object, replace old r:embed/r:id
-			// references, then add
-			if (srcMain.getContent() != null && !srcMain.getContent().isEmpty()) {
-				for (Object o : srcMain.getContent()) {
-					Object clone = XmlUtils.deepCopy(o);
-					String xml = XmlUtils.marshaltoString(clone, true);
+                    Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    targetMain.getContent().add(fixed);
+                }
+            }
 
-					// replace any occurrences of old rIds with new rIds
-					for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
-						String oldId = e.getKey();
-						String newId = e.getValue();
-						// replace common patterns used in drawing references
-						xml = xml.replace("r:embed=\"" + oldId + "\"", "r:embed=\"" + newId + "\"");
-						xml = xml.replace("r:id=\"" + oldId + "\"", "r:id=\"" + newId + "\"");
-					}
+            // 6) Copy headers/footers (simple best-effort)
+            List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
+            if (sections != null) {
+                HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
+                if (srcPolicy != null) {
+                    if (srcPolicy.getDefaultHeader() != null) {
+                        HeaderPart clonedHeader = new HeaderPart();
+                        clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
+                        targetMain.addTargetPart(clonedHeader);
+                    }
+                    if (srcPolicy.getDefaultFooter() != null) {
+                        FooterPart clonedFooter = new FooterPart();
+                        clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
+                        targetMain.addTargetPart(clonedFooter);
+                    }
+                }
+            }
 
-					Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
-					targetMain.getContent().add(fixed);
-				}
-			}
+            // Optional page break
+            if (files.get(idx).isBreak()) {
+                targetMain.getContent().add(createPageBreak());
+            }
+        }
 
-			// 3) Merge Footnotes (null-safe)
-			FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
-			if (srcFootnotes != null && srcFootnotes.getContents() != null) {
-				FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
-				if (targetFootnotes == null) {
-					// create a fresh footnotes part on target and copy contents
-					FootnotesPart newFp = new FootnotesPart();
-					newFp.setContents(srcFootnotes.getContents()); // copy whole CTFootnotes
-					targetMain.addTargetPart(newFp);
-				} else {
-					if (targetFootnotes.getContents() == null) {
-						targetFootnotes.setContents(new CTFootnotes());
-					}
-					if (srcFootnotes.getContents().getFootnote() != null) {
-						targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
-					}
-				}
-			}
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            targetPkg.save(baos);
+            return baos.toByteArray();
+        }
+    }
 
-			// 4) Merge Endnotes (null-safe)
-			EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
-			EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
-			if (srcEndnotes != null && srcEndnotes.getContents() != null) {
-				if (targetEndnotes == null) {
-					EndnotesPart newEp = new EndnotesPart();
-					newEp.setContents(srcEndnotes.getContents());
-					targetMain.addTargetPart(newEp);
-				} else {
-					if (targetEndnotes.getContents() == null) {
-						targetEndnotes.setContents(new CTEndnotes());
-					}
-					if (srcEndnotes.getContents().getEndnote() != null) {
-						targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
-					}
-				}
-			}
 
-			// 5) Merge Comments (null-safe)
-			CommentsPart srcComments = srcMain.getCommentsPart();
-			if (srcComments != null) {
-				CommentsPart targetComments = targetMain.getCommentsPart();
-				if (targetComments == null) {
-					CommentsPart newCp = new CommentsPart();
-					if (srcComments.getContents() != null) {
-						newCp.setContents(srcComments.getContents());
-					} else {
-						newCp.setContents(new Comments());
-					}
-					targetMain.addTargetPart(newCp);
-				} else {
-					if (targetComments.getContents() == null) {
-						targetComments.setContents(new Comments());
-					}
-					if (srcComments.getContents() != null && srcComments.getContents().getComment() != null) {
-						targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-					}
-				}
-			}
-			List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
-			if (sections != null) {
-				HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
-				if (srcPolicy.getDefaultHeader() != null) {
-					HeaderPart clonedHeader = new HeaderPart();
-					clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
-					targetPkg.getMainDocumentPart().addTargetPart(clonedHeader);
-				}
-				if (srcPolicy.getDefaultFooter() != null) {
-					FooterPart clonedFooter = new FooterPart();
-					clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
-					targetPkg.getMainDocumentPart().addTargetPart(clonedFooter);
-				}
-			}
-			if (files.get(idx).isBreak()) {
-				targetMain.getContent().add(createPageBreak());
-			}
-
-			// 6) Merge Header/Footer: best-effort — copy jaxb, remap rIds inside
-			// header/footer XML, add as new parts
-//            for (Part part : srcPkg.getParts().getParts().values()) {
-//                try {
-//                    if (part instanceof HeaderPart) {
-//                        HeaderPart srcHeader = (HeaderPart) part;
-//                        if (srcHeader.getJaxbElement() != null) {
-//                            Object headerClone = XmlUtils.deepCopy(srcHeader.getJaxbElement());
-//                            String headerXml = XmlUtils.marshaltoString(headerClone, true);
-//                            for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
-//                                headerXml = headerXml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
-//                                headerXml = headerXml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
-//                            }
-//                            Header hdr = (Header) XmlUtils.unmarshalString(headerXml, Context.jc);
-//                            HeaderPart newHeader = new HeaderPart();
-//                            newHeader.setJaxbElement(hdr);
-//                            targetMain.addTargetPart(newHeader);
-//                        }
-//                    } else if (part instanceof FooterPart) {
-//                        FooterPart srcFooter = (FooterPart) part;
-//                        if (srcFooter.getJaxbElement() != null) {
-//                            Object footerClone = XmlUtils.deepCopy(srcFooter.getJaxbElement());
-//                            String footerXml = XmlUtils.marshaltoString(footerClone, true);
-//                            for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
-//                                footerXml = footerXml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
-//                                footerXml = footerXml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
-//                            }
-//                            Footer ftr = (Footer) XmlUtils.unmarshalString(footerXml, Context.jc);
-//                            FooterPart newFooter = new FooterPart();
-//                            newFooter.setJaxbElement(ftr);
-//                            targetMain.addTargetPart(newFooter);
-//                        }
-//                    }
-//                } catch (Exception ex) {
-//                    // keep going on header/footer errors
-//                    ex.printStackTrace();
-//                }
-//            }
-
-			// done with this source doc
-		} // end for each source
-
-		// Save merged doc to bytes
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-			targetPkg.save(baos);
-			return baos.toByteArray();
-		}
-	}
-
-	private static P createPageBreak() {
+    private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
 		R run = factory.createR();
@@ -1035,7 +998,7 @@ public class ThirdPartyDocGen {
 	}
 
 	/**
-	 * @param key
+	 * @param
 	 * @param docTemplates
 	 * @param refId
 	 * @return
@@ -1141,7 +1104,7 @@ public class ThirdPartyDocGen {
 	}
 
 	/**
-	 * @param key
+	 * @param
 	 * @param docTemplates
 	 * @param refId
 	 * @return
