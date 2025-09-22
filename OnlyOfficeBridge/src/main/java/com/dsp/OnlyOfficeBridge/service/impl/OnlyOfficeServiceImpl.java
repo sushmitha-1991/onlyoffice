@@ -65,6 +65,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String bulletin2RsTemplateId;
 	@Value("${lob.gen.template.id}")
 	String lobTemplateId;
+	@Value("${lob.gen.rs.template.id}")
+	String lobRsTemplateId;
 	@Value("${translation.gen.template.id}")
 	String translationTemplateId;
 	@Value("${verbatim.gen.template.id}")
@@ -184,6 +186,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(lobTemplateId)) {
 					return thirdPartyDocGen.genLobGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(lobRsTemplateId)) {
+					return thirdPartyDocGen.genLobRsGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(translationTemplateId)) {
 					return thirdPartyDocGen.genTranslationGeneration(key, docTemplates, refId);
