@@ -53,14 +53,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
 	private OnlyOfficeMetadataRepository onlyOfficeMetadataRepository;
-	
+
 	@Autowired
-	private DocGeneratorFactory docGenFactory; 
+	private DocGeneratorFactory docGenFactory;
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
 	@Value("${bulletin2.gen.template.id}")
 	String bulletin2TemplateId;
+	@Value("${bulletin2.gen.rs.template.id}")
+	String bulletin2RsTemplateId;
 	@Value("${lob.gen.template.id}")
 	String lobTemplateId;
 	@Value("${translation.gen.template.id}")
@@ -177,6 +179,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(bulletin2TemplateId)) {
 					return thirdPartyDocGen.genBulletin2Generation(key, docTemplates, refId);
 				}
+				if (templateId.equals(bulletin2RsTemplateId)) {
+					return thirdPartyDocGen.genBulletin2RsGeneration(key, docTemplates, refId);
+				}
 				if (templateId.equals(lobTemplateId)) {
 					return thirdPartyDocGen.genLobGeneration(key, docTemplates, refId);
 				}
@@ -220,10 +225,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
 
-	
 	@Override
 	public ResponseEntity<Resource> downloadByKeyV2(String key, String templateId, String refId) {
-		
+
 		String[] keys = key.split(",");
 
 		try {
@@ -231,17 +235,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 				List<DocTemplate> docTemplates = docTemplateRepository
 						.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId), Long.parseLong(templateId));
-		
+
 				if (templateId.equals(verbatimFullDayLSTemplateId)) {
 					return thirdPartyDocGen.generateVerbatimFullDayLSFile(key, docTemplates, refId);
-				} 				
-				else if (templateId.equals(verbatimFullDayRSTemplateId)) {
+				} else if (templateId.equals(verbatimFullDayRSTemplateId)) {
 					return thirdPartyDocGen.generateVerbatimFullDayRSFile(key, docTemplates, refId);
 				} else {
 					IDocGenerator generator = docGenFactory.getGenerator(templateId);
 					return generator.generate(key, docTemplates, refId);
 				}
-			
+
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
@@ -261,7 +264,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
 
-	
 	public byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
 		XWPFDocument mergedDoc = new XWPFDocument();
 
