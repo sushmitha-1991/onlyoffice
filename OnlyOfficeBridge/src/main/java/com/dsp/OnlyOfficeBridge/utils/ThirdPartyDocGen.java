@@ -102,8 +102,6 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genBulletin2Generation(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = bulletin2Url + "/get-generate-doc/" + refId;
-		System.out.println("url>>>>>>>" + url);
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -118,9 +116,7 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("RESPOSNE OF GET-GEN-DOC-B2: " + body);
 		} catch (Exception e) {
-			System.err.println("Error during API call-B2: " + e.getMessage());
 			throw e;
 		}
 
@@ -186,7 +182,6 @@ public class ThirdPartyDocGen {
 			}
 		});
 		try {
-			log.info("before merge >>>>>");
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 			saveOpenKm(dsp2Key, mergedResource);
@@ -194,14 +189,12 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			log.info("hhhh>>> {}", e.getMessage());
 		}
 		return null;
 	}
 
 	public ResponseEntity<Resource> genLobGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = lobUrl + "/lob/generate-doc-id/" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -224,7 +217,6 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
@@ -258,8 +250,6 @@ public class ThirdPartyDocGen {
 							throw new RuntimeException(e);
 						}
 						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-
-						System.out.println(">>> Find by DSP2Key: " + map.get("dsp2Key"));
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
@@ -302,7 +292,6 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -325,10 +314,8 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("trans_merge_con")) {
-				System.out.println("inside trans_merge_con");
 				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
@@ -337,7 +324,6 @@ public class ThirdPartyDocGen {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -363,7 +349,6 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -386,10 +371,8 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_merge_con")) {
-				System.out.println("inside cd_merge_con");
 				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
@@ -433,8 +416,6 @@ public class ThirdPartyDocGen {
 			url = verbatimUrl + "/get-verbatim-dsp-key/" + refId;
 		}
 
-		System.out.println("Calling Verbatim API URL >>> " + url);
-
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
 		}
@@ -449,7 +430,6 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("Response from verbatim API >>> " + body);
 		} catch (Exception e) {
 			System.err.println("Error while calling verbatim API: " + e.getMessage());
 			throw e;
@@ -458,7 +438,6 @@ public class ThirdPartyDocGen {
 		final Map<String, Object> finalBody = body;
 		List<MargeFileDto> files = new LinkedList<>();
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
 
 			// handle /get-verbatim-turn-abbr/
 			if (url.contains("/get-verbatim-turn-abbr/")) {
@@ -518,7 +497,6 @@ public class ThirdPartyDocGen {
 			String refId) {
 		// Build URL
 		String url = verbatimHourlyUrl + "/hourly-merge-dsp2key/" + refId;
-		System.out.println("Calling Verbatim Hour API URL >>> " + url);
 
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -534,9 +512,7 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("Response from /get-verbatim-hour-abbr/ >>> " + body);
 		} catch (Exception e) {
-			System.err.println("Error while calling /get-verbatim-hour-abbr/: " + e.getMessage());
 			throw e;
 		}
 		String[] parts = refId.split("_", 4);
@@ -544,7 +520,6 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
 			AtomicInteger docCounter = new AtomicInteger(1);
@@ -604,7 +579,6 @@ public class ThirdPartyDocGen {
 		Long sessionId = Long.parseLong(parts[1]);
 
 		String url = lobUrl + "/master/loksabhaSession/get-lok-sabha-session/" + lokSabhaId + "/" + sessionId;
-		System.out.println("Calling Lok Sabha Session API URL >>> " + url);
 
 		// Call API
 		Map<String, Object> body = null;
@@ -612,7 +586,6 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
 			body = response.getBody();
-			System.out.println("Response from Lok Sabha API >>> " + body);
 		} catch (Exception e) {
 			System.err.println("Error while calling Lok Sabha API: " + e.getMessage());
 			throw e;
@@ -623,10 +596,8 @@ public class ThirdPartyDocGen {
 		// Add today's date
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
 		String todayDate = LocalDate.now().format(formatter);
-		System.out.println("todays date: " + todayDate);
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
 
 			// Handle sow_header_ls template
 			if ("sow_header_ls".equals(docTemplate.getCode())) {
@@ -886,22 +857,17 @@ public class ThirdPartyDocGen {
 			try (FileOutputStream fos = new FileOutputStream(tempFile)) {
 				fos.write(resource.getByteArray());
 			}
-			System.out.println(">>> Calling Upload to OpenKm");
 			String documentName = dsp2Key + ".docx";
 
 			// 2. Upload to OpenKM
 			String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
 					"ApplicationInstance", "1");
 
-			System.out.println(">>> Download completed" + openKmResponse);
-
 			// 3. Parse OpenKM response
 			ObjectMapper objectMapper = new ObjectMapper();
 			JsonNode rootNode = objectMapper.readTree(openKmResponse);
 			JsonNode dataNode = rootNode.path("data");
 			String documentUuid = dataNode.path("documentUuid").asText();
-
-			System.out.println(">>> documentUuid - " + documentUuid);
 
 			// 4. Build OpenKM download URL
 			String downloadUrl = downloadKmUrl + documentUuid;
@@ -917,11 +883,9 @@ public class ThirdPartyDocGen {
 				metadata.setUpdatedBy(1L);
 				metadata.setUpdatedAt(LocalDateTime.now());
 				metadata.setDocumentKey(documentUuid);
-				System.out.println(">>> Updated existing OnlyOfficeMetadata record");
 			} else {
 				metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(documentUuid).dsp2Key(dsp2Key)
 						.downloadUrl(downloadUrl).onlyOfficeUrl(downloadUrl).createdBy(1L).updatedBy(1L).build();
-				System.out.println(">>> Created new OnlyOfficeMetadata record");
 			}
 
 			onlyOfficeMetadataRepository.save(metadata);
@@ -1016,8 +980,6 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genBulletin2RsGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = bulletin2Url + "/get-generate-doc/" + refId;
-		System.out.println("url>>>>>>>" + url);
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -1032,7 +994,6 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("RESPOSNE OF GET-GEN-DOC-B2 RS: " + body);
 		} catch (Exception e) {
 			System.err.println("Error during API call-B2 RS: " + e.getMessage());
 			throw e;
@@ -1041,7 +1002,6 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("bull2_gen_header_rs")) {
 				Map<String, String> map = new HashMap<>();
@@ -1100,7 +1060,6 @@ public class ThirdPartyDocGen {
 			}
 		});
 		try {
-			log.info("before merge >>>>>");
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 			saveOpenKm(dsp2Key, mergedResource);
@@ -1108,7 +1067,6 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			log.info("Exception >>> {}", e.getMessage());
 		}
 		return null;
 	}
@@ -1121,7 +1079,6 @@ public class ThirdPartyDocGen {
 	 */
 	public ResponseEntity<Resource> genLobRsGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = lobUrl + "/lob/generate-doc-id/" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -1137,14 +1094,12 @@ public class ThirdPartyDocGen {
 			body = response.getBody();
 			System.out.println(body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
 			throw e;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("lob_gen_header_rs")) {
 				Map<String, String> map = new HashMap<>();
@@ -1178,8 +1133,6 @@ public class ThirdPartyDocGen {
 							throw new RuntimeException(e);
 						}
 						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-
-						System.out.println(">>> Find by DSP2Key: " + map.get("dsp2Key"));
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
@@ -1247,7 +1200,6 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("bull1_gen_header")) {
 				Map<String, String> map = new HashMap<>();
@@ -1283,7 +1235,6 @@ public class ThirdPartyDocGen {
 								HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
 
 						Map<String, Object> bodyResp = response.getBody();
-						System.out.println(">>> response.getBody() - " + response.getBody());
 						if (bodyResp != null && bodyResp.containsKey("data")) {
 							Map<String, Object> data = (Map<String, Object>) bodyResp.get("data");
 							Map<String, String> convertedDate = (Map<String, String>) data.get("convertedDate");
@@ -1351,7 +1302,6 @@ public class ThirdPartyDocGen {
 		});
 
 		try {
-			log.info("before merge >>>>>");
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 			saveOpenKm(dsp2Key, mergedResource);
@@ -1360,9 +1310,116 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			log.info("hhhh>>> {}", e.getMessage());
 		}
 		return null;
+	}
+
+	/**
+	 * @param key
+	 * @param docTemplates
+	 * @param refId
+	 * @return
+	 */
+	public ResponseEntity<Resource> genBulletin1RSGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			if (docTemplate.getCode().equals("bull1_gen_header_rs")) {
+				Map<String, String> map = new HashMap<>();
+
+// Extract session and date from refId: B1InitRS-264-2025-09-23
+				String[] parts = refId.split("-");
+				int session = 0;
+				String gregorianDate = null;
+				if (parts.length > 2) {
+					session = Integer.parseInt(parts[1]);
+					gregorianDate = parts[2] + "-" + parts[3] + "-" + parts[4];
+				}
+
+				map.put("num", String.valueOf(session));
+
+// Convert session to words with ordinal + "SESSION"
+				map.put("numTotext", NumberToWordsConverter.convertToOrdinal(session) + " SESSION");
+
+// Format Gregorian date
+				LocalDate date = LocalDate.parse(gregorianDate);
+				DateTimeFormatter longFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM dd, yyyy", Locale.ENGLISH);
+				map.put("datePrefixDay", date.format(longFormatter)); // Tuesday, September 23, 2025
+
+				DateTimeFormatter withoutDayFormatter = DateTimeFormatter.ofPattern("d'%s' MMMM, yyyy", Locale.ENGLISH);
+				int day = date.getDayOfMonth();
+				String daySuffix = getDayOfMonthSuffix(day);
+				map.put("dateW/oDay", String.format("%d%s %s", day, daySuffix,
+						date.format(DateTimeFormatter.ofPattern("MMMM, yyyy")))); // 23rd September, 2025
+
+// Current time in 12-hour format with uppercase AM/PM
+				DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+				map.put("currentTime", LocalTime.now().format(timeFormatter));
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+
+			} else if (docTemplate.getCode().equals("bull1_gen_con_rs")) {
+				Map<String, String> emptyMap = new HashMap<>();
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), emptyMap);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			} else {
+				try {
+					Map<String, String> map = new HashMap<>();
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.info("Error merging files >>> {}", e.getMessage());
+		}
+		return null;
+	}
+
+//Helper method for day suffix
+	private static String getDayOfMonthSuffix(int n) {
+		if (n >= 11 && n <= 13)
+			return "th";
+		switch (n % 10) {
+		case 1:
+			return "st";
+		case 2:
+			return "nd";
+		case 3:
+			return "rd";
+		default:
+			return "th";
+		}
 	}
 
 }
