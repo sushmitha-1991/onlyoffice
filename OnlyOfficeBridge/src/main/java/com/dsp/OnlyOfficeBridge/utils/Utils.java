@@ -14,13 +14,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.xml.bind.JAXBElement;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
 import org.docx4j.XmlUtils;
 import org.docx4j.model.datastorage.migration.VariablePrepare;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.JaxbXmlPart;
+import org.docx4j.openpackaging.parts.Part;
+import org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
+import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
+import org.docx4j.relationships.Relationship;
+import org.docx4j.wml.ContentAccessor;
 import org.docx4j.wml.Text;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 //import org.jodconverter.local.LocalConverter;
@@ -62,6 +71,7 @@ import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
 
 @Component
+@Slf4j
 public class Utils {
 
 	@Autowired 
@@ -380,6 +390,31 @@ public class Utils {
             // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
             // we'll continue to the manual fallback below.
         }
+        RelationshipsPart rels = mainPart.getRelationshipsPart();
+        for (Relationship rel : rels.getRelationships().getRelationship()) {
+            Part part = rels.getPart(rel);
+            if (part instanceof HeaderPart) {
+                HeaderPart hp = (HeaderPart) part;
+                try {
+                    VariablePrepare.prepare(wordMLPackage);
+                    hp.variableReplace(replacements);
+                    replaceInPart(hp, replacements);
+                } catch (Exception e) {
+                    log.info("header merge {}", e.getMessage());
+                    //replaceInPart(hp, replacements);
+                }
+            } else if (part instanceof FooterPart) {
+                FooterPart fp = (FooterPart) part;
+                try {
+                    VariablePrepare.prepare(wordMLPackage);
+                    fp.variableReplace(replacements);
+                    replaceInPart(fp, replacements);
+                } catch (Exception e) {
+                    log.info("footer merge {}", e.getMessage());
+                    //replaceInPart(fp, replacements);
+                }
+            }
+        }
 
         // --- Manual fallback for templates using {name} and split runs ---
         List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
@@ -449,6 +484,79 @@ public class Utils {
         return new ByteArrayResource(baos.toByteArray());
     }
 
+    private static void replaceInPart(JaxbXmlPart<?> part, Map<String, String> replacements) throws Exception {
+        List<Object> texts = getAllElementFromObject(part.getContents(), Text.class);
+
+        int n = texts.size();
+        int i = 0;
+
+        while (i < n) {
+            StringBuilder sb = new StringBuilder();
+            boolean replacedInWindow = false;
+            int j = i;
+
+            while (j < n) {
+                Text textElement = (Text) texts.get(j);
+                String val = textElement.getValue();
+                if (val != null) sb.append(val);
+
+                String combined = sb.toString();
+
+                if (combined.contains("}")) {
+                    String replacedCombined = combined;
+                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                        // supports ${key}
+                        String placeholder = "${" + entry.getKey() + "}";
+                        if (replacedCombined.contains(placeholder)) {
+                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+                        }
+                    }
+
+                    if (!replacedCombined.equals(combined)) {
+                        // put replaced value in first run
+                        ((Text) texts.get(i)).setValue(replacedCombined);
+                        // clear subsequent runs that were part of the placeholder
+                        for (int k = i + 1; k <= j; k++) {
+                            ((Text) texts.get(k)).setValue("");
+                        }
+                        replacedInWindow = true;
+                        break;
+                    }
+                }
+                j++;
+            }
+
+            if (replacedInWindow) {
+                i = j + 1;
+            } else {
+                i++;
+            }
+        }
+    }
+
+    /**
+     * Recursively get all elements of a certain type from a content tree.
+     */
+    private static <T> List<Object> getAllElementFromObject(Object obj, Class<T> toSearch) {
+        List<Object> result = new ArrayList<>();
+        if (obj == null) return result;
+
+        if (obj instanceof JAXBElement<?>) {
+            obj = ((JAXBElement<?>) obj).getValue();
+        }
+
+        if (toSearch.isAssignableFrom(obj.getClass())) {
+            result.add(obj);
+        } else if (obj instanceof ContentAccessor) {
+            List<?> children = ((ContentAccessor) obj).getContent();
+            for (Object child : children) {
+                result.addAll(getAllElementFromObject(child, toSearch));
+            }
+        }
+
+        return result;
+    }
 
     public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
                                                         Map<String, String> replacements)  {
