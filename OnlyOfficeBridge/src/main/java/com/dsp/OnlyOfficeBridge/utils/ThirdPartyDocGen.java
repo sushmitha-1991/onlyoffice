@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -33,7 +34,15 @@ import org.docx4j.openpackaging.parts.WordprocessingML.FootnotesPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.docx4j.relationships.Relationship;
-import org.docx4j.wml.*;
+import org.docx4j.wml.Br;
+import org.docx4j.wml.CTEndnotes;
+import org.docx4j.wml.CTFootnotes;
+import org.docx4j.wml.CTFtnEdn;
+import org.docx4j.wml.Comments;
+import org.docx4j.wml.ObjectFactory;
+import org.docx4j.wml.P;
+import org.docx4j.wml.R;
+import org.docx4j.wml.STBrType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -85,6 +94,8 @@ public class ThirdPartyDocGen {
 	String downloadKmUrl;
 	@Value("${cd.service.url}")
 	private String cdUrl;
+	@Value("${dsp2.base.url}")
+	private String dsp2Url;
 	@Autowired
 	private VerbatimClient verbatimClient;
 
@@ -679,176 +690,175 @@ public class ThirdPartyDocGen {
 //        }
 //    }
 
-    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
-        if (files == null || files.isEmpty()) {
-            throw new IllegalArgumentException("No files to merge");
-        }
+	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+		if (files == null || files.isEmpty()) {
+			throw new IllegalArgumentException("No files to merge");
+		}
 
-        // Load first file as base
-        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.load(
-                new ByteArrayInputStream(files.get(0).getFile()));
-        MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
+		// Load first file as base
+		WordprocessingMLPackage targetPkg = WordprocessingMLPackage
+				.load(new ByteArrayInputStream(files.get(0).getFile()));
+		MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
 
-        // Ensure footnotes, endnotes, comments exist
-        FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
-        if (targetFootnotes == null) {
-            targetFootnotes = new FootnotesPart();
-            targetFootnotes.setContents(new CTFootnotes());
-            targetMain.addTargetPart(targetFootnotes);
-        }
-        EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
-        if (targetEndnotes == null) {
-            targetEndnotes = new EndnotesPart();
-            targetEndnotes.setContents(new CTEndnotes());
-            targetMain.addTargetPart(targetEndnotes);
-        }
-        CommentsPart targetComments = targetMain.getCommentsPart();
-        if (targetComments == null) {
-            targetComments = new CommentsPart();
-            targetComments.setContents(new Comments());
-            targetMain.addTargetPart(targetComments);
-        }
+		// Ensure footnotes, endnotes, comments exist
+		FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
+		if (targetFootnotes == null) {
+			targetFootnotes = new FootnotesPart();
+			targetFootnotes.setContents(new CTFootnotes());
+			targetMain.addTargetPart(targetFootnotes);
+		}
+		EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
+		if (targetEndnotes == null) {
+			targetEndnotes = new EndnotesPart();
+			targetEndnotes.setContents(new CTEndnotes());
+			targetMain.addTargetPart(targetEndnotes);
+		}
+		CommentsPart targetComments = targetMain.getCommentsPart();
+		if (targetComments == null) {
+			targetComments = new CommentsPart();
+			targetComments.setContents(new Comments());
+			targetMain.addTargetPart(targetComments);
+		}
 
-        // Track max IDs
-        int maxFootnoteId = targetFootnotes.getContents().getFootnote()
-                .stream().map(fn -> fn.getId().intValue()).max(Integer::compareTo).orElse(0);
-        int maxEndnoteId = targetEndnotes.getContents().getEndnote()
-                .stream().map(en -> en.getId().intValue()).max(Integer::compareTo).orElse(0);
-        int maxCommentId = targetComments.getContents().getComment()
-                .stream().map(c -> c.getId().intValue()).max(Integer::compareTo).orElse(0);
+		// Track max IDs
+		int maxFootnoteId = targetFootnotes.getContents().getFootnote().stream().map(fn -> fn.getId().intValue())
+				.max(Integer::compareTo).orElse(0);
+		int maxEndnoteId = targetEndnotes.getContents().getEndnote().stream().map(en -> en.getId().intValue())
+				.max(Integer::compareTo).orElse(0);
+		int maxCommentId = targetComments.getContents().getComment().stream().map(c -> c.getId().intValue())
+				.max(Integer::compareTo).orElse(0);
 
-        // For each source file
-        for (int idx = 1; idx < files.size(); idx++) {
-            WordprocessingMLPackage srcPkg = WordprocessingMLPackage.load(
-                    new ByteArrayInputStream(files.get(idx).getFile()));
-            MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
+		// For each source file
+		for (int idx = 1; idx < files.size(); idx++) {
+			WordprocessingMLPackage srcPkg = WordprocessingMLPackage
+					.load(new ByteArrayInputStream(files.get(idx).getFile()));
+			MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
 
-            // 1) Copy images
-            Map<String, String> relIdMapping = new HashMap<>();
-            for (Part p : srcPkg.getParts().getParts().values()) {
-                if (p instanceof BinaryPart && p.getPartName() != null
-                        && p.getPartName().getName().startsWith("/word/media/")) {
-                    BinaryPart srcBin = (BinaryPart) p;
-                    ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
-                    srcBin.writeDataToOutputStream(imgOut);
-                    BinaryPartAbstractImage newImgPart =
-                            BinaryPartAbstractImage.createImagePart(targetPkg, imgOut.toByteArray());
-                    Relationship newRel = newImgPart.getSourceRelationship();
-                    if (newRel != null) {
-                        for (Relationship srcRel : srcBin.getSourceRelationships()) {
-                            relIdMapping.put(srcRel.getId(), newRel.getId());
-                        }
-                    }
-                }
-            }
+			// 1) Copy images
+			Map<String, String> relIdMapping = new HashMap<>();
+			for (Part p : srcPkg.getParts().getParts().values()) {
+				if (p instanceof BinaryPart && p.getPartName() != null
+						&& p.getPartName().getName().startsWith("/word/media/")) {
+					BinaryPart srcBin = (BinaryPart) p;
+					ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
+					srcBin.writeDataToOutputStream(imgOut);
+					BinaryPartAbstractImage newImgPart = BinaryPartAbstractImage.createImagePart(targetPkg,
+							imgOut.toByteArray());
+					Relationship newRel = newImgPart.getSourceRelationship();
+					if (newRel != null) {
+						for (Relationship srcRel : srcBin.getSourceRelationships()) {
+							relIdMapping.put(srcRel.getId(), newRel.getId());
+						}
+					}
+				}
+			}
 
-            // 2) Merge Footnotes
-            Map<BigInteger, BigInteger> footnoteIdMap = new HashMap<>();
-            FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
-            if (srcFootnotes != null && srcFootnotes.getContents() != null) {
-                for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
-                    BigInteger oldId = fn.getId();
-                    BigInteger newId = BigInteger.valueOf(++maxFootnoteId);
-                    fn.setId(newId);
-                    footnoteIdMap.put(oldId, newId);
-                }
-                targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
-            }
+			// 2) Merge Footnotes
+			Map<BigInteger, BigInteger> footnoteIdMap = new HashMap<>();
+			FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
+			if (srcFootnotes != null && srcFootnotes.getContents() != null) {
+				for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
+					BigInteger oldId = fn.getId();
+					BigInteger newId = BigInteger.valueOf(++maxFootnoteId);
+					fn.setId(newId);
+					footnoteIdMap.put(oldId, newId);
+				}
+				targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
+			}
 
-            // 3) Merge Endnotes
-            Map<BigInteger, BigInteger> endnoteIdMap = new HashMap<>();
-            EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
-            if (srcEndnotes != null && srcEndnotes.getContents() != null) {
-                for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
-                    BigInteger oldId = en.getId();
-                    BigInteger newId = BigInteger.valueOf(++maxEndnoteId);
-                    en.setId(newId);
-                    endnoteIdMap.put(oldId, newId);
-                }
-                targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
-            }
+			// 3) Merge Endnotes
+			Map<BigInteger, BigInteger> endnoteIdMap = new HashMap<>();
+			EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
+			if (srcEndnotes != null && srcEndnotes.getContents() != null) {
+				for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
+					BigInteger oldId = en.getId();
+					BigInteger newId = BigInteger.valueOf(++maxEndnoteId);
+					en.setId(newId);
+					endnoteIdMap.put(oldId, newId);
+				}
+				targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
+			}
 
-            // 4) Merge Comments
-            Map<BigInteger, BigInteger> commentIdMap = new HashMap<>();
-            CommentsPart srcComments = srcMain.getCommentsPart();
-            if (srcComments != null && srcComments.getContents() != null) {
-                for (Comments.Comment c : srcComments.getContents().getComment()) {
-                    BigInteger oldId = c.getId();
-                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
-                    c.setId(newId);
-                    commentIdMap.put(oldId, newId);
-                }
-                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-            }
+			// 4) Merge Comments
+			Map<BigInteger, BigInteger> commentIdMap = new HashMap<>();
+			CommentsPart srcComments = srcMain.getCommentsPart();
+			if (srcComments != null && srcComments.getContents() != null) {
+				for (Comments.Comment c : srcComments.getContents().getComment()) {
+					BigInteger oldId = c.getId();
+					BigInteger newId = BigInteger.valueOf(++maxCommentId);
+					c.setId(newId);
+					commentIdMap.put(oldId, newId);
+				}
+				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+			}
 
-            // 5) Append body content, fixing IDs
-            if (srcMain.getContent() != null) {
-                for (Object o : srcMain.getContent()) {
-                    Object clone = XmlUtils.deepCopy(o);
-                    String xml = XmlUtils.marshaltoString(clone, true);
+			// 5) Append body content, fixing IDs
+			if (srcMain.getContent() != null) {
+				for (Object o : srcMain.getContent()) {
+					Object clone = XmlUtils.deepCopy(o);
+					String xml = XmlUtils.marshaltoString(clone, true);
 
-                    // Replace relIds
-                    for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
-                        xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
-                        xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
-                    }
-                    // Replace footnote IDs
-                    for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
-                        xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
-                                "w:footnoteReference w:id=\"" + e.getValue() + "\"");
-                    }
-                    // Replace endnote IDs
-                    for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
-                        xml = xml.replace("w:endnoteReference w:id=\"" + e.getKey() + "\"",
-                                "w:endnoteReference w:id=\"" + e.getValue() + "\"");
-                    }
-                    // Replace comment IDs
-                    for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
-                        xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
-                                "w:commentReference w:id=\"" + e.getValue() + "\"");
-                        xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
-                                "w:commentRangeStart w:id=\"" + e.getValue() + "\"");
-                        xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
-                                "w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
-                    }
+					// Replace relIds
+					for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+						xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
+						xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
+					}
+					// Replace footnote IDs
+					for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
+						xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
+								"w:footnoteReference w:id=\"" + e.getValue() + "\"");
+					}
+					// Replace endnote IDs
+					for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
+						xml = xml.replace("w:endnoteReference w:id=\"" + e.getKey() + "\"",
+								"w:endnoteReference w:id=\"" + e.getValue() + "\"");
+					}
+					// Replace comment IDs
+					for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
+						xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
+								"w:commentReference w:id=\"" + e.getValue() + "\"");
+						xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
+								"w:commentRangeStart w:id=\"" + e.getValue() + "\"");
+						xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
+								"w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+					}
 
-                    Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
-                    targetMain.getContent().add(fixed);
-                }
-            }
+					Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+					targetMain.getContent().add(fixed);
+				}
+			}
 
-            // 6) Copy headers/footers (simple best-effort)
-            List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
-            if (sections != null) {
-                HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
-                if (srcPolicy != null) {
-                    if (srcPolicy.getDefaultHeader() != null) {
-                        HeaderPart clonedHeader = new HeaderPart();
-                        clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
-                        targetMain.addTargetPart(clonedHeader);
-                    }
-                    if (srcPolicy.getDefaultFooter() != null) {
-                        FooterPart clonedFooter = new FooterPart();
-                        clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
-                        targetMain.addTargetPart(clonedFooter);
-                    }
-                }
-            }
+			// 6) Copy headers/footers (simple best-effort)
+			List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
+			if (sections != null) {
+				HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
+				if (srcPolicy != null) {
+					if (srcPolicy.getDefaultHeader() != null) {
+						HeaderPart clonedHeader = new HeaderPart();
+						clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
+						targetMain.addTargetPart(clonedHeader);
+					}
+					if (srcPolicy.getDefaultFooter() != null) {
+						FooterPart clonedFooter = new FooterPart();
+						clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
+						targetMain.addTargetPart(clonedFooter);
+					}
+				}
+			}
 
-            // Optional page break
-            if (files.get(idx).isBreak()) {
-                targetMain.getContent().add(createPageBreak());
-            }
-        }
+			// Optional page break
+			if (files.get(idx).isBreak()) {
+				targetMain.getContent().add(createPageBreak());
+			}
+		}
 
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            targetPkg.save(baos);
-            return baos.toByteArray();
-        }
-    }
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+			targetPkg.save(baos);
+			return baos.toByteArray();
+		}
+	}
 
-
-    private static P createPageBreak() {
+	private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
 		R run = factory.createR();
@@ -1139,7 +1149,7 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("lob_gen_header_rs")) {
 				Map<String, String> map = new HashMap<>();
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				map.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
+				map.put("date", (String) data.get("forDate"));
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 
@@ -1184,6 +1194,20 @@ public class ThirdPartyDocGen {
 
 			}
 
+			else if (docTemplate.getCode().equals("lob_gen_ft_rs")) {
+				Map<String, String> map = new HashMap<>();
+				// Format current date like: September 09, 2025
+				DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM dd, yyyy", Locale.ENGLISH);
+				map.put("currentDate", LocalDate.now().format(formatter));
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+
 			else {
 				ByteArrayResource resource = null;
 				try {
@@ -1205,6 +1229,138 @@ public class ThirdPartyDocGen {
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
 
+		}
+		return null;
+	}
+
+	public ResponseEntity<Resource> genBulletin1LSGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+
+			if (docTemplate.getCode().equals("bull1_gen_header")) {
+				Map<String, String> map = new HashMap<>();
+
+				// Extract number from refId (b1Init-12-2025-09-23 → 12)
+				String[] parts = refId.split("-");
+				if (parts.length > 1) {
+					map.put("num", parts[1]);
+				}
+
+				// Extract date from refId (last part → 2025-09-23)
+				// Extract date from refId
+				String gregorianDate = null;
+				if (parts.length > 3) {
+					String dayPart = parts[4];
+					// Remove locale suffix if present
+					if (dayPart.endsWith("EN") || dayPart.endsWith("HI")) {
+						dayPart = dayPart.substring(0, dayPart.length() - 2);
+					}
+					gregorianDate = parts[2] + "-" + parts[3] + "-" + dayPart; // yyyy-MM-dd
+				}
+
+				String sakaDate = null;
+				if (gregorianDate != null) {
+					try {
+						// Prepare request body
+						Map<String, String> requestPayload = new HashMap<>();
+						requestPayload.put("dateToConvert", gregorianDate);
+
+						// Call API
+						RestTemplate restTemplate = new RestTemplate();
+						ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+								HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+						Map<String, Object> bodyResp = response.getBody();
+						System.out.println(">>> response.getBody() - " + response.getBody());
+						if (bodyResp != null && bodyResp.containsKey("data")) {
+							Map<String, Object> data = (Map<String, Object>) bodyResp.get("data");
+							Map<String, String> convertedDate = (Map<String, String>) data.get("convertedDate");
+
+							// Default locale
+							String locale = "en"; // fallback
+
+							if (refId.endsWith("EN")) {
+								locale = "en";
+							} else if (refId.endsWith("HI")) {
+								locale = "hi";
+							}
+
+							sakaDate = convertedDate.get(locale); // "en" or "hi" based on refId
+						}
+					} catch (Exception e) {
+						log.error("Error fetching Saka date: {}", e.getMessage());
+					}
+				}
+
+				// Format Gregorian date in long format (e.g., Tuesday, September 23, 2025)
+				DateTimeFormatter longFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM dd, yyyy", Locale.ENGLISH);
+				String formattedGregorianDate;
+				if (gregorianDate != null) {
+					formattedGregorianDate = LocalDate.parse(gregorianDate).format(longFormatter);
+				} else {
+					formattedGregorianDate = LocalDate.now().format(longFormatter);
+				}
+
+				// Final date: Gregorian + optional Saka
+				if (sakaDate != null) {
+					map.put("date", formattedGregorianDate + " / " + sakaDate + " (Saka)");
+				} else {
+					map.put("date", formattedGregorianDate);
+				}
+
+				// Format current time in 12-hour format with uppercase AM/PM
+				DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+				map.put("currentTime", LocalTime.now().format(timeFormatter));
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			} else if (docTemplate.getCode().equals("bull1_gen_con")) {
+				Map<String, String> emptyMap = new HashMap<>();
+				try {
+					// Blank replacement since docx has no placeholders
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), emptyMap);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			} else {
+				try {
+					Map<String, String> map = new HashMap<>();
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+
+		try {
+			log.info("before merge >>>>>");
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.info("hhhh>>> {}", e.getMessage());
 		}
 		return null;
 	}
