@@ -631,6 +631,103 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
+
+	public ResponseEntity<Resource> genSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = lobUrl + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
+		System.out.println("url>>>>>>>" + url);
+
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println("API response >>>>> "+body);
+		} catch (Exception e) {
+			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			throw e;
+		}
+
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		String synopsisDate = (String) data.get("synopsisDate");
+		List<String> dspKeys = (List<String>) data.get("dspKeys");
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+
+			// HEADER
+			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header")) {
+
+				Map<String, String> map = new HashMap<>();
+				map.put("synopsisDate", (String) synopsisDate);
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+
+			// CONTENT
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con")) {
+
+				dspKeys.forEach(dspKey -> {
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+					metadataOpt.ifPresent(metadata -> {
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					});
+				});
+			}
+
+			// FOOTER
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer")) {
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+
+			// FALLBACK (any other template)
+			else {
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+
+		// MERGE & SAVE
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
+
 //    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
 //        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
 //        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
