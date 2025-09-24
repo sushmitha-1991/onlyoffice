@@ -411,26 +411,27 @@ public class ThirdPartyDocGen {
 	
 	public ResponseEntity<Resource> genCdMergedGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-//		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
-//		System.out.println("url>>>>>>>" + url + " ==== " + token);
-//		Map<String, Object> body;
-//		if (token == null) {
-//			throw new IllegalStateException("Authorization token is missing");
-//		}
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.set("Authorization", "Bearer " + token);
-//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-//		HttpEntity<Void> entity = new HttpEntity<>(headers);
-//
-//		try {
-//			RestTemplate restTemplate = new RestTemplate();
-//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-//			body = response.getBody();
-//			System.out.println(body);
-//		} catch (Exception e) {
-//			System.err.println("Error during API call: " + e.getMessage()); 
-//			throw e;
-//		}
+		Long historyId=onlyOfficeMetadataRepository.getHistoryId(refId);
+		String url = cdUrl + "/debate/history/get/" + historyId;
+		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage()); 
+			throw e;
+		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
@@ -449,21 +450,17 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 				System.out.println("inside cd_static_con");
-//				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
-//				Map<String, Object> data = dataList.get(0);
-//				List<Map> inputList = (List<Map>) data.get("allocations");
-//				inputList.forEach(map -> {
-//					if (map.get("dsp2Key") != null) {
-//
-//						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-//								.findByDsp2Key((String) map.get("dsp2Key"));
-//						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
-//						ByteArrayResource resourceBody = utils
-//								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+				if (data.get("dsp2Key") != null) {
 
-//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-//					}
-//				});
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
 
 			}
 
