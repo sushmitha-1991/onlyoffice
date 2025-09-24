@@ -89,6 +89,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String downloadKmUrl;
 	@Value("${cd.gen.template.id}")
 	String cdTemplateId;
+	@Value("${cd.gen.merge.template.id}")
+	String cdMergedTemplateId;
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -214,6 +216,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(statementOfWorkTemplateId)) {
 					return thirdPartyDocGen.genSowGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(cdMergedTemplateId)) {
+					return thirdPartyDocGen.genCdMergedGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(b1lsTemplateId)) {
 					return thirdPartyDocGen.genBulletin1LSGeneration(key, docTemplates, refId);

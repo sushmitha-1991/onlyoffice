@@ -8,6 +8,7 @@ package com.dsp.OnlyOfficeBridge.repository;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
@@ -29,5 +30,8 @@ public interface OnlyOfficeMetadataRepository extends JpaRepository<OnlyOfficeMe
 	 * @return
 	 */
 	Optional<OnlyOfficeMetadata> findByDsp2Key(String key);
+	
+	@Query(value="select id FROM corrected_debate.history where allocation_input_id=:refId",nativeQuery=true)
+	Long getHistoryId(String refId);
 
 }
