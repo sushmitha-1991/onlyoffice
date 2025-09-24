@@ -81,6 +81,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String b1lsTemplateId;
 	@Value("${b1.rs.gen.template.id}")
 	String b1RsTemplateId;
+	@Value("${si.rs.gen.template.id}")
+	String siRsTemplateId;
 	@Value("${synopsis.ls.gen.template.id}")
 	String synopsisLsTemplateId;
 	@Value("${synopsis.en.ls.gen.template.id}")
@@ -228,9 +230,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(b1RsTemplateId)) {
 					return thirdPartyDocGen.genBulletin1RSGeneration(key, docTemplates, refId);
 				}
-				if ( templateId.equals(synopsisLsTemplateId) || templateId.equals(synopsisEnLsTemplateId) || templateId.equals(synopsisHiLsTemplateId)) {
+				if (templateId.equals(synopsisLsTemplateId) || templateId.equals(synopsisEnLsTemplateId)
+						|| templateId.equals(synopsisHiLsTemplateId)) {
 					return thirdPartyDocGen.genSynopsisGeneration(key, docTemplates, refId);
 				}
+				if (templateId.equals(siRsTemplateId)) {
+					return thirdPartyDocGen.genSIRSGeneration(key, docTemplates, refId);
+				}
+
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
