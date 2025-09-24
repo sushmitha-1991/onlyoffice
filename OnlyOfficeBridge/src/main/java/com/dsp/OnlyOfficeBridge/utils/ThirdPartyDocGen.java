@@ -346,10 +346,9 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
-	
-	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-			String refId) {
-		Long historyId=onlyOfficeMetadataRepository.getHistoryId(refId);
+
+	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+		Long historyId = onlyOfficeMetadataRepository.getHistoryId(refId);
 		String url = cdUrl + "/debate/history/get/" + historyId;
 		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
@@ -367,7 +366,7 @@ public class ThirdPartyDocGen {
 			body = response.getBody();
 			System.out.println(body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage()); 
+			System.err.println("Error during API call: " + e.getMessage());
 			throw e;
 		}
 
@@ -379,17 +378,16 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("cd_merge_con")) {
 				System.out.println("inside cd_merge_con");
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-					if (data.get("dsp2Key") != null) {
+				if (data.get("dsp2Key") != null) {
 
-						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-								.findByDsp2Key((String) data.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
-						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					}
-			
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
 
 			}
 
@@ -407,11 +405,9 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
-	
-	
 	public ResponseEntity<Resource> genCdMergedGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		Long historyId=onlyOfficeMetadataRepository.getHistoryId(refId);
+		Long historyId = onlyOfficeMetadataRepository.getHistoryId(refId);
 		String url = cdUrl + "/debate/history/get/" + historyId;
 		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
@@ -429,7 +425,7 @@ public class ThirdPartyDocGen {
 			body = response.getBody();
 			System.out.println(body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage()); 
+			System.err.println("Error during API call: " + e.getMessage());
 			throw e;
 		}
 
@@ -443,7 +439,8 @@ public class ThirdPartyDocGen {
 //				mapinput.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
 				mapinput.put("date", "Friday 19 September, 2025" + "/" + "भाद्रपक्ष 28, 1947");
 				try {
-					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx", mapinput);
+					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
+							mapinput);
 
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				} catch (Exception e) {
@@ -723,7 +720,7 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("API response >>>>> "+body);
+			System.out.println("API response >>>>> " + body);
 		} catch (Exception e) {
 			System.err.println("Error during API call Synopsis: " + e.getMessage());
 			throw e;
@@ -1590,6 +1587,84 @@ public class ThirdPartyDocGen {
 		default:
 			return "th";
 		}
+	}
+
+	/**
+	 * @param key
+	 * @param docTemplates
+	 * @param refId
+	 * @return
+	 */
+	public ResponseEntity<Resource> genSIRSGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			if (docTemplate.getCode().equals("si_header_rs")) {
+				Map<String, String> map = new HashMap<>();
+
+				// Extract session, fromDate, toDate from refId: SIRS-264-2024-05-12-2024-07-12
+				String[] parts = refId.split("-");
+				int session = 0;
+				String fromDateStr = null;
+				String toDateStr = null;
+
+				if (parts.length >= 8) {
+					session = Integer.parseInt(parts[1]);
+
+					// fromDate = 2024-05-12
+					fromDateStr = parts[2] + "-" + parts[3] + "-" + parts[4];
+
+					// toDate = 2024-07-12
+					toDateStr = parts[5] + "-" + parts[6] + "-" + parts[7];
+				}
+
+				// Put session with superscript suffix (e.g., 264ᵗʰ)
+				map.put("session", session + utils.getSuperscriptOrdinal(session));
+
+				// Format fromDate and toDate
+				DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+				if (fromDateStr != null) {
+					LocalDate fromDate = LocalDate.parse(fromDateStr, inputFormatter);
+					map.put("fromDate", fromDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+				}
+
+				if (toDateStr != null) {
+					LocalDate toDate = LocalDate.parse(toDateStr, inputFormatter);
+					map.put("toDate", toDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+				}
+
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+
+			} else {
+				try {
+					Map<String, String> map = new HashMap<>();
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.info("Error merging files >>> {}", e.getMessage());
+		}
+		return null;
 	}
 
 }

@@ -5,19 +5,23 @@
  */
 package com.dsp.OnlyOfficeBridge.utils;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import jakarta.xml.bind.JAXBElement;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.poi.xwpf.usermodel.*;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.xmlbeans.XmlOptions;
 import org.docx4j.XmlUtils;
 import org.docx4j.model.datastorage.migration.VariablePrepare;
@@ -31,11 +35,6 @@ import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.relationships.Relationship;
 import org.docx4j.wml.ContentAccessor;
 import org.docx4j.wml.Text;
-import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
-//import org.jodconverter.local.LocalConverter;
-//import org.jodconverter.local.office.LocalOfficeManager;
-import org.jodconverter.local.LocalConverter;
-import org.jodconverter.local.office.LocalOfficeManager;
 //import org.jodconverter.remote.RemoteConverter;
 //import org.jodconverter.remote.office.RemoteOfficeManager;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
@@ -69,12 +68,14 @@ import com.dsp.OnlyOfficeBridge.repository.MyUserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.xml.bind.JAXBElement;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
 public class Utils {
 
-	@Autowired 
+	@Autowired
 	private MyUserRepository myUserRepository;
 
 	@Autowired
@@ -88,10 +89,10 @@ public class Utils {
 
 	@Value("${download.url}")
 	String downloadOkmUrl;
-	
+
 	@Value("${upload.url}")
-	String uploadOkmUrl; 
-	
+	String uploadOkmUrl;
+
 	/**
 	 * Fetches the user ID of the currently authenticated user
 	 * 
@@ -289,7 +290,7 @@ public class Utils {
 		try {
 			String downloadUrl = downloadOkmUrl + uuid;
 			System.out.println(">>>>> DownloadURL: " + downloadUrl);
-			
+
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -359,7 +360,7 @@ public class Utils {
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			System.out.println(requestEntity);
 //			String uploadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/document/upload";
-			System.out.println(">>> NEW uploadUrl - " + uploadOkmUrl); 
+			System.out.println(">>> NEW uploadUrl - " + uploadOkmUrl);
 			ResponseEntity<String> response = restTemplate.exchange(uploadOkmUrl, HttpMethod.POST, requestEntity,
 					String.class);
 
@@ -372,264 +373,271 @@ public class Utils {
 			throw new RuntimeException("Error uploading document to OpenKM.", e);
 		}
 	}
-    public static ByteArrayResource replacePlaceholders(
-            String resourcePath, Map<String, String> replacements) throws Exception {
 
-        // Load DOCX from resources
-        WordprocessingMLPackage wordMLPackage =
-                WordprocessingMLPackage.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
+	public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements)
+			throws Exception {
 
-        MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
+		// Load DOCX from resources
+		WordprocessingMLPackage wordMLPackage = WordprocessingMLPackage
+				.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
 
-        // --- Try the docx4j variableReplace path first (recommended) ---
-        // This expects placeholders like ${name} and uses VariablePrepare to merge split runs.
-        try {
-            VariablePrepare.prepare(wordMLPackage);
-            mainPart.variableReplace(replacements);
-        } catch (Exception e) {
-            // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
-            // we'll continue to the manual fallback below.
-        }
-        RelationshipsPart rels = mainPart.getRelationshipsPart();
-        for (Relationship rel : rels.getRelationships().getRelationship()) {
-            Part part = rels.getPart(rel);
-            if (part instanceof HeaderPart) {
-                HeaderPart hp = (HeaderPart) part;
-                try {
-                    VariablePrepare.prepare(wordMLPackage);
-                    hp.variableReplace(replacements);
-                    replaceInPart(hp, replacements);
-                } catch (Exception e) {
-                    log.info("header merge {}", e.getMessage());
-                    //replaceInPart(hp, replacements);
-                }
-            } else if (part instanceof FooterPart) {
-                FooterPart fp = (FooterPart) part;
-                try {
-                    VariablePrepare.prepare(wordMLPackage);
-                    fp.variableReplace(replacements);
-                    replaceInPart(fp, replacements);
-                } catch (Exception e) {
-                    log.info("footer merge {}", e.getMessage());
-                    //replaceInPart(fp, replacements);
-                }
-            }
-        }
+		MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
 
-        // --- Manual fallback for templates using {name} and split runs ---
-        List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
-        List<Text> textElements = new ArrayList<>();
+		// --- Try the docx4j variableReplace path first (recommended) ---
+		// This expects placeholders like ${name} and uses VariablePrepare to merge
+		// split runs.
+		try {
+			VariablePrepare.prepare(wordMLPackage);
+			mainPart.variableReplace(replacements);
+		} catch (Exception e) {
+			// If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
+			// we'll continue to the manual fallback below.
+		}
+		RelationshipsPart rels = mainPart.getRelationshipsPart();
+		for (Relationship rel : rels.getRelationships().getRelationship()) {
+			Part part = rels.getPart(rel);
+			if (part instanceof HeaderPart) {
+				HeaderPart hp = (HeaderPart) part;
+				try {
+					VariablePrepare.prepare(wordMLPackage);
+					hp.variableReplace(replacements);
+					replaceInPart(hp, replacements);
+				} catch (Exception e) {
+					log.info("header merge {}", e.getMessage());
+					// replaceInPart(hp, replacements);
+				}
+			} else if (part instanceof FooterPart) {
+				FooterPart fp = (FooterPart) part;
+				try {
+					VariablePrepare.prepare(wordMLPackage);
+					fp.variableReplace(replacements);
+					replaceInPart(fp, replacements);
+				} catch (Exception e) {
+					log.info("footer merge {}", e.getMessage());
+					// replaceInPart(fp, replacements);
+				}
+			}
+		}
 
-        for (Object obj : tNodes) {
-            Object unwrapped = XmlUtils.unwrap(obj);
-            if (unwrapped instanceof Text) {
-                textElements.add((Text) unwrapped);
-            }
-        }
+		// --- Manual fallback for templates using {name} and split runs ---
+		List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
+		List<Text> textElements = new ArrayList<>();
 
-        int n = textElements.size();
-        int i = 0;
+		for (Object obj : tNodes) {
+			Object unwrapped = XmlUtils.unwrap(obj);
+			if (unwrapped instanceof Text) {
+				textElements.add((Text) unwrapped);
+			}
+		}
 
-        while (i < n) {
-            StringBuilder sb = new StringBuilder();
-            boolean replacedInWindow = false;
-            int j = i;
+		int n = textElements.size();
+		int i = 0;
 
-            // Expand window until we hit a closing brace '}' (only then a full placeholder might exist)
-            while (j < n) {
-                String val = textElements.get(j).getValue();
-                if (val != null) sb.append(val);
+		while (i < n) {
+			StringBuilder sb = new StringBuilder();
+			boolean replacedInWindow = false;
+			int j = i;
 
-                String combined = sb.toString();
+			// Expand window until we hit a closing brace '}' (only then a full placeholder
+			// might exist)
+			while (j < n) {
+				String val = textElements.get(j).getValue();
+				if (val != null)
+					sb.append(val);
 
-                // Only attempt replacement when there's a '}' in the combined text (closing brace)
-                if (combined.indexOf('}') >= 0) {
-                    String replacedCombined = combined;
-                    // Replace all placeholders that occur in this combined text
-                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                        String placeholder = "{" + entry.getKey() + "}";
-                        if (replacedCombined.contains(placeholder)) {
-                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
-                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
-                        }
-                    }
+				String combined = sb.toString();
 
-                    if (!replacedCombined.equals(combined)) {
-                        // Put replaced text into the first run of the window
-                        textElements.get(i).setValue(replacedCombined);
-                        // Clear the text in the remaining runs of the window to remove leftover fragments
-                        for (int k = i + 1; k <= j; k++) {
-                            textElements.get(k).setValue("");
-                        }
-                        replacedInWindow = true;
-                        break;
-                    }
-                }
-                j++;
-            }
+				// Only attempt replacement when there's a '}' in the combined text (closing
+				// brace)
+				if (combined.indexOf('}') >= 0) {
+					String replacedCombined = combined;
+					// Replace all placeholders that occur in this combined text
+					for (Map.Entry<String, String> entry : replacements.entrySet()) {
+						String placeholder = "{" + entry.getKey() + "}";
+						if (replacedCombined.contains(placeholder)) {
+							String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+							replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+						}
+					}
 
-            if (replacedInWindow) {
-                // Continue after the window we processed
-                i = j + 1;
-            } else {
-                // No replacement in this window: move one run forward
-                i++;
-            }
-        }
+					if (!replacedCombined.equals(combined)) {
+						// Put replaced text into the first run of the window
+						textElements.get(i).setValue(replacedCombined);
+						// Clear the text in the remaining runs of the window to remove leftover
+						// fragments
+						for (int k = i + 1; k <= j; k++) {
+							textElements.get(k).setValue("");
+						}
+						replacedInWindow = true;
+						break;
+					}
+				}
+				j++;
+			}
 
-        // Write updated DOCX into memory and return as resource
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        wordMLPackage.save(baos);
+			if (replacedInWindow) {
+				// Continue after the window we processed
+				i = j + 1;
+			} else {
+				// No replacement in this window: move one run forward
+				i++;
+			}
+		}
 
-        return new ByteArrayResource(baos.toByteArray());
-    }
+		// Write updated DOCX into memory and return as resource
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		wordMLPackage.save(baos);
 
-    private static void replaceInPart(JaxbXmlPart<?> part, Map<String, String> replacements) throws Exception {
-        List<Object> texts = getAllElementFromObject(part.getContents(), Text.class);
+		return new ByteArrayResource(baos.toByteArray());
+	}
 
-        int n = texts.size();
-        int i = 0;
+	private static void replaceInPart(JaxbXmlPart<?> part, Map<String, String> replacements) throws Exception {
+		List<Object> texts = getAllElementFromObject(part.getContents(), Text.class);
 
-        while (i < n) {
-            StringBuilder sb = new StringBuilder();
-            boolean replacedInWindow = false;
-            int j = i;
+		int n = texts.size();
+		int i = 0;
 
-            while (j < n) {
-                Text textElement = (Text) texts.get(j);
-                String val = textElement.getValue();
-                if (val != null) sb.append(val);
+		while (i < n) {
+			StringBuilder sb = new StringBuilder();
+			boolean replacedInWindow = false;
+			int j = i;
 
-                String combined = sb.toString();
+			while (j < n) {
+				Text textElement = (Text) texts.get(j);
+				String val = textElement.getValue();
+				if (val != null)
+					sb.append(val);
 
-                if (combined.contains("}")) {
-                    String replacedCombined = combined;
-                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                        // supports ${key}
-                        String placeholder = "${" + entry.getKey() + "}";
-                        if (replacedCombined.contains(placeholder)) {
-                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
-                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
-                        }
-                    }
+				String combined = sb.toString();
 
-                    if (!replacedCombined.equals(combined)) {
-                        // put replaced value in first run
-                        ((Text) texts.get(i)).setValue(replacedCombined);
-                        // clear subsequent runs that were part of the placeholder
-                        for (int k = i + 1; k <= j; k++) {
-                            ((Text) texts.get(k)).setValue("");
-                        }
-                        replacedInWindow = true;
-                        break;
-                    }
-                }
-                j++;
-            }
+				if (combined.contains("}")) {
+					String replacedCombined = combined;
+					for (Map.Entry<String, String> entry : replacements.entrySet()) {
+						// supports ${key}
+						String placeholder = "${" + entry.getKey() + "}";
+						if (replacedCombined.contains(placeholder)) {
+							String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+							replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+						}
+					}
 
-            if (replacedInWindow) {
-                i = j + 1;
-            } else {
-                i++;
-            }
-        }
-    }
+					if (!replacedCombined.equals(combined)) {
+						// put replaced value in first run
+						((Text) texts.get(i)).setValue(replacedCombined);
+						// clear subsequent runs that were part of the placeholder
+						for (int k = i + 1; k <= j; k++) {
+							((Text) texts.get(k)).setValue("");
+						}
+						replacedInWindow = true;
+						break;
+					}
+				}
+				j++;
+			}
 
-    /**
-     * Recursively get all elements of a certain type from a content tree.
-     */
-    private static <T> List<Object> getAllElementFromObject(Object obj, Class<T> toSearch) {
-        List<Object> result = new ArrayList<>();
-        if (obj == null) return result;
+			if (replacedInWindow) {
+				i = j + 1;
+			} else {
+				i++;
+			}
+		}
+	}
 
-        if (obj instanceof JAXBElement<?>) {
-            obj = ((JAXBElement<?>) obj).getValue();
-        }
+	/**
+	 * Recursively get all elements of a certain type from a content tree.
+	 */
+	private static <T> List<Object> getAllElementFromObject(Object obj, Class<T> toSearch) {
+		List<Object> result = new ArrayList<>();
+		if (obj == null)
+			return result;
 
-        if (toSearch.isAssignableFrom(obj.getClass())) {
-            result.add(obj);
-        } else if (obj instanceof ContentAccessor) {
-            List<?> children = ((ContentAccessor) obj).getContent();
-            for (Object child : children) {
-                result.addAll(getAllElementFromObject(child, toSearch));
-            }
-        }
+		if (obj instanceof JAXBElement<?>) {
+			obj = ((JAXBElement<?>) obj).getValue();
+		}
 
-        return result;
-    }
+		if (toSearch.isAssignableFrom(obj.getClass())) {
+			result.add(obj);
+		} else if (obj instanceof ContentAccessor) {
+			List<?> children = ((ContentAccessor) obj).getContent();
+			for (Object child : children) {
+				result.addAll(getAllElementFromObject(child, toSearch));
+			}
+		}
 
-    public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
-                                                        Map<String, String> replacements)  {
+		return result;
+	}
 
-        try (ByteArrayInputStream bis = new ByteArrayInputStream(inputResource.getByteArray());
-             XWPFDocument document = new XWPFDocument(bis)) {
+	public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource, Map<String, String> replacements) {
 
-            // Replace in paragraphs
-            for (XWPFParagraph paragraph : document.getParagraphs()) {
-                List<XWPFRun> runs = paragraph.getRuns();
-                if (runs != null) {
-                    for (XWPFRun run : runs) {
-                        String text = run.getText(0);
-                        if (text != null) {
-                            for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                                if (text.contains(entry.getKey())) {
-                                    text = text.replace(entry.getKey(), entry.getValue());
-                                    run.setText(text, 0);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+		try (ByteArrayInputStream bis = new ByteArrayInputStream(inputResource.getByteArray());
+				XWPFDocument document = new XWPFDocument(bis)) {
 
-            // Replace in tables also (if placeholders exist inside tables)
-            for (XWPFTable table : document.getTables()) {
-                for (XWPFTableRow row : table.getRows()) {
-                    for (XWPFTableCell cell : row.getTableCells()) {
-                        for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                            List<XWPFRun> runs = paragraph.getRuns();
-                            if (runs != null) {
-                                for (XWPFRun run : runs) {
-                                    String text = run.getText(0);
-                                    if (text != null) {
-                                        for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                                            if (text.contains(entry.getKey())) {
-                                                text = text.replace(entry.getKey(), entry.getValue());
-                                                run.setText(text, 0);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+			// Replace in paragraphs
+			for (XWPFParagraph paragraph : document.getParagraphs()) {
+				List<XWPFRun> runs = paragraph.getRuns();
+				if (runs != null) {
+					for (XWPFRun run : runs) {
+						String text = run.getText(0);
+						if (text != null) {
+							for (Map.Entry<String, String> entry : replacements.entrySet()) {
+								if (text.contains(entry.getKey())) {
+									text = text.replace(entry.getKey(), entry.getValue());
+									run.setText(text, 0);
+								}
+							}
+						}
+					}
+				}
+			}
 
-            // Write to ByteArrayOutputStream
-            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                document.write(bos);
-                return new ByteArrayResource(bos.toByteArray());
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+			// Replace in tables also (if placeholders exist inside tables)
+			for (XWPFTable table : document.getTables()) {
+				for (XWPFTableRow row : table.getRows()) {
+					for (XWPFTableCell cell : row.getTableCells()) {
+						for (XWPFParagraph paragraph : cell.getParagraphs()) {
+							List<XWPFRun> runs = paragraph.getRuns();
+							if (runs != null) {
+								for (XWPFRun run : runs) {
+									String text = run.getText(0);
+									if (text != null) {
+										for (Map.Entry<String, String> entry : replacements.entrySet()) {
+											if (text.contains(entry.getKey())) {
+												text = text.replace(entry.getKey(), entry.getValue());
+												run.setText(text, 0);
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 
-    public ByteArrayResource getFileAsResource(String filename) throws IOException {
-        // Load file from resources/doc-template
-        Resource resource = new ClassPathResource("doc-template/" + filename);
+			// Write to ByteArrayOutputStream
+			try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+				document.write(bos);
+				return new ByteArrayResource(bos.toByteArray());
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-        // Convert to ByteArrayResource
-        byte[] fileBytes = Files.readAllBytes(resource.getFile().toPath());
+	public ByteArrayResource getFileAsResource(String filename) throws IOException {
+		// Load file from resources/doc-template
+		Resource resource = new ClassPathResource("doc-template/" + filename);
 
-        return new ByteArrayResource(fileBytes) {
-            @Override
-            public String getFilename() {
-                return filename; // preserve filename
-            }
-        };
-    }
+		// Convert to ByteArrayResource
+		byte[] fileBytes = Files.readAllBytes(resource.getFile().toPath());
+
+		return new ByteArrayResource(fileBytes) {
+			@Override
+			public String getFilename() {
+				return filename; // preserve filename
+			}
+		};
+	}
 //    public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
 //                                                 Map<String, String> replacements)  {
 //
@@ -688,7 +696,6 @@ public class Utils {
 //        }
 //    }
 
-
 //    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
 //        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
 //
@@ -720,94 +727,201 @@ public class Utils {
 //        }
 //    }
 
-    public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
-        try (XWPFDocument mergedDoc = new XWPFDocument()) {
-        	
-            boolean first = true;
+	public static byte[] mergeDocxFiles(List<byte[]> docxFiles) throws Exception {
+		try (XWPFDocument mergedDoc = new XWPFDocument()) {
 
-            for (int i = 0; i < docxFiles.size(); i++) {
-                byte[] fileBytes = docxFiles.get(i);
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
-                     XWPFDocument doc = new XWPFDocument(bais)) {
+			boolean first = true;
 
-                    CTBody srcBody = doc.getDocument().getBody();
-                    CTBody destBody = mergedDoc.getDocument().getBody();
+			for (int i = 0; i < docxFiles.size(); i++) {
+				byte[] fileBytes = docxFiles.get(i);
+				try (ByteArrayInputStream bais = new ByteArrayInputStream(fileBytes);
+						XWPFDocument doc = new XWPFDocument(bais)) {
 
-                    // Strip <w:sectPr> from all but the last document
-                    CTBody cleaned = (i == docxFiles.size() - 1)
-                            ? srcBody
-                            : removeSectPr(srcBody);
+					CTBody srcBody = doc.getDocument().getBody();
+					CTBody destBody = mergedDoc.getDocument().getBody();
 
-                    if (first) {
-                        destBody.set(cleaned);
-                        first = false;
-                    } else {
-                        appendBody(destBody, cleaned);
-                    }
-                }
-            }
+					// Strip <w:sectPr> from all but the last document
+					CTBody cleaned = (i == docxFiles.size() - 1) ? srcBody : removeSectPr(srcBody);
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            mergedDoc.write(baos);
-            return baos.toByteArray();
-        }
-    }
+					if (first) {
+						destBody.set(cleaned);
+						first = false;
+					} else {
+						appendBody(destBody, cleaned);
+					}
+				}
+			}
 
-    /**
-     * Remove trailing <w:sectPr> which causes page breaks.
-     */
-    private static CTBody removeSectPr(CTBody body) throws Exception {
-        String xml = body.xmlText();
-        // Drop section properties
-        xml = xml.replaceAll("(?s)<w:sectPr.*?</w:sectPr>", "");
-        return CTBody.Factory.parse(xml);
-    }
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			mergedDoc.write(baos);
+			return baos.toByteArray();
+		}
+	}
 
-    /**
-     * Append one document body into another.
-     */
-    private static void appendBody(CTBody src, CTBody append) throws Exception {
-        XmlOptions optionsOuter = new XmlOptions();
-        optionsOuter.setSaveOuter();
-        String appendString = append.xmlText(optionsOuter);
+	/**
+	 * Remove trailing <w:sectPr> which causes page breaks.
+	 */
+	private static CTBody removeSectPr(CTBody body) throws Exception {
+		String xml = body.xmlText();
+		// Drop section properties
+		xml = xml.replaceAll("(?s)<w:sectPr.*?</w:sectPr>", "");
+		return CTBody.Factory.parse(xml);
+	}
 
-        String srcString = src.xmlText();
-        String prefix = srcString.substring(0, srcString.indexOf(">") + 1);
-        String mainPart = srcString.substring(srcString.indexOf(">") + 1, srcString.lastIndexOf("<"));
-        String suffix = srcString.substring(srcString.lastIndexOf("<"));
+	/**
+	 * Append one document body into another.
+	 */
+	private static void appendBody(CTBody src, CTBody append) throws Exception {
+		XmlOptions optionsOuter = new XmlOptions();
+		optionsOuter.setSaveOuter();
+		String appendString = append.xmlText(optionsOuter);
 
-        String addPart = appendString.substring(appendString.indexOf(">") + 1, appendString.lastIndexOf("<"));
+		String srcString = src.xmlText();
+		String prefix = srcString.substring(0, srcString.indexOf(">") + 1);
+		String mainPart = srcString.substring(srcString.indexOf(">") + 1, srcString.lastIndexOf("<"));
+		String suffix = srcString.substring(srcString.lastIndexOf("<"));
 
-        CTBody newBody = CTBody.Factory.parse(prefix + mainPart + addPart + suffix);
-        src.set(newBody);
-    }
-    public String getTokenFromRequest() {
-        String authorizationHeader = httpRequest.getHeader("Authorization");
-        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-            return authorizationHeader.substring(7);
-        }
-        return null;
-    }
-     
+		String addPart = appendString.substring(appendString.indexOf(">") + 1, appendString.lastIndexOf("<"));
+
+		CTBody newBody = CTBody.Factory.parse(prefix + mainPart + addPart + suffix);
+		src.set(newBody);
+	}
+
+	public String getTokenFromRequest() {
+		String authorizationHeader = httpRequest.getHeader("Authorization");
+		if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+			return authorizationHeader.substring(7);
+		}
+		return null;
+	}
+
 	// 🔧 Helper: set default margins = 1 inch
-    public void setDefaultMargins(XWPFDocument doc) {
-        CTSectPr sectPr = doc.getDocument().getBody().isSetSectPr()
-                ? doc.getDocument().getBody().getSectPr()
-                : doc.getDocument().getBody().addNewSectPr();
+	public void setDefaultMargins(XWPFDocument doc) {
+		CTSectPr sectPr = doc.getDocument().getBody().isSetSectPr() ? doc.getDocument().getBody().getSectPr()
+				: doc.getDocument().getBody().addNewSectPr();
 
-        // --- Set page size (A4 = 210mm × 297mm) ---
-        CTPageSz pageSize = sectPr.isSetPgSz() ? sectPr.getPgSz() : sectPr.addNewPgSz();
-        pageSize.setW(BigInteger.valueOf(11906)); // A4 width in twips
-        pageSize.setH(BigInteger.valueOf(16838)); // A4 height in twips
-        
-        CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+		// --- Set page size (A4 = 210mm × 297mm) ---
+		CTPageSz pageSize = sectPr.isSetPgSz() ? sectPr.getPgSz() : sectPr.addNewPgSz();
+		pageSize.setW(BigInteger.valueOf(11906)); // A4 width in twips
+		pageSize.setH(BigInteger.valueOf(16838)); // A4 height in twips
 
-        int topMargin = 1440; // twips
-        int sideMargin = 1080; // twips
-        pageMar.setTop(BigInteger.valueOf(topMargin));
-        pageMar.setBottom(BigInteger.valueOf(topMargin));
-        pageMar.setLeft(BigInteger.valueOf(sideMargin));
-        pageMar.setRight(BigInteger.valueOf(sideMargin));
-    }
-    
+		CTPageMar pageMar = sectPr.isSetPgMar() ? sectPr.getPgMar() : sectPr.addNewPgMar();
+
+		int topMargin = 1440; // twips
+		int sideMargin = 1080; // twips
+		pageMar.setTop(BigInteger.valueOf(topMargin));
+		pageMar.setBottom(BigInteger.valueOf(topMargin));
+		pageMar.setLeft(BigInteger.valueOf(sideMargin));
+		pageMar.setRight(BigInteger.valueOf(sideMargin));
+	}
+
+	/**
+	 * Get ordinal suffix for numbers (e.g., 1ST, 2ND, 3RD, 4TH, etc.)
+	 */
+	private String getOrdinalSuffix(int number) {
+		int n = number % 100;
+		if (n >= 11 && n <= 13) {
+			return "TH";
+		}
+		switch (n % 10) {
+		case 1:
+			return "ST";
+		case 2:
+			return "ND";
+		case 3:
+			return "RD";
+		default:
+			return "TH";
+		}
+	}
+
+	public String getSuperscriptOrdinal(int number) {
+		String suffix = getOrdinalSuffix(number); // e.g., "st", "nd", "rd", "th"
+		return toSuperscript(suffix);
+	}
+
+	private String toSuperscript(String str) {
+		str = str.toLowerCase();
+		StringBuilder sb = new StringBuilder();
+		for (char c : str.toCharArray()) {
+			switch (c) {
+			case 'a':
+				sb.append("ᵃ");
+				break;
+			case 'b':
+				sb.append("ᵇ");
+				break;
+			case 'c':
+				sb.append("ᶜ");
+				break;
+			case 'd':
+				sb.append("ᵈ");
+				break;
+			case 'e':
+				sb.append("ᵉ");
+				break;
+			case 'g':
+				sb.append("ᵍ");
+				break;
+			case 'h':
+				sb.append("ʰ");
+				break;
+			case 'i':
+				sb.append("ⁱ");
+				break;
+			case 'j':
+				sb.append("ʲ");
+				break;
+			case 'k':
+				sb.append("ᵏ");
+				break;
+			case 'l':
+				sb.append("ˡ");
+				break;
+			case 'm':
+				sb.append("ᵐ");
+				break;
+			case 'n':
+				sb.append("ⁿ");
+				break;
+			case 'o':
+				sb.append("ᵒ");
+				break;
+			case 'p':
+				sb.append("ᵖ");
+				break;
+			case 'r':
+				sb.append("ʳ");
+				break;
+			case 's':
+				sb.append("ˢ");
+				break;
+			case 't':
+				sb.append("ᵗ");
+				break;
+			case 'u':
+				sb.append("ᵘ");
+				break;
+			case 'v':
+				sb.append("ᵛ");
+				break;
+			case 'w':
+				sb.append("ʷ");
+				break;
+			case 'x':
+				sb.append("ˣ");
+				break;
+			case 'y':
+				sb.append("ʸ");
+				break;
+			case 'z':
+				sb.append("ᶻ");
+				break;
+			default:
+				sb.append(c);
+			}
+		}
+		return sb.toString();
+	}
+
 }
