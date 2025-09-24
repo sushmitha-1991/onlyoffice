@@ -348,8 +348,7 @@ public class ThirdPartyDocGen {
 	}
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
-		Long historyId = onlyOfficeMetadataRepository.getHistoryId(refId);
-		String url = cdUrl + "/debate/history/get/" + historyId;
+		String url = cdUrl + "debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
 		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
@@ -377,17 +376,21 @@ public class ThirdPartyDocGen {
 
 			if (docTemplate.getCode().equals("cd_merge_con")) {
 				System.out.println("inside cd_merge_con");
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("dsp2Key") != null) {
+				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+				Map<String, Object> data = dataList.get(0);
+				List<Map> inputList = (List<Map>) data.get("allocations");
+				inputList.forEach(map -> {
+					if (data.get("dsp2Key") != null) {
 
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+								.findByDsp2Key((String) data.get("dsp2Key"));
+						System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-				}
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					}
+				});
 
 			}
 
