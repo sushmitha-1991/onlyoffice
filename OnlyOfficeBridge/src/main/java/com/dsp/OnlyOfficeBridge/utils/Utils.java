@@ -14,13 +14,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.xml.bind.JAXBElement;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlOptions;
 import org.docx4j.XmlUtils;
 import org.docx4j.model.datastorage.migration.VariablePrepare;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
+import org.docx4j.openpackaging.parts.JaxbXmlPart;
+import org.docx4j.openpackaging.parts.Part;
+import org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
+import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
+import org.docx4j.relationships.Relationship;
+import org.docx4j.wml.ContentAccessor;
 import org.docx4j.wml.Text;
 import org.jodconverter.core.document.DefaultDocumentFormatRegistry;
 //import org.jodconverter.local.LocalConverter;
@@ -62,6 +71,7 @@ import jakarta.persistence.Query;
 import jakarta.servlet.http.HttpServletRequest;
 
 @Component
+@Slf4j
 public class Utils {
 
 	@Autowired 
@@ -362,6 +372,192 @@ public class Utils {
 			throw new RuntimeException("Error uploading document to OpenKM.", e);
 		}
 	}
+    public static ByteArrayResource replacePlaceholders(
+            String resourcePath, Map<String, String> replacements) throws Exception {
+
+        // Load DOCX from resources
+        WordprocessingMLPackage wordMLPackage =
+                WordprocessingMLPackage.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
+
+        MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
+
+        // --- Try the docx4j variableReplace path first (recommended) ---
+        // This expects placeholders like ${name} and uses VariablePrepare to merge split runs.
+        try {
+            VariablePrepare.prepare(wordMLPackage);
+            mainPart.variableReplace(replacements);
+        } catch (Exception e) {
+            // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
+            // we'll continue to the manual fallback below.
+        }
+        RelationshipsPart rels = mainPart.getRelationshipsPart();
+        for (Relationship rel : rels.getRelationships().getRelationship()) {
+            Part part = rels.getPart(rel);
+            if (part instanceof HeaderPart) {
+                HeaderPart hp = (HeaderPart) part;
+                try {
+                    VariablePrepare.prepare(wordMLPackage);
+                    hp.variableReplace(replacements);
+                    replaceInPart(hp, replacements);
+                } catch (Exception e) {
+                    log.info("header merge {}", e.getMessage());
+                    //replaceInPart(hp, replacements);
+                }
+            } else if (part instanceof FooterPart) {
+                FooterPart fp = (FooterPart) part;
+                try {
+                    VariablePrepare.prepare(wordMLPackage);
+                    fp.variableReplace(replacements);
+                    replaceInPart(fp, replacements);
+                } catch (Exception e) {
+                    log.info("footer merge {}", e.getMessage());
+                    //replaceInPart(fp, replacements);
+                }
+            }
+        }
+
+        // --- Manual fallback for templates using {name} and split runs ---
+        List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
+        List<Text> textElements = new ArrayList<>();
+
+        for (Object obj : tNodes) {
+            Object unwrapped = XmlUtils.unwrap(obj);
+            if (unwrapped instanceof Text) {
+                textElements.add((Text) unwrapped);
+            }
+        }
+
+        int n = textElements.size();
+        int i = 0;
+
+        while (i < n) {
+            StringBuilder sb = new StringBuilder();
+            boolean replacedInWindow = false;
+            int j = i;
+
+            // Expand window until we hit a closing brace '}' (only then a full placeholder might exist)
+            while (j < n) {
+                String val = textElements.get(j).getValue();
+                if (val != null) sb.append(val);
+
+                String combined = sb.toString();
+
+                // Only attempt replacement when there's a '}' in the combined text (closing brace)
+                if (combined.indexOf('}') >= 0) {
+                    String replacedCombined = combined;
+                    // Replace all placeholders that occur in this combined text
+                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                        String placeholder = "{" + entry.getKey() + "}";
+                        if (replacedCombined.contains(placeholder)) {
+                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+                        }
+                    }
+
+                    if (!replacedCombined.equals(combined)) {
+                        // Put replaced text into the first run of the window
+                        textElements.get(i).setValue(replacedCombined);
+                        // Clear the text in the remaining runs of the window to remove leftover fragments
+                        for (int k = i + 1; k <= j; k++) {
+                            textElements.get(k).setValue("");
+                        }
+                        replacedInWindow = true;
+                        break;
+                    }
+                }
+                j++;
+            }
+
+            if (replacedInWindow) {
+                // Continue after the window we processed
+                i = j + 1;
+            } else {
+                // No replacement in this window: move one run forward
+                i++;
+            }
+        }
+
+        // Write updated DOCX into memory and return as resource
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        wordMLPackage.save(baos);
+
+        return new ByteArrayResource(baos.toByteArray());
+    }
+
+    private static void replaceInPart(JaxbXmlPart<?> part, Map<String, String> replacements) throws Exception {
+        List<Object> texts = getAllElementFromObject(part.getContents(), Text.class);
+
+        int n = texts.size();
+        int i = 0;
+
+        while (i < n) {
+            StringBuilder sb = new StringBuilder();
+            boolean replacedInWindow = false;
+            int j = i;
+
+            while (j < n) {
+                Text textElement = (Text) texts.get(j);
+                String val = textElement.getValue();
+                if (val != null) sb.append(val);
+
+                String combined = sb.toString();
+
+                if (combined.contains("}")) {
+                    String replacedCombined = combined;
+                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
+                        // supports ${key}
+                        String placeholder = "${" + entry.getKey() + "}";
+                        if (replacedCombined.contains(placeholder)) {
+                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
+                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
+                        }
+                    }
+
+                    if (!replacedCombined.equals(combined)) {
+                        // put replaced value in first run
+                        ((Text) texts.get(i)).setValue(replacedCombined);
+                        // clear subsequent runs that were part of the placeholder
+                        for (int k = i + 1; k <= j; k++) {
+                            ((Text) texts.get(k)).setValue("");
+                        }
+                        replacedInWindow = true;
+                        break;
+                    }
+                }
+                j++;
+            }
+
+            if (replacedInWindow) {
+                i = j + 1;
+            } else {
+                i++;
+            }
+        }
+    }
+
+    /**
+     * Recursively get all elements of a certain type from a content tree.
+     */
+    private static <T> List<Object> getAllElementFromObject(Object obj, Class<T> toSearch) {
+        List<Object> result = new ArrayList<>();
+        if (obj == null) return result;
+
+        if (obj instanceof JAXBElement<?>) {
+            obj = ((JAXBElement<?>) obj).getValue();
+        }
+
+        if (toSearch.isAssignableFrom(obj.getClass())) {
+            result.add(obj);
+        } else if (obj instanceof ContentAccessor) {
+            List<?> children = ((ContentAccessor) obj).getContent();
+            for (Object child : children) {
+                result.addAll(getAllElementFromObject(child, toSearch));
+            }
+        }
+
+        return result;
+    }
+
     public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
                                                         Map<String, String> replacements)  {
 
@@ -434,92 +630,64 @@ public class Utils {
             }
         };
     }
-    public static ByteArrayResource replacePlaceholders(
-            String resourcePath, Map<String, String> replacements) throws Exception {
+//    public ByteArrayResource replacePlaceholders(ByteArrayResource inputResource,
+//                                                 Map<String, String> replacements)  {
+//
+//        try (ByteArrayInputStream bis = new ByteArrayInputStream(inputResource.getByteArray());
+//             XWPFDocument document = new XWPFDocument(bis)) {
+//
+//            // Replace in paragraphs
+//            for (XWPFParagraph paragraph : document.getParagraphs()) {
+//                List<XWPFRun> runs = paragraph.getRuns();
+//                if (runs != null) {
+//                    for (XWPFRun run : runs) {
+//                        String text = run.getText(0);
+//                        if (text != null) {
+//                            for (Map.Entry<String, String> entry : replacements.entrySet()) {
+//                                if (text.contains(entry.getKey())) {
+//                                    text = text.replace(entry.getKey(), entry.getValue());
+//                                    run.setText(text, 0);
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//
+//            // Replace in tables also (if placeholders exist inside tables)
+//            for (XWPFTable table : document.getTables()) {
+//                for (XWPFTableRow row : table.getRows()) {
+//                    for (XWPFTableCell cell : row.getTableCells()) {
+//                        for (XWPFParagraph paragraph : cell.getParagraphs()) {
+//                            List<XWPFRun> runs = paragraph.getRuns();
+//                            if (runs != null) {
+//                                for (XWPFRun run : runs) {
+//                                    String text = run.getText(0);
+//                                    if (text != null) {
+//                                        for (Map.Entry<String, String> entry : replacements.entrySet()) {
+//                                            if (text.contains(entry.getKey())) {
+//                                                text = text.replace(entry.getKey(), entry.getValue());
+//                                                run.setText(text, 0);
+//                                            }
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//
+//            // Write to ByteArrayOutputStream
+//            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+//                document.write(bos);
+//                return new ByteArrayResource(bos.toByteArray());
+//            }
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
 
-        // Load DOCX from resources
-        WordprocessingMLPackage wordMLPackage =
-                WordprocessingMLPackage.load(new ClassPathResource("doc-template/" + resourcePath).getInputStream());
-
-        MainDocumentPart mainPart = wordMLPackage.getMainDocumentPart();
-
-        // --- Try the docx4j variableReplace path first (recommended) ---
-        // This expects placeholders like ${name} and uses VariablePrepare to merge split runs.
-        try {
-            VariablePrepare.prepare(wordMLPackage);
-            mainPart.variableReplace(replacements);
-        } catch (Exception e) {
-            // If variableReplace fails (e.g. placeholders are {name} instead of ${name}),
-            // we'll continue to the manual fallback below.
-        }
-
-        // --- Manual fallback for templates using {name} and split runs ---
-        List<Object> tNodes = mainPart.getJAXBNodesViaXPath("//w:t", true);
-        List<Text> textElements = new ArrayList<>();
-
-        for (Object obj : tNodes) {
-            Object unwrapped = XmlUtils.unwrap(obj);
-            if (unwrapped instanceof Text) {
-                textElements.add((Text) unwrapped);
-            }
-        }
-
-        int n = textElements.size();
-        int i = 0;
-
-        while (i < n) {
-            StringBuilder sb = new StringBuilder();
-            boolean replacedInWindow = false;
-            int j = i;
-
-            // Expand window until we hit a closing brace '}' (only then a full placeholder might exist)
-            while (j < n) {
-                String val = textElements.get(j).getValue();
-                if (val != null) sb.append(val);
-
-                String combined = sb.toString();
-
-                // Only attempt replacement when there's a '}' in the combined text (closing brace)
-                if (combined.indexOf('}') >= 0) {
-                    String replacedCombined = combined;
-                    // Replace all placeholders that occur in this combined text
-                    for (Map.Entry<String, String> entry : replacements.entrySet()) {
-                        String placeholder = "{" + entry.getKey() + "}";
-                        if (replacedCombined.contains(placeholder)) {
-                            String replacementValue = entry.getValue() == null ? "" : entry.getValue();
-                            replacedCombined = replacedCombined.replace(placeholder, replacementValue);
-                        }
-                    }
-
-                    if (!replacedCombined.equals(combined)) {
-                        // Put replaced text into the first run of the window
-                        textElements.get(i).setValue(replacedCombined);
-                        // Clear the text in the remaining runs of the window to remove leftover fragments
-                        for (int k = i + 1; k <= j; k++) {
-                            textElements.get(k).setValue("");
-                        }
-                        replacedInWindow = true;
-                        break;
-                    }
-                }
-                j++;
-            }
-
-            if (replacedInWindow) {
-                // Continue after the window we processed
-                i = j + 1;
-            } else {
-                // No replacement in this window: move one run forward
-                i++;
-            }
-        }
-
-        // Write updated DOCX into memory and return as resource
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        wordMLPackage.save(baos);
-
-        return new ByteArrayResource(baos.toByteArray());
-    }
 
 //    public static ByteArrayResource replacePlaceholders(String resourcePath, Map<String, String> replacements) throws Exception {
 //        ClassPathResource resource = new ClassPathResource("doc-template/" + resourcePath);
