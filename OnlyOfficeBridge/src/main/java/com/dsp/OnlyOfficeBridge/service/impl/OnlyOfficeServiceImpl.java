@@ -81,10 +81,12 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String b1lsTemplateId;
 	@Value("${b1.rs.gen.template.id}")
 	String b1RsTemplateId;
+	@Value("${synopsis.ls.gen.template.id}")
+	String synopsisLsTemplateId;
 	@Value("${synopsis.en.ls.gen.template.id}")
 	String synopsisEnLsTemplateId;
 	@Value("${synopsis.hi.ls.gen.template.id}")
-	String synopsishiLsTemplateId;
+	String synopsisHiLsTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Value("${cd.gen.template.id}")
@@ -226,7 +228,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(b1RsTemplateId)) {
 					return thirdPartyDocGen.genBulletin1RSGeneration(key, docTemplates, refId);
 				}
-				if (templateId.equals(synopsisEnLsTemplateId) || templateId.equals(synopsishiLsTemplateId)) {
+				if ( templateId.equals(synopsisLsTemplateId) || templateId.equals(synopsisEnLsTemplateId) || templateId.equals(synopsisHiLsTemplateId)) {
 					return thirdPartyDocGen.genSynopsisGeneration(key, docTemplates, refId);
 				}
 			} else {
