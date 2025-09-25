@@ -95,6 +95,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String cdTemplateId;
 	@Value("${cd.gen.merge.template.id}")
 	String cdMergedTemplateId;
+
+	@Value("${pmb.gen.template.id}")
+	String pmbTemplateId;
+
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -236,6 +240,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(siRsTemplateId)) {
 					return thirdPartyDocGen.genSIRSGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(pmbTemplateId)) {
+					return thirdPartyDocGen.genPMBGeneration(key, docTemplates, refId);
 				}
 
 			} else {
