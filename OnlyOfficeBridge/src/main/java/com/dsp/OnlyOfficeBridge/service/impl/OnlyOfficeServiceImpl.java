@@ -99,6 +99,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Value("${pmb.gen.template.id}")
 	String pmbTemplateId;
 
+	@Value("${pmb.resol.gen.template.id}")
+	String pmbResolTemplateId;
+
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -243,6 +246,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(pmbTemplateId)) {
 					return thirdPartyDocGen.genPMBGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(pmbResolTemplateId)) {
+					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
 				}
 
 			} else {

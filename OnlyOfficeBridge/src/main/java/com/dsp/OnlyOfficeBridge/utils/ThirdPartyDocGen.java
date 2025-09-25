@@ -1837,4 +1837,114 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+	/**
+	 * @param key
+	 * @param docTemplates
+	 * @param refId
+	 * @return
+	 */
+	public ResponseEntity<Resource> genPMBResolGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		System.out.println("#### here");
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			Map<String, String> map = new HashMap<>();
+
+			try {
+				if ("pmb_resol_gen_header".equals(docTemplate.getCode())
+						|| "pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> response = restTemplate.exchange(
+							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
+							new HttpEntity<>(headers), Map.class);
+
+					Map<String, Object> body = response.getBody();
+					if (body != null && body.containsKey("data")) {
+						Map<String, Object> data = (Map<String, Object>) body.get("data");
+
+						// Header-specific processing
+						if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
+							// Format date
+							String forDate = (String) data.get("forDate");
+							if (forDate != null) {
+								LocalDate parsedDate = LocalDate.parse(forDate);
+								DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy",
+										Locale.ENGLISH);
+								map.put("dateWithDay", parsedDate.format(formatter));
+							}
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+
+							// Initialize placeholders
+							map.put("countForBillIntro", "");
+							map.put("memberName", "");
+							map.put("nameOfBill", "");
+							map.put("content", "");
+
+							// Take the first record if available
+							List<Map<String, Object>> details = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+							System.out.println("### details - " + details);
+							if (details != null && !details.isEmpty()) {
+								Map<String, Object> detail = details.get(0);
+
+								String memberName = (String) detail.get("memberFullName");
+								if (memberName == null || memberName.isEmpty())
+									memberName = (String) detail.get("memberName");
+
+								Integer serialNo = (Integer) detail.get("serialNo");
+								if (serialNo == null || serialNo == 0)
+									serialNo = 1;
+
+								map.put("countForBillIntro", serialNo.toString());
+								map.put("memberName", memberName);
+								map.put("nameOfBill", (String) detail.get("nameOfBill"));
+								map.put("content", (String) detail.get("content"));
+							}
+						}
+
+						// FT-specific processing
+						if ("pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+							map.put("currentDate", LocalDate.now().format(formatter));
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+						}
+					}
+
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} else {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				}
+
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+
+		return null;
+	}
+
 }
