@@ -1118,7 +1118,7 @@ public class ThirdPartyDocGen {
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
 
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
 			});
 		});
 		return getMergedFile(key, files);
