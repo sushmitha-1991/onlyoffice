@@ -595,7 +595,7 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
-			AtomicInteger docCounter = new AtomicInteger(1);
+//			AtomicInteger docCounter = new AtomicInteger(1);
 
 			// Decide which template code should be used
 			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
@@ -604,7 +604,7 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 				map.put("meetingDate", (String) parts[1]);
 				map.put("abbr", (String) parts[2]);
-				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
+//				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
