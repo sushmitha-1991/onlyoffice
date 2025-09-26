@@ -730,18 +730,52 @@ public class ThirdPartyDocGen {
 		}
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String synopsisDate = (String) data.get("synopsisDate");
+		String synopsisDate = (String) data.get("synopsisDate"); // yyyy-MM-dd
 		List<String> dspKeys = (List<String>) data.get("dspKeys");
 
+		// 🔹 Convert Gregorian → Saka date
+		String sakaDate = null;
+		if (synopsisDate != null) {
+			try {
+				Map<String, String> requestPayload = new HashMap<>();
+				requestPayload.put("dateToConvert", synopsisDate);
+
+				RestTemplate restTemplate = new RestTemplate();
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+				Map<String, Object> bodyResp = response.getBody();
+				if (bodyResp != null && bodyResp.containsKey("data")) {
+					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+
+					// default locale → English
+					String locale = "en";
+					if (refId.endsWith("HI")) {
+						locale = "hi";
+					}
+					sakaDate = convertedDate.get(locale);
+				}
+			} catch (Exception e) {
+				System.err.println("Error fetching Saka date: " + e.getMessage());
+			}
+		}
+
+		// 🔹 Final displayDate = Gregorian + optional Saka
+		final String displayDate;
+		if (sakaDate != null) {
+			displayDate = synopsisDate + " / " + sakaDate + " (Saka)";
+		} else {
+			displayDate = synopsisDate;
+		}
+
 		List<MargeFileDto> files = new LinkedList<>();
-
 		docTemplates.forEach(docTemplate -> {
-
 			// HEADER
 			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header")) {
 
 				Map<String, String> map = new HashMap<>();
-				map.put("synopsisDate", (String) synopsisDate);
+				map.put("synopsisDate", (String) displayDate);
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -750,7 +784,6 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
-
 			// CONTENT
 			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con")) {
 
@@ -763,7 +796,6 @@ public class ThirdPartyDocGen {
 					});
 				});
 			}
-
 			// FOOTER
 			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer")) {
 				try {
@@ -773,7 +805,6 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
-
 			// FALLBACK (any other template)
 			else {
 				try {
