@@ -1111,7 +1111,7 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -1139,7 +1139,7 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
