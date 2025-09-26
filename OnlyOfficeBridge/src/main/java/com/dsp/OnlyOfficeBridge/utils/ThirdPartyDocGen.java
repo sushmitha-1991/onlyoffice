@@ -595,7 +595,7 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
-			AtomicInteger docCounter = new AtomicInteger(1);
+//			AtomicInteger docCounter = new AtomicInteger(1);
 
 			// Decide which template code should be used
 			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
@@ -604,7 +604,7 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 				map.put("meetingDate", (String) parts[1]);
 				map.put("abbr", (String) parts[2]);
-				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
+//				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -730,18 +730,52 @@ public class ThirdPartyDocGen {
 		}
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String synopsisDate = (String) data.get("synopsisDate");
+		String synopsisDate = (String) data.get("synopsisDate"); // yyyy-MM-dd
 		List<String> dspKeys = (List<String>) data.get("dspKeys");
 
+		// 🔹 Convert Gregorian → Saka date
+		String sakaDate = null;
+		if (synopsisDate != null) {
+			try {
+				Map<String, String> requestPayload = new HashMap<>();
+				requestPayload.put("dateToConvert", synopsisDate);
+
+				RestTemplate restTemplate = new RestTemplate();
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+				Map<String, Object> bodyResp = response.getBody();
+				if (bodyResp != null && bodyResp.containsKey("data")) {
+					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+
+					// default locale → English
+					String locale = "en";
+					if (refId.endsWith("HI")) {
+						locale = "hi";
+					}
+					sakaDate = convertedDate.get(locale);
+				}
+			} catch (Exception e) {
+				System.err.println("Error fetching Saka date: " + e.getMessage());
+			}
+		}
+
+		// 🔹 Final displayDate = Gregorian + optional Saka
+		final String displayDate;
+		if (sakaDate != null) {
+			displayDate = synopsisDate + " / " + sakaDate + " (Saka)";
+		} else {
+			displayDate = synopsisDate;
+		}
+
 		List<MargeFileDto> files = new LinkedList<>();
-
 		docTemplates.forEach(docTemplate -> {
-
 			// HEADER
 			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header")) {
 
 				Map<String, String> map = new HashMap<>();
-				map.put("synopsisDate", (String) synopsisDate);
+				map.put("synopsisDate", (String) displayDate);
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -750,7 +784,6 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
-
 			// CONTENT
 			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con")) {
 
@@ -763,7 +796,6 @@ public class ThirdPartyDocGen {
 					});
 				});
 			}
-
 			// FOOTER
 			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer")) {
 				try {
@@ -773,7 +805,6 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
-
 			// FALLBACK (any other template)
 			else {
 				try {
@@ -1118,7 +1149,7 @@ public class ThirdPartyDocGen {
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
 
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
 			});
 		});
 		return getMergedFile(key, files);
@@ -1667,6 +1698,283 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			log.info("Error merging files >>> {}", e.getMessage());
 		}
+		return null;
+	}
+
+	/**
+	 * @param key
+	 * @param docTemplates
+	 * @param refId
+	 * @return
+	 */
+	public ResponseEntity<Resource> genPMBGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			Map<String, String> map = new HashMap<>();
+
+			try {
+				if (docTemplate.getCode().equals("pmb_gen_header") || docTemplate.getCode().equals("pmb_gen_ft")) {
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> response = restTemplate.exchange(
+							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
+							new HttpEntity<>(headers), Map.class);
+
+					Map<String, Object> body = response.getBody();
+					if (body != null && body.containsKey("data")) {
+						Map<String, Object> data = (Map<String, Object>) body.get("data");
+
+						// Header-specific processing
+						if (docTemplate.getCode().equals("pmb_gen_header")) {
+
+							// Format date
+							String forDate = (String) data.get("forDate");
+							if (forDate != null) {
+								LocalDate parsedDate = LocalDate.parse(forDate);
+								DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy",
+										Locale.ENGLISH);
+								map.put("dateWithDay", parsedDate.format(formatter));
+							}
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+
+							// Initialize placeholders as blank
+							map.put("billsForIntroduction", "");
+							map.put("countForBillIntro", "");
+							map.put("billNo", "");
+							map.put("memberName", "");
+							map.put("nameOfBill", "");
+							map.put("content", "");
+							map.put("footerForBillForIntroduction", "");
+
+							map.put("billsForConsid", "");
+							map.put("countForBillConsid", "");
+							map.put("billNoConsid", "");
+							map.put("memberNameConsid", "");
+							map.put("nameOfBillConsid", "");
+							map.put("contentConsid", "");
+							map.put("footerForBillForConsideration", "");
+
+							map.put("billsForWith", "");
+							map.put("countForBillWith", "");
+							map.put("billNoWith", "");
+							map.put("memberNameWith", "");
+							map.put("nameOfBillWith", "");
+							map.put("contentWith", "");
+							map.put("footerForBillForWithdrawl", "");
+
+							// Track which categories exist
+							boolean introExists = false, considExists = false, withExists = false;
+
+							List<Map<String, Object>> details = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+							if (details != null) {
+								for (Map<String, Object> detail : details) {
+									String billCategory = (String) detail.get("billCategoryName");
+									String billNumber = (String) detail.get("billNumber");
+									String memberName = (String) detail.get("memberFullName");
+									if (memberName == null || memberName.isEmpty())
+										memberName = (String) detail.get("memberName");
+									String nameOfBill = (String) detail.get("nameOfBill");
+									String content = (String) detail.get("content");
+									Integer serialNo = (Integer) detail.get("serialNo");
+									if (serialNo == null || serialNo == 0)
+										serialNo = 1;
+
+									switch (billCategory) {
+									case "PMB_BILL_INTRODUCTION":
+										introExists = true;
+										map.put("billsForIntroduction", "(i) Bills for Introduction");
+										map.put("countForBillIntro", billNumber);
+										map.put("billNo", serialNo.toString());
+										map.put("memberName", memberName);
+										map.put("nameOfBill", nameOfBill);
+										map.put("contentIntro", content);
+										map.put("footerForBillForIntroduction", "ALSO to introduce the bill.");
+										break;
+									case "PMB_BILL_CONSIDERATION":
+										considExists = true;
+										map.put("billsForConsid", "(ii) Bills for Consideration and Passing");
+										map.put("countForBillConsid", billNumber);
+										map.put("billNoConsid", serialNo.toString());
+										map.put("memberNameConsid", memberName);
+										map.put("nameOfBillConsid", nameOfBill);
+										map.put("contentConsid", content);
+										map.put("footerForBillForConsideration",
+												"ALSO to move that the Bill be passed.");
+										break;
+									case "PMB_BILL_WITHDRAWL":
+										withExists = true;
+										map.put("billsForWith", "(iii) Bills for Withdrawal");
+										map.put("countForBillWith", billNumber);
+										map.put("billNoWith", serialNo.toString());
+										map.put("memberNameWith", memberName);
+										map.put("nameOfBillWith", nameOfBill);
+										map.put("contentWith", content);
+										map.put("footerForBillForWithdrawl", "ALSO to withdraw the bill.");
+										break;
+									}
+								}
+
+								// Clear headings for missing categories
+								if (!introExists)
+									map.put("billsForIntroduction", "");
+								if (!considExists)
+									map.put("billsForConsid", "");
+								if (!withExists)
+									map.put("billsForWith", "");
+							}
+						}
+
+						// FT-specific processing
+						if (docTemplate.getCode().equals("pmb_gen_ft")) {
+							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+							map.put("currentDate", LocalDate.now().format(formatter));
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+						}
+					}
+
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} else {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				}
+
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param key
+	 * @param docTemplates
+	 * @param refId
+	 * @return
+	 */
+	public ResponseEntity<Resource> genPMBResolGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		System.out.println("#### here");
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			Map<String, String> map = new HashMap<>();
+
+			try {
+				if ("pmb_resol_gen_header".equals(docTemplate.getCode())
+						|| "pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> response = restTemplate.exchange(
+							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
+							new HttpEntity<>(headers), Map.class);
+
+					Map<String, Object> body = response.getBody();
+					if (body != null && body.containsKey("data")) {
+						Map<String, Object> data = (Map<String, Object>) body.get("data");
+
+						// Header-specific processing
+						if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
+							// Format date
+							String forDate = (String) data.get("forDate");
+							if (forDate != null) {
+								LocalDate parsedDate = LocalDate.parse(forDate);
+								DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy",
+										Locale.ENGLISH);
+								map.put("dateWithDay", parsedDate.format(formatter));
+							}
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+
+							// Initialize placeholders
+							map.put("countForBillIntro", "");
+							map.put("memberName", "");
+							map.put("nameOfBill", "");
+							map.put("content", "");
+
+							// Take the first record if available
+							List<Map<String, Object>> details = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+							System.out.println("### details - " + details);
+							if (details != null && !details.isEmpty()) {
+								Map<String, Object> detail = details.get(0);
+
+								String memberName = (String) detail.get("memberFullName");
+								if (memberName == null || memberName.isEmpty())
+									memberName = (String) detail.get("memberName");
+
+								Integer serialNo = (Integer) detail.get("serialNo");
+								if (serialNo == null || serialNo == 0)
+									serialNo = 1;
+
+								map.put("countForBillIntro", serialNo.toString());
+								map.put("memberName", memberName);
+								map.put("nameOfBill", (String) detail.get("nameOfBill"));
+								map.put("content", (String) detail.get("content"));
+							}
+						}
+
+						// FT-specific processing
+						if ("pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+							map.put("currentDate", LocalDate.now().format(formatter));
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+						}
+					}
+
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} else {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				}
+
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+
 		return null;
 	}
 
