@@ -498,9 +498,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		try {
 			int status = (int) payload.get("status");
 
+			System.out.println(">>> status - " + status);
+
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
+
+				System.out.println(">>> fileUrl - " + fileUrl);
+				System.out.println(">>> key - " + key);
 
 				// 1. Download file from OnlyOffice
 				File tempFile = File.createTempFile("edited-doc", ".docx");
@@ -511,9 +516,13 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 				String documentName = key + ".docx";
 
+				System.out.println(">>> documentName - " + documentName);
+
 				// 2. Upload to OpenKM
 				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231",
 						"51303", "ApplicationInstance", "1");
+
+				System.out.println(">>> openKmResponse - " + openKmResponse);
 
 				// 3. Parse OpenKM response
 				ObjectMapper objectMapper = new ObjectMapper();
@@ -524,11 +533,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				// 4. Build OpenKM download URL
 				String downloadUrl = downloadKmUrl + documentUuid;
 
+				System.out.println(">>> downloadUrl - " + downloadUrl);
+
 				// 5. Update or insert into OnlyOfficeMetadata
 				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
 
 				OnlyOfficeMetadata metadata;
 				if (existingMetadataOpt.isPresent()) {
+					System.out.println(">>> inside present");
 					metadata = existingMetadataOpt.get();
 					metadata.setDownloadUrl(downloadUrl);
 					metadata.setOnlyOfficeUrl(fileUrl);
@@ -537,12 +549,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					metadata.setDocumentKey(documentUuid);
 					metadata.setApplicationId(Long.parseLong(applicationId));
 				} else {
+					System.out.println(">>> inside else");
+
 					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId))
 							.documentKey(documentUuid).dsp2Key(dsp2Key).downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl)
 							.createdBy(1L).updatedBy(1L).build();
 				}
 
 				onlyOfficeMetadataRepository.save(metadata);
+
+				System.out.println(">>> save completed");
 
 				// Clean up
 				tempFile.delete();
