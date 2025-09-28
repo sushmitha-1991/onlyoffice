@@ -77,10 +77,31 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String verbatimHourTemplateId;
 	@Value("${statementofwork.gen.template.id}")
 	String statementOfWorkTemplateId;
+	@Value("${b1.ls.gen.template.id}")
+	String b1lsTemplateId;
+	@Value("${b1.rs.gen.template.id}")
+	String b1RsTemplateId;
+	@Value("${si.rs.gen.template.id}")
+	String siRsTemplateId;
+	@Value("${synopsis.ls.gen.template.id}")
+	String synopsisLsTemplateId;
+	@Value("${synopsis.en.ls.gen.template.id}")
+	String synopsisEnLsTemplateId;
+	@Value("${synopsis.hi.ls.gen.template.id}")
+	String synopsisHiLsTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Value("${cd.gen.template.id}")
 	String cdTemplateId;
+	@Value("${cd.gen.merge.template.id}")
+	String cdMergedTemplateId;
+
+	@Value("${pmb.gen.template.id}")
+	String pmbTemplateId;
+
+	@Value("${pmb.resol.gen.template.id}")
+	String pmbResolTemplateId;
+
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -104,7 +125,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		String editFlag = payload.get("edit"); // "true", "false", or null
 		String emptyFlg = payload.get("empty");
 		String fileType = fileName.split("\\.")[1];
-		System.out.println("fileType>>> " + fileType);
 		String templateId = payload.get("templateId") == null ? "0" : payload.get("templateId");
 		boolean isInitStep = "INIT".equalsIgnoreCase(step);
 		String keyToUse;
@@ -116,14 +136,12 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			templateId = "0";
 		} else {
 			dsp2Key = UUID.randomUUID().toString();
-			System.out.println("### inside dsp2Key");
 		}
 
 		if (isInitStep) {
 			keyToUse = UUID.randomUUID().toString(); // new key
 			downloadUrl = onlyOfficeUrl + "/only-office/download/1"; // static blank doc
 			title = "Document.odt";
-			System.out.println("INIT step: Generated new documentKey: " + keyToUse);
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
 			if (emptyFlg.equals("1")) {
@@ -135,7 +153,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 			// download-empty-docx
 			title = "Document-" + keyToUse + ".odt";
-			System.out.println("EDIT step: Generated NEW documentKey for editing: " + keyToUse);
 		}
 
 		String callbackUrl = onlyOfficeUrl + "/only-office/callback?dsp2Key=" + dsp2Key + "&applicationId="
@@ -211,6 +228,29 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(statementOfWorkTemplateId)) {
 					return thirdPartyDocGen.genSowGeneration(key, docTemplates, refId);
 				}
+				if (templateId.equals(cdMergedTemplateId)) {
+					return thirdPartyDocGen.genCdMergedGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(b1lsTemplateId)) {
+					return thirdPartyDocGen.genBulletin1LSGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(b1RsTemplateId)) {
+					return thirdPartyDocGen.genBulletin1RSGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(synopsisLsTemplateId) || templateId.equals(synopsisEnLsTemplateId)
+						|| templateId.equals(synopsisHiLsTemplateId)) {
+					return thirdPartyDocGen.genSynopsisGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(siRsTemplateId)) {
+					return thirdPartyDocGen.genSIRSGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(pmbTemplateId)) {
+					return thirdPartyDocGen.genPMBGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(pmbResolTemplateId)) {
+					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
+				}
+
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
@@ -457,31 +497,32 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			Map<String, Object> payload) {
 		try {
 			int status = (int) payload.get("status");
-			System.out.println("status>>>>>> " + status);
+
+			System.out.println(">>> status - " + status);
 
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
-				System.out.println("url >>>>> " + fileUrl);
-				System.out.println("key >>>>> " + key);
-				System.out.println("dsp2Key >>>>>" + dsp2Key);
+
+				System.out.println(">>> fileUrl - " + fileUrl);
+				System.out.println(">>> key - " + key);
 
 				// 1. Download file from OnlyOffice
-				System.out.println(">>> Downloading file from fileUrl - " + fileUrl);
 				File tempFile = File.createTempFile("edited-doc", ".docx");
 				try (InputStream in = new URL(fileUrl).openStream();
 						FileOutputStream out = new FileOutputStream(tempFile)) {
 					in.transferTo(out);
 				}
 
-				System.out.println(">>> Calling Upload to OpenKm");
 				String documentName = key + ".docx";
+
+				System.out.println(">>> documentName - " + documentName);
 
 				// 2. Upload to OpenKM
 				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231",
 						"51303", "ApplicationInstance", "1");
 
-				System.out.println(">>> Download completed" + openKmResponse);
+				System.out.println(">>> openKmResponse - " + openKmResponse);
 
 				// 3. Parse OpenKM response
 				ObjectMapper objectMapper = new ObjectMapper();
@@ -489,10 +530,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				JsonNode dataNode = rootNode.path("data");
 				String documentUuid = dataNode.path("documentUuid").asText();
 
-				System.out.println(">>> documentUuid - " + documentUuid);
-
 				// 4. Build OpenKM download URL
 				String downloadUrl = downloadKmUrl + documentUuid;
+
 				System.out.println(">>> downloadUrl - " + downloadUrl);
 
 				// 5. Update or insert into OnlyOfficeMetadata
@@ -500,6 +540,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 				OnlyOfficeMetadata metadata;
 				if (existingMetadataOpt.isPresent()) {
+					System.out.println(">>> inside present");
 					metadata = existingMetadataOpt.get();
 					metadata.setDownloadUrl(downloadUrl);
 					metadata.setOnlyOfficeUrl(fileUrl);
@@ -507,15 +548,17 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					metadata.setUpdatedAt(LocalDateTime.now());
 					metadata.setDocumentKey(documentUuid);
 					metadata.setApplicationId(Long.parseLong(applicationId));
-					System.out.println(">>> Updated existing OnlyOfficeMetadata record");
 				} else {
+					System.out.println(">>> inside else");
+
 					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId))
 							.documentKey(documentUuid).dsp2Key(dsp2Key).downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl)
 							.createdBy(1L).updatedBy(1L).build();
-					System.out.println(">>> Created new OnlyOfficeMetadata record");
 				}
 
 				onlyOfficeMetadataRepository.save(metadata);
+
+				System.out.println(">>> save completed");
 
 				// Clean up
 				tempFile.delete();
