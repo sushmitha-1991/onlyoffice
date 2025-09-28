@@ -966,12 +966,8 @@ public class ThirdPartyDocGen {
                 for (Object o : srcMain.getContent()) {
                     Object clone = XmlUtils.deepCopy(o);
                     String xml = XmlUtils.marshaltoString(clone, true);
-                    Pattern p = Pattern.compile("w:commentReference[^>]*w:id=\"(\\d+)\"");
-                    Matcher m = p.matcher(xml);
-                    while (m.find())
-                    {
-                        log.info("Found commentReference with ID: {} xml {}", m.group(1),xml);
-                    }
+                   
+
 
                     // Replace relIds
                     for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
@@ -989,37 +985,30 @@ public class ThirdPartyDocGen {
                                 "w:endnoteReference w:id=\"" + e.getValue() + "\"");
                     }
                     // Replace comment IDs
-                    boolean breakFlg = false;
+                    List<Integer> currId = new ArrayList<>();
+                    try {
+                        Pattern pr = Pattern.compile("w:commentReference[^>]*w:id=\"(\\d+)\"");
+                        Matcher mr = pr.matcher(xml);
+                        while(mr.find()) {
+                            currId.add(Integer.parseInt(mr.group(1)));
+                        }
+                    } catch (Exception ignored) {
+                    }
                     for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
-                        try {
-                            Pattern pr = Pattern.compile("w:commentReference[^>]*w:id=\"(\\d+)\"");
-                            Matcher mr = pr.matcher(xml);
 
-                            while (mr.find()) {
-                                if (e.getKey().intValue() == Integer.parseInt(mr.group(1))) {
-                                    breakFlg = true;
-                                }
-                                log.info("Found commentReference with ID: {} xml {}", m.group(1), xml);
-                            }
-                        } catch (Exception ignored) {
+                        if(currId.contains(e.getKey().intValue())) {
+                            xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
+                                    "w:commentReference w:id=\"" + e.getValue() + "\"");
+                            xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
+                                    "w:commentRangeStart w:id=\"" + e.getValue() + "\"");
+                            xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
+                                    "w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+                            currId.remove(Integer.getInteger(e.getKey().toString()));
+                        }
 
-                        }
-                        xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
-                                "w:commentReference w:id=\"" + e.getValue() + "\"");
-                        xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
-                                "w:commentRangeStart w:id=\"" + e.getValue() + "\"");
-                        xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
-                                "w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
-                        if(breakFlg)
-                        {
-                            break;
-                        }
+
                     }
-                    Pattern p1 = Pattern.compile("w:commentReference[^>]*w:id=\"(\\d+)\"");
-                    Matcher m1 = p1.matcher(xml);
-                    while (m1.find()) {
-                        log.info("After Found commentReference with ID: {} xml {}", m1.group(1),xml);
-                    }
+
                     Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
                     targetMain.getContent().add(fixed);
                 }
