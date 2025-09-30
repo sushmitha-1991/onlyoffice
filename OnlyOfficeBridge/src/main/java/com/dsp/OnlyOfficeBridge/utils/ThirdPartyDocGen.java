@@ -961,23 +961,29 @@ public class ThirdPartyDocGen {
             }
 
             // 5) Append body content, fixing IDs
-            log.info("hhhh {}", commentIdMap);
+            log.info("foot note map {}",footnoteIdMap);
             if (srcMain.getContent() != null) {
                 for (Object o : srcMain.getContent()) {
                     Object clone = XmlUtils.deepCopy(o);
                     String xml = XmlUtils.marshaltoString(clone, true);
-                   
+
 
 
                     // Replace relIds
+
                     for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
                         xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
                         xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
                     }
                     // Replace footnote IDs
+
+                    List<Integer> currIdFootnote = getMapKeyList(xml,"w:footnoteReference[^>]*w:id=\"(\\d+)\"") ;
                     for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
-                        xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
-                                "w:footnoteReference w:id=\"" + e.getValue() + "\"");
+                        if(currIdFootnote.contains(e.getKey().intValue())) {
+                            xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
+                                    "w:footnoteReference w:id=\"" + e.getValue() + "\"");
+                            currIdFootnote.remove(Integer.getInteger(e.getKey().toString()));
+                        }
                     }
                     // Replace endnote IDs
                     for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
@@ -985,15 +991,8 @@ public class ThirdPartyDocGen {
                                 "w:endnoteReference w:id=\"" + e.getValue() + "\"");
                     }
                     // Replace comment IDs
-                    List<Integer> currId = new ArrayList<>();
-                    try {
-                        Pattern pr = Pattern.compile("w:commentReference[^>]*w:id=\"(\\d+)\"");
-                        Matcher mr = pr.matcher(xml);
-                        while(mr.find()) {
-                            currId.add(Integer.parseInt(mr.group(1)));
-                        }
-                    } catch (Exception ignored) {
-                    }
+                    List<Integer> currId = getMapKeyList(xml,"w:commentReference[^>]*w:id=\"(\\d+)\"") ;
+
                     for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
 
                         if(currId.contains(e.getKey().intValue())) {
@@ -1043,7 +1042,22 @@ public class ThirdPartyDocGen {
             return baos.toByteArray();
         }
     }
-
+    private static List<Integer> getMapKeyList(String xml, String rgx)
+    {
+        List<Integer> currId = new ArrayList<>();
+        try {
+            Pattern pr = Pattern.compile(rgx);
+            Matcher mr = pr.matcher(xml);
+            while(mr.find()) {
+                if(rgx.contains("footnoteReference")) {
+                    log.info("foot not id {} xml {}", mr.group(1), xml);
+                }
+                currId.add(Integer.parseInt(mr.group(1)));
+            }
+        } catch (Exception ignored) {
+        }
+        return currId;
+    }
 	private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
