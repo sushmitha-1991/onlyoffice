@@ -625,7 +625,7 @@ public class ThirdPartyDocGen {
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
 						});
 					});
 				}
@@ -955,25 +955,26 @@ public class ThirdPartyDocGen {
 				targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
 			}
 
-			// 4) Merge Comments
-			Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
-			CommentsPart srcComments = srcMain.getCommentsPart();
-			if (srcComments != null && srcComments.getContents() != null) {
-				for (Comments.Comment c : srcComments.getContents().getComment()) {
-					BigInteger oldId = c.getId();
-					BigInteger newId = BigInteger.valueOf(++maxCommentId);
-					c.setId(newId);
-					commentIdMap.put(oldId, newId);
-				}
-				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-			}
+            // 4) Merge Comments
+            Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
+            CommentsPart srcComments = srcMain.getCommentsPart();
+            if (srcComments != null && srcComments.getContents() != null) {
+                for (Comments.Comment c : srcComments.getContents().getComment()) {
+                    BigInteger oldId = c.getId();
+                    log.info("comment old id {}",oldId);
+                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
+                    c.setId(newId);
+                    commentIdMap.put(oldId, newId);
+                }
+                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+            }
 
-			// 5) Append body content, fixing IDs
-			log.info("foot note map {}", footnoteIdMap);
-			if (srcMain.getContent() != null) {
-				for (Object o : srcMain.getContent()) {
-					Object clone = XmlUtils.deepCopy(o);
-					String xml = XmlUtils.marshaltoString(clone, true);
+            // 5) Append body content, fixing IDs
+            log.info("relIdMapping map {}",relIdMapping);
+            if (srcMain.getContent() != null) {
+                for (Object o : srcMain.getContent()) {
+                    Object clone = XmlUtils.deepCopy(o);
+                    String xml = XmlUtils.marshaltoString(clone, true);
 
 					// Replace relIds
 
@@ -1042,28 +1043,27 @@ public class ThirdPartyDocGen {
 			}
 		}
 
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-			targetPkg.save(baos);
-			return baos.toByteArray();
-		}
-	}
-
-	private static List<Integer> getMapKeyList(String xml, String rgx) {
-		List<Integer> currId = new ArrayList<>();
-		try {
-			Pattern pr = Pattern.compile(rgx);
-			Matcher mr = pr.matcher(xml);
-			while (mr.find()) {
-				if (rgx.contains("footnoteReference")) {
-					log.info("foot not id {} xml {}", mr.group(1), xml);
-				}
-				currId.add(Integer.parseInt(mr.group(1)));
-			}
-		} catch (Exception ignored) {
-		}
-		return currId;
-	}
-
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            targetPkg.save(baos);
+            return baos.toByteArray();
+        }
+    }
+    private static List<Integer> getMapKeyList(String xml, String rgx)
+    {
+        List<Integer> currId = new ArrayList<>();
+        try {
+            Pattern pr = Pattern.compile(rgx);
+            Matcher mr = pr.matcher(xml);
+            while(mr.find()) {
+//                if(rgx.contains("commentReference")) {
+//                    log.info("commentReference id {} xml {}", mr.group(1), xml);
+//                }
+                currId.add(Integer.parseInt(mr.group(1)));
+            }
+        } catch (Exception ignored) {
+        }
+        return currId;
+    }
 	private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
