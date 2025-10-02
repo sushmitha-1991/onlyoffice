@@ -617,7 +617,7 @@ public class ThirdPartyDocGen {
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
 						});
 					});
 				}
@@ -953,6 +953,7 @@ public class ThirdPartyDocGen {
             if (srcComments != null && srcComments.getContents() != null) {
                 for (Comments.Comment c : srcComments.getContents().getComment()) {
                     BigInteger oldId = c.getId();
+                    log.info("comment old id {}",oldId);
                     BigInteger newId = BigInteger.valueOf(++maxCommentId);
                     c.setId(newId);
                     commentIdMap.put(oldId, newId);
@@ -961,7 +962,7 @@ public class ThirdPartyDocGen {
             }
 
             // 5) Append body content, fixing IDs
-            log.info("foot note map {}",footnoteIdMap);
+            log.info("relIdMapping map {}",relIdMapping);
             if (srcMain.getContent() != null) {
                 for (Object o : srcMain.getContent()) {
                     Object clone = XmlUtils.deepCopy(o);
@@ -1049,9 +1050,9 @@ public class ThirdPartyDocGen {
             Pattern pr = Pattern.compile(rgx);
             Matcher mr = pr.matcher(xml);
             while(mr.find()) {
-                if(rgx.contains("footnoteReference")) {
-                    log.info("foot not id {} xml {}", mr.group(1), xml);
-                }
+//                if(rgx.contains("commentReference")) {
+//                    log.info("commentReference id {} xml {}", mr.group(1), xml);
+//                }
                 currId.add(Integer.parseInt(mr.group(1)));
             }
         } catch (Exception ignored) {
