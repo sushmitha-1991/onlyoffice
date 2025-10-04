@@ -608,8 +608,8 @@ public class ThirdPartyDocGen {
 
 			if (docTemplate.getCode().equals(expectedCode)) {
 				Map<String, String> map = new HashMap<>();
-				map.put("meetingDate", (String) parts[1]);
-				map.put("abbr", (String) parts[2]);
+				map.put("meetingDate", parts[1]);
+				map.put("abbr", parts[2]);
 //				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
