@@ -1151,13 +1151,17 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		int arr[]= {1};
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				if (arr[0]++==dspKeys.size()) {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				} else {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				}
 			});
 		});
 		return getMergedFile(key, files);
@@ -1179,13 +1183,17 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		int arr[]= {1};
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				if (arr[0]++==dspKeys.size()) {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				} else {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				}
 			});
 		});
 		return getMergedFile(key, files);
