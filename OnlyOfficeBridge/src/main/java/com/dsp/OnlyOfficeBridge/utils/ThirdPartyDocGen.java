@@ -9,14 +9,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.docx4j.XmlUtils;
@@ -501,6 +506,7 @@ public class ThirdPartyDocGen {
 		Map<String, Object> body = null;
 		try {
 			RestTemplate restTemplate = new RestTemplate();
+			System.out.println(">>> url - " + url);
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
@@ -602,8 +608,8 @@ public class ThirdPartyDocGen {
 
 			if (docTemplate.getCode().equals(expectedCode)) {
 				Map<String, String> map = new HashMap<>();
-				map.put("meetingDate", (String) parts[1]);
-				map.put("abbr", (String) parts[2]);
+				map.put("meetingDate", parts[1]);
+				map.put("abbr", parts[2]);
 //				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
@@ -926,7 +932,7 @@ public class ThirdPartyDocGen {
 			}
 
 			// 2) Merge Footnotes
-			Map<BigInteger, BigInteger> footnoteIdMap = new HashMap<>();
+			Map<BigInteger, BigInteger> footnoteIdMap = new LinkedHashMap<>();
 			FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
 			if (srcFootnotes != null && srcFootnotes.getContents() != null) {
 				for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
@@ -939,7 +945,7 @@ public class ThirdPartyDocGen {
 			}
 
 			// 3) Merge Endnotes
-			Map<BigInteger, BigInteger> endnoteIdMap = new HashMap<>();
+			Map<BigInteger, BigInteger> endnoteIdMap = new LinkedHashMap<>();
 			EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
 			if (srcEndnotes != null && srcEndnotes.getContents() != null) {
 				for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
@@ -951,34 +957,42 @@ public class ThirdPartyDocGen {
 				targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
 			}
 
-			// 4) Merge Comments
-			Map<BigInteger, BigInteger> commentIdMap = new HashMap<>();
-			CommentsPart srcComments = srcMain.getCommentsPart();
-			if (srcComments != null && srcComments.getContents() != null) {
-				for (Comments.Comment c : srcComments.getContents().getComment()) {
-					BigInteger oldId = c.getId();
-					BigInteger newId = BigInteger.valueOf(++maxCommentId);
-					c.setId(newId);
-					commentIdMap.put(oldId, newId);
-				}
-				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-			}
+            // 4) Merge Comments
+            Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
+            CommentsPart srcComments = srcMain.getCommentsPart();
+            if (srcComments != null && srcComments.getContents() != null) {
+                for (Comments.Comment c : srcComments.getContents().getComment()) {
+                    BigInteger oldId = c.getId();
+                    log.info("comment old id {}",oldId);
+                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
+                    c.setId(newId);
+                    commentIdMap.put(oldId, newId);
+                }
+                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+            }
 
-			// 5) Append body content, fixing IDs
-			if (srcMain.getContent() != null) {
-				for (Object o : srcMain.getContent()) {
-					Object clone = XmlUtils.deepCopy(o);
-					String xml = XmlUtils.marshaltoString(clone, true);
+            // 5) Append body content, fixing IDs
+            log.info("relIdMapping map {}",relIdMapping);
+            if (srcMain.getContent() != null) {
+                for (Object o : srcMain.getContent()) {
+                    Object clone = XmlUtils.deepCopy(o);
+                    String xml = XmlUtils.marshaltoString(clone, true);
 
 					// Replace relIds
+
 					for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
 						xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
 						xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
 					}
 					// Replace footnote IDs
+
+					List<Integer> currIdFootnote = getMapKeyList(xml, "w:footnoteReference[^>]*w:id=\"(\\d+)\"");
 					for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
-						xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
-								"w:footnoteReference w:id=\"" + e.getValue() + "\"");
+						if (currIdFootnote.contains(e.getKey().intValue())) {
+							xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
+									"w:footnoteReference w:id=\"" + e.getValue() + "\"");
+							currIdFootnote.remove(Integer.getInteger(e.getKey().toString()));
+						}
 					}
 					// Replace endnote IDs
 					for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
@@ -986,13 +1000,20 @@ public class ThirdPartyDocGen {
 								"w:endnoteReference w:id=\"" + e.getValue() + "\"");
 					}
 					// Replace comment IDs
+					List<Integer> currId = getMapKeyList(xml, "w:commentReference[^>]*w:id=\"(\\d+)\"");
+
 					for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
-						xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
-								"w:commentReference w:id=\"" + e.getValue() + "\"");
-						xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
-								"w:commentRangeStart w:id=\"" + e.getValue() + "\"");
-						xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
-								"w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+
+						if (currId.contains(e.getKey().intValue())) {
+							xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
+									"w:commentReference w:id=\"" + e.getValue() + "\"");
+							xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
+									"w:commentRangeStart w:id=\"" + e.getValue() + "\"");
+							xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
+									"w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+							currId.remove(Integer.getInteger(e.getKey().toString()));
+						}
+
 					}
 
 					Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
@@ -1024,12 +1045,27 @@ public class ThirdPartyDocGen {
 			}
 		}
 
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-			targetPkg.save(baos);
-			return baos.toByteArray();
-		}
-	}
-
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            targetPkg.save(baos);
+            return baos.toByteArray();
+        }
+    }
+    private static List<Integer> getMapKeyList(String xml, String rgx)
+    {
+        List<Integer> currId = new ArrayList<>();
+        try {
+            Pattern pr = Pattern.compile(rgx);
+            Matcher mr = pr.matcher(xml);
+            while(mr.find()) {
+//                if(rgx.contains("commentReference")) {
+//                    log.info("commentReference id {} xml {}", mr.group(1), xml);
+//                }
+                currId.add(Integer.parseInt(mr.group(1)));
+            }
+        } catch (Exception ignored) {
+        }
+        return currId;
+    }
 	private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
@@ -1111,17 +1147,21 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		int arr[]= {1};
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				if (arr[0]++==dspKeys.size()) {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				} else {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				}
 			});
 		});
 		return getMergedFile(key, files);
@@ -1139,17 +1179,21 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		int arr[]= {1};
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-
-				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				if (arr[0]++==dspKeys.size()) {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				} else {
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				}
 			});
 		});
 		return getMergedFile(key, files);
@@ -1722,7 +1766,12 @@ public class ThirdPartyDocGen {
 			Map<String, String> map = new HashMap<>();
 
 			try {
-				if (docTemplate.getCode().equals("pmb_gen_header") || docTemplate.getCode().equals("pmb_gen_ft")) {
+				// Templates that require API data
+				if (docTemplate.getCode().equals("pmb_gen_header") || docTemplate.getCode().equals("pmb_gen_ft")
+						|| docTemplate.getCode().equals("pmb_gen_con_intro_ls")
+						|| docTemplate.getCode().equals("pmb_gen_con_consid_ls")
+						|| docTemplate.getCode().equals("pmb_gen_con_with_ls")) {
+
 					RestTemplate restTemplate = new RestTemplate();
 					ResponseEntity<Map> response = restTemplate.exchange(
 							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
@@ -1732,10 +1781,8 @@ public class ThirdPartyDocGen {
 					if (body != null && body.containsKey("data")) {
 						Map<String, Object> data = (Map<String, Object>) body.get("data");
 
-						// Header-specific processing
+						// Header template
 						if (docTemplate.getCode().equals("pmb_gen_header")) {
-
-							// Format date
 							String forDate = (String) data.get("forDate");
 							if (forDate != null) {
 								LocalDate parsedDate = LocalDate.parse(forDate);
@@ -1744,106 +1791,119 @@ public class ThirdPartyDocGen {
 								map.put("dateWithDay", parsedDate.format(formatter));
 							}
 							map.put("sakaDate", (String) data.get("forDateSaka"));
-
-							// Initialize placeholders as blank
-							map.put("billsForIntroduction", "");
-							map.put("countForBillIntro", "");
-							map.put("billNo", "");
-							map.put("memberName", "");
-							map.put("nameOfBill", "");
-							map.put("content", "");
-							map.put("footerForBillForIntroduction", "");
-
-							map.put("billsForConsid", "");
-							map.put("countForBillConsid", "");
-							map.put("billNoConsid", "");
-							map.put("memberNameConsid", "");
-							map.put("nameOfBillConsid", "");
-							map.put("contentConsid", "");
-							map.put("footerForBillForConsideration", "");
-
-							map.put("billsForWith", "");
-							map.put("countForBillWith", "");
-							map.put("billNoWith", "");
-							map.put("memberNameWith", "");
-							map.put("nameOfBillWith", "");
-							map.put("contentWith", "");
-							map.put("footerForBillForWithdrawl", "");
-
-							// Track which categories exist
-							boolean introExists = false, considExists = false, withExists = false;
-
-							List<Map<String, Object>> details = (List<Map<String, Object>>) data
-									.get("privateMemberBusinessDetails");
-							if (details != null) {
-								for (Map<String, Object> detail : details) {
-									String billCategory = (String) detail.get("billCategoryName");
-									String billNumber = (String) detail.get("billNumber");
-									String memberName = (String) detail.get("memberFullName");
-									if (memberName == null || memberName.isEmpty())
-										memberName = (String) detail.get("memberName");
-									String nameOfBill = (String) detail.get("nameOfBill");
-									String content = (String) detail.get("content");
-									Integer serialNo = (Integer) detail.get("serialNo");
-									if (serialNo == null || serialNo == 0)
-										serialNo = 1;
-
-									switch (billCategory) {
-									case "PMB_BILL_INTRODUCTION":
-										introExists = true;
-										map.put("billsForIntroduction", "(i) Bills for Introduction");
-										map.put("countForBillIntro", billNumber);
-										map.put("billNo", serialNo.toString());
-										map.put("memberName", memberName);
-										map.put("nameOfBill", nameOfBill);
-										map.put("contentIntro", content);
-										map.put("footerForBillForIntroduction", "ALSO to introduce the bill.");
-										break;
-									case "PMB_BILL_CONSIDERATION":
-										considExists = true;
-										map.put("billsForConsid", "(ii) Bills for Consideration and Passing");
-										map.put("countForBillConsid", billNumber);
-										map.put("billNoConsid", serialNo.toString());
-										map.put("memberNameConsid", memberName);
-										map.put("nameOfBillConsid", nameOfBill);
-										map.put("contentConsid", content);
-										map.put("footerForBillForConsideration",
-												"ALSO to move that the Bill be passed.");
-										break;
-									case "PMB_BILL_WITHDRAWL":
-										withExists = true;
-										map.put("billsForWith", "(iii) Bills for Withdrawal");
-										map.put("countForBillWith", billNumber);
-										map.put("billNoWith", serialNo.toString());
-										map.put("memberNameWith", memberName);
-										map.put("nameOfBillWith", nameOfBill);
-										map.put("contentWith", content);
-										map.put("footerForBillForWithdrawl", "ALSO to withdraw the bill.");
-										break;
-									}
-								}
-
-								// Clear headings for missing categories
-								if (!introExists)
-									map.put("billsForIntroduction", "");
-								if (!considExists)
-									map.put("billsForConsid", "");
-								if (!withExists)
-									map.put("billsForWith", "");
-							}
 						}
 
-						// FT-specific processing
+						// FT template
 						if (docTemplate.getCode().equals("pmb_gen_ft")) {
 							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
 							map.put("currentDate", LocalDate.now().format(formatter));
 							map.put("sakaDate", (String) data.get("forDateSaka"));
 						}
+
+						// LS templates for PMB bills
+						if (docTemplate.getCode().equals("pmb_gen_con_intro_ls")
+								|| docTemplate.getCode().equals("pmb_gen_con_consid_ls")
+								|| docTemplate.getCode().equals("pmb_gen_con_with_ls")) {
+
+							List<Map<String, Object>> bills = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+
+							// helper to build content for each category
+							BiConsumer<String, String> buildCategory = (categoryName, prefix) -> {
+								List<Map<String, Object>> filteredBills = bills.stream()
+										.filter(b -> categoryName.equals(b.get("billCategoryName")))
+										.sorted(Comparator.comparingInt(b -> (Integer) b.getOrDefault("serialNo", 0)))
+										.toList();
+
+								if (!filteredBills.isEmpty()) {
+									switch (prefix) {
+									case "intro":
+										map.put("billsForIntroduction", "(i) Bills for Introduction");
+										map.put("footerForBillForIntroduction", "ALSO to introduce the bill.");
+										map.put("countForBillIntro", String.valueOf(filteredBills.size()));
+										break;
+									case "consid":
+										map.put("billsForConsid", "(ii) Bills for Consideration and Passing");
+										map.put("footerForBillForConsideration",
+												"ALSO to move that the Bill be passed.");
+										map.put("countForBillConsid", String.valueOf(filteredBills.size()));
+										break;
+									case "with":
+										map.put("billsForWith", "(iii) Bills for Withdrawal");
+										map.put("footerForBillForWithdrawl", "ALSO to move that the Bill be passed.");
+										map.put("countForBillWith", String.valueOf(filteredBills.size()));
+										break;
+									}
+
+									StringBuilder sb = new StringBuilder();
+									for (Map<String, Object> b : filteredBills) {
+										int serialNo = (Integer) b.getOrDefault("serialNo", 0);
+										if (serialNo == 0)
+											serialNo = 1;
+
+										String memberName = (String) b.getOrDefault("memberName",
+												b.get("memberFullName"));
+										String billName = (String) b.getOrDefault("nameOfBill", "");
+										String content = (String) b.getOrDefault("content", "");
+
+										sb.append(serialNo).append(". ").append(memberName).append("      ")
+												.append(billName).append("\t").append(content)
+												.append("      							").append("\n");
+									}
+
+									switch (prefix) {
+									case "intro":
+										map.put("contentIntro", sb.toString());
+										break;
+									case "consid":
+										map.put("contentConsid", sb.toString());
+										break;
+									case "with":
+										map.put("contentWith", sb.toString());
+										break;
+									}
+
+								} else {
+									// Clear placeholders if no bills
+									switch (prefix) {
+									case "intro":
+										map.put("billsForIntroduction", "");
+										map.put("footerForBillForIntroduction", "");
+										map.put("countForBillIntro", "");
+										map.put("contentIntro", "");
+										break;
+									case "consid":
+										map.put("billsForConsid", "");
+										map.put("footerForBillForConsideration", "");
+										map.put("countForBillConsid", "");
+										map.put("contentConsid", "");
+										break;
+									case "with":
+										map.put("billsForWith", "");
+										map.put("footerForBillForWithdrawl", "");
+										map.put("countForBillWith", "");
+										map.put("contentWith", "");
+										break;
+									}
+								}
+							};
+
+							// process category based on template
+							if (docTemplate.getCode().equals("pmb_gen_con_intro_ls")) {
+								buildCategory.accept("PMB_BILL_INTRODUCTION", "intro");
+							} else if (docTemplate.getCode().equals("pmb_gen_con_consid_ls")) {
+								buildCategory.accept("PMB_BILL_CONSIDERATION", "consid");
+							} else if (docTemplate.getCode().equals("pmb_gen_con_with_ls")) {
+								buildCategory.accept("PMB_BILL_WITHDRAWL", "with");
+							}
+						}
 					}
 
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+
 				} else {
+					// Templates that do not need API data
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				}
@@ -1861,6 +1921,7 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
+
 		} catch (Exception e) {
 			log.error("Error merging files >>> {}", e.getMessage());
 		}
@@ -1903,6 +1964,7 @@ public class ThirdPartyDocGen {
 						Map<String, Object> data = (Map<String, Object>) body.get("data");
 
 						// Header-specific processing
+						// Header-specific processing
 						if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
 							// Format date
 							String forDate = (String) data.get("forDate");
@@ -1915,31 +1977,38 @@ public class ThirdPartyDocGen {
 							map.put("sakaDate", (String) data.get("forDateSaka"));
 
 							// Initialize placeholders
-							map.put("countForBillIntro", "");
-							map.put("memberName", "");
-							map.put("nameOfBill", "");
-							map.put("content", "");
+							map.put("resolutionsContent", "");
 
-							// Take the first record if available
+							// Build all resolutions
 							List<Map<String, Object>> details = (List<Map<String, Object>>) data
 									.get("privateMemberBusinessDetails");
-							System.out.println("### details - " + details);
 							if (details != null && !details.isEmpty()) {
-								Map<String, Object> detail = details.get(0);
+								StringBuilder sb = new StringBuilder();
 
-								String memberName = (String) detail.get("memberFullName");
-								if (memberName == null || memberName.isEmpty())
-									memberName = (String) detail.get("memberName");
+								for (Map<String, Object> detail : details) {
+									String memberName = (String) detail.get("memberFullName");
+									if (memberName == null || memberName.isEmpty()) {
+										memberName = (String) detail.get("memberName");
+									}
 
-								Integer serialNo = (Integer) detail.get("serialNo");
-								if (serialNo == null || serialNo == 0)
-									serialNo = 1;
+									Integer serialNo = (Integer) detail.get("serialNo");
+									if (serialNo == null || serialNo == 0) {
+										serialNo = 1;
+									}
 
-								map.put("countForBillIntro", serialNo.toString());
-								map.put("memberName", memberName);
-								map.put("nameOfBill", (String) detail.get("nameOfBill"));
-								map.put("content", (String) detail.get("content"));
+									String nameOfBill = (String) detail.get("nameOfBill");
+									String content = (String) detail.get("content");
+
+									sb.append(serialNo).append("      ").append(memberName).append(" to move:-\t")
+											.append(nameOfBill).append("\r\n") // newline for bill heading
+											.append(content).append("\r\n\r\n")
+											.append("                                 "); // double newline after
+																							// content
+								}
+
+								map.put("resolutionsContent", sb.toString().trim());
 							}
+
 						}
 
 						// FT-specific processing
