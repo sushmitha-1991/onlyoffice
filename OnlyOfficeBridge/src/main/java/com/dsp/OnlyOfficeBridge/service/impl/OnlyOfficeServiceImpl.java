@@ -256,9 +256,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pmbResolTemplateId)) {
 					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
 				}
-//				if (templateId.equals(pcTemplateId)) {
-//					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
-//				}
+				if (templateId.equals(pcTemplateId)) {
+					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
+				}
 
 				if (templateId.equals(sessionalResumeTemplateId)) {
 					return thirdPartyDocGen.genSessionalResumeGeneration(key, docTemplates, refId);
