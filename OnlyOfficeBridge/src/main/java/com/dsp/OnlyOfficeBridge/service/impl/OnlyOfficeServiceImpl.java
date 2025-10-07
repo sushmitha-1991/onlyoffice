@@ -101,6 +101,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${pmb.resol.gen.template.id}")
 	String pmbResolTemplateId;
+	
+	@Value("${pc.gen.template.id}")
+	String pcTemplateId;
 
 	@Value("${sessional.resume.gen.template.id}")
 	String sessionalResumeTemplateId;
@@ -253,6 +256,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pmbResolTemplateId)) {
 					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
 				}
+//				if (templateId.equals(pcTemplateId)) {
+//					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
+//				}
+
 				if (templateId.equals(sessionalResumeTemplateId)) {
 					return thirdPartyDocGen.genSessionalResumeGeneration(key, docTemplates, refId);
 				}
