@@ -101,6 +101,9 @@ public class ThirdPartyDocGen {
 	private String cdUrl;
 	@Value("${dsp2.base.url}")
 	private String dsp2Url;
+	@Value("${prov.calender.service.url}")
+	private String pcUrl;
+	
 	@Autowired
 	private VerbatimClient verbatimClient;
 
@@ -353,7 +356,7 @@ public class ThirdPartyDocGen {
 	}
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
-		String url = cdUrl + "debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
+		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
 		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
@@ -2047,4 +2050,67 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+	/* ----------------   Provisional Calender gen ---------------------------*/
+//	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+//			String refId) {
+//		String url = pcUrl + "/provisionalcalendar/" + refId;
+//		Map<String, Object> body;
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			body = response.getBody();
+//			System.out.println(body);
+//		} catch (Exception e) {
+//			System.err.println("Error during API call: " + e.getMessage());
+//			throw e;
+//		}
+//
+//		List<MargeFileDto> files = new LinkedList<>();
+//
+//		docTemplates.forEach(docTemplate -> {
+//
+//			if (docTemplate.getCode().equals("provisional_calender_content")) {
+//				Map<String, Object> data = (Map<String, Object>) body.get("data");
+//					if (data.get("content") != null) {
+//						String htmlConvUrl = "http://localhost:3000/convert-to-odt";
+//						 headers = new HttpHeaders();
+//						 headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//							entity = new HttpEntity<>(headers);
+//
+//							try {
+//								RestTemplate restTemplate = new RestTemplate();
+//								ResponseEntity<Map> response = restTemplate.exchange(htmlConvUrl, HttpMethod.GET, entity, Map.class);
+//								body = response.getBody();
+//								System.out.println(body);
+//							} catch (Exception e) {
+//								System.err.println("Error during API call: " + e.getMessage());
+//								throw e;
+//							}
+//					}
+//			}
+//			});
+//
+//			}
+//
+//		});
+//		try {
+//			byte[] mergedBytes = mergeDocxFiles(files);
+//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+//			saveOpenKm(dsp2Key, mergedResource);
+//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
+//					.contentLength(mergedResource.contentLength()).body(mergedResource);
+//		} catch (Exception e) {
+//
+//		}
+//		return null;
+//	}
 }
