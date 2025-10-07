@@ -2051,68 +2051,72 @@ public class ThirdPartyDocGen {
 	}
 
 	/* ----------------   Provisional Calender gen ---------------------------*/
-//	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-//			String refId) {
-//		String url = pcUrl + "/provisionalcalendar/" + refId;
-//		Map<String, Object> body;
-//		if (token == null) {
-//			throw new IllegalStateException("Authorization token is missing");
-//		}
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.set("Authorization", "Bearer " + token);
-//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-//		HttpEntity<Void> entity = new HttpEntity<>(headers);
-//
-//		try {
-//			RestTemplate restTemplate = new RestTemplate();
-//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-//			body = response.getBody();
-//			System.out.println(body);
-//		} catch (Exception e) {
-//			System.err.println("Error during API call: " + e.getMessage());
-//			throw e;
-//		}
-//
-//		List<MargeFileDto> files = new LinkedList<>();
-//
-//		docTemplates.forEach(docTemplate -> {
-//
-//			if (docTemplate.getCode().equals("provisional_calender_content")) {
-//				Map<String, Object> data = (Map<String, Object>) body.get("data");
-//					if (data.get("content") != null) {
-//						String htmlConvUrl = "http://localhost:3000/convert-to-odt";
-//						 headers = new HttpHeaders();
-//						 headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-//							entity = new HttpEntity<>(headers);
-//
-//							try {
-//								RestTemplate restTemplate = new RestTemplate();
-//								ResponseEntity<Map> response = restTemplate.exchange(htmlConvUrl, HttpMethod.GET, entity, Map.class);
-//								body = response.getBody();
-//								System.out.println(body);
-//							} catch (Exception e) {
-//								System.err.println("Error during API call: " + e.getMessage());
-//								throw e;
-//							}
-//					}
-//			}
-//			});
-//
-//			}
-//
-//		});
-//		try {
-//			byte[] mergedBytes = mergeDocxFiles(files);
-//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-//			saveOpenKm(dsp2Key, mergedResource);
-//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
-//					.contentLength(mergedResource.contentLength()).body(mergedResource);
-//		} catch (Exception e) {
-//
-//		}
-//		return null;
-//	}
+	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = pcUrl + "/provisionalcalendar/" + refId;
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage());
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+
+			if (docTemplate.getCode().equals("provisional_calender_content")) {
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+					if (data.get("content") != null) {
+						String html = (String) data.get("content");
+						
+						 Map<String, String> requestBody = new HashMap<>();
+					        requestBody.put("html", html);
+					        
+						HttpHeaders headers1 = new HttpHeaders();
+						 headers1.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+						 HttpEntity<Map<String, String>> entity1 = new HttpEntity<>(requestBody,headers);
+
+						 RestTemplate restTemplate = new RestTemplate();
+							try {
+								String htmlConvUrl = "http://10.247.129.22:3001/convert-to-odt";
+								ResponseEntity<Map> response = restTemplate.exchange(htmlConvUrl, HttpMethod.POST, entity1, Map.class);
+								Map responseBody = response.getBody();
+								System.out.println("Response from ODT API: " +responseBody);
+								 body.put("convertedOdt", responseBody);
+								 
+							} catch (Exception e) {
+								System.err.println("Error during API call: " + e.getMessage());
+								throw e;
+							}
+					}
+			}
+			});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+		return null;
+	}
 
 	public ResponseEntity<Resource> genSessionalResumeGeneration(String key, List<DocTemplate> docTemplates, String refId) {
 		// Parse refId (e.g., EN-TMPL_RWDOS-1 → EN, TMPL_RWDOS, 1)
