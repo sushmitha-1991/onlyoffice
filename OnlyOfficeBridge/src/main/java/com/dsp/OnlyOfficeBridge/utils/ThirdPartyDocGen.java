@@ -2047,4 +2047,91 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+	public ResponseEntity<Resource> genSessionalResumeGeneration(String key, List<DocTemplate> docTemplates, String refId) {
+		// Parse refId (e.g., EN-TMPL_RWDOS-1 → EN, TMPL_RWDOS, 1)
+	    String[] refParts = refId.split("-", 3);
+	    String language = refParts.length > 0 ? refParts[0] : "EN";
+	    String abbr = refParts.length > 1 ? refParts[1] : "";
+	    Long houseId = Long.parseLong(refParts[2]);
+
+	    // Build the API URL dynamically
+	    String url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
+	    		+ "&houseId=" + houseId;
+	    System.out.println("API URL : "+url);
+	    if (token == null) {
+	        throw new IllegalStateException("Authorization token is missing");
+	    }
+
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("Authorization", "Bearer " + token);
+	    headers.setContentType(MediaType.APPLICATION_JSON);
+	    HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+	    Map<String, Object> body;
+	    try {
+	        RestTemplate restTemplate = new RestTemplate();
+	        System.out.println(">>> Calling Placeholder API: " + url);
+	        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+	        body = response.getBody();
+	    } catch (Exception e) {
+	        System.err.println("Error while calling Placeholder API: " + e.getMessage());
+	        throw new RuntimeException("Failed to fetch placeholders from API", e);
+	    }
+
+	    if (body == null || body.get("data") == null) {
+	        throw new RuntimeException("No placeholder data received from API for " + refId);
+	    }
+
+	    List<?> dataList = (List<?>) body.get("data");
+	    if (dataList.isEmpty()) {
+	        throw new RuntimeException("Empty placeholder list returned from API for " + refId);
+	    }
+
+	    Map<String, Object> firstEntry = (Map<String, Object>) dataList.get(0);
+	    Map<String, Object> placeholders = (Map<String, Object>) firstEntry.get("placeholders");
+
+	    // Extract the placeholders you care about
+	    String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
+	    String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
+
+	    Map<String, String> map = new HashMap<>();
+	    map.put("sessionNumber", sessionNumber);
+	    map.put("sessionDate", sessionDate);
+
+	    List<MargeFileDto> files = new LinkedList<>();
+
+	    // Only apply for the header template
+	    docTemplates.forEach(docTemplate -> {
+	        if ("sessional_resume_gen_header".equals(docTemplate.getCode())) {
+	            try {
+	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+	                files.add(MargeFileDto.builder()
+	                        .file(resource.getByteArray())
+	                        .isBreak(false)
+	                        .build());
+	            } catch (Exception e) {
+	                throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
+	            }
+	        }
+	    });
+
+	    // Merge and return as downloadable DOCX
+	    try {
+	        byte[] mergedBytes = mergeDocxFiles(files);
+	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+	        saveOpenKm(key, mergedResource);
+
+	        return ResponseEntity.ok()
+	                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_" + abbr + ".docx")
+	                .contentLength(mergedResource.contentLength())
+	                .body(mergedResource);
+	    } catch (Exception e) {
+	        System.err.println("Error while merging sessional resume docs: " + e.getMessage());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+	    }
+	}
+
+
 }

@@ -102,6 +102,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Value("${pmb.resol.gen.template.id}")
 	String pmbResolTemplateId;
 
+	@Value("${sessional.resume.gen.template.id}")
+	String sessionalResumeTemplateId;
+	
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -250,7 +253,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pmbResolTemplateId)) {
 					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
 				}
-
+				if (templateId.equals(sessionalResumeTemplateId)) {
+					return thirdPartyDocGen.genSessionalResumeGeneration(key, docTemplates, refId);
+				}
+				
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
