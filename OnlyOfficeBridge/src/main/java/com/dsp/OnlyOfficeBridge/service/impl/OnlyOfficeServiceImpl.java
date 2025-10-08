@@ -108,6 +108,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Value("${sessional.resume.gen.template.id}")
 	String sessionalResumeTemplateId;
 	
+	@Value("${resume.of.work.gen.template.id}")
+	String resumeOfWorkTemplateId;
+	
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -259,9 +262,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pcTemplateId)) {
 					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
 				}
-
-				if (templateId.equals(sessionalResumeTemplateId)) {
-					return thirdPartyDocGen.genSessionalResumeGeneration(key, docTemplates, refId);
+				if (templateId.equals(sessionalResumeTemplateId) || (templateId.equals(resumeOfWorkTemplateId))) {
+					return thirdPartyDocGen.genResumeOfWorkGeneration(key, docTemplates, refId);
 				}
 				
 			} else {
