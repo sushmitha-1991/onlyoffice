@@ -2091,7 +2091,7 @@ public class ThirdPartyDocGen {
 
 						 RestTemplate restTemplate = new RestTemplate();
 							try {
-								String htmlConvUrl = "http://10.247.129.22:3001/convert-to-odt";
+								String htmlConvUrl = "http://10.247.128.22:3001/convert-to-odt";
 								ResponseEntity<Map> response = restTemplate.exchange(htmlConvUrl, HttpMethod.POST, entity1, Map.class);
 								Map responseBody = response.getBody();
 								System.out.println("Response from ODT API: " +responseBody);
