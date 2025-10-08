@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -103,6 +104,9 @@ public class ThirdPartyDocGen {
 	private String dsp2Url;
 	@Value("${prov.calender.service.url}")
 	private String pcUrl;
+	@Value("${doc.convert.url}")
+	private String docConvertUrl;
+	
 	
 	@Autowired
 	private VerbatimClient verbatimClient;
@@ -2074,40 +2078,24 @@ public class ThirdPartyDocGen {
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
-
+		final AtomicReference<String> htmlRef = new AtomicReference<>();
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 					if (data.get("content") != null) {
-						String html = (String) data.get("content");
-						
-						 Map<String, String> requestBody = new HashMap<>();
-					        requestBody.put("html", html);
-					        
-						HttpHeaders headers1 = new HttpHeaders();
-						 headers1.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-						 HttpEntity<Map<String, String>> entity1 = new HttpEntity<>(requestBody,headers);
-
-						 RestTemplate restTemplate = new RestTemplate();
-							try {
-								String htmlConvUrl = "http://10.247.128.22:3001/convert-to-odt";
-								ResponseEntity<Map> response = restTemplate.exchange(htmlConvUrl, HttpMethod.POST, entity1, Map.class);
-								Map responseBody = response.getBody();
-								System.out.println("Response from ODT API: " +responseBody);
-								 body.put("convertedOdt", responseBody);
-								 
-							} catch (Exception e) {
-								System.err.println("Error during API call: " + e.getMessage());
-								throw e;
-							}
+						 String html = (String) data.get("content");
+						 htmlRef.set(html);
 					}
 			}
 			});
-
+		String html = htmlRef.get();
+		if (html == null) {
+		    throw new IllegalStateException("HTML content is missing for provisional calendar");
+		}
 		try {
-			byte[] mergedBytes = mergeDocxFiles(files);
-			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			//byte[] mergedBytes = mergeDocxFiles(html);
+			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
@@ -2118,6 +2106,36 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+	public byte[] convertHtmlToDocx(String htmlContent) {
+		try {
+			System.out.println("### inside convertUrlToDocx");
+
+
+			RestTemplate restTemplate = new RestTemplate(); 
+
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.APPLICATION_JSON);
+
+			// Build JSON payload
+			Map<String, String> payload = new HashMap<>();
+			payload.put("html", htmlContent);
+
+			HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+
+//			// Call the /convert-to-odt endpoint
+//			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
+//					HttpMethod.POST, request, byte[].class);
+
+			System.out.println("#########"+docConvertUrl+"/convert-to-odt");
+            ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl+"/convert-to-odt",
+                    HttpMethod.POST, request, byte[].class);
+
+			return response.getBody();
+		} catch (Exception e) {
+			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
+		}
+	}
+	
 	public ResponseEntity<Resource> genSessionalResumeGeneration(String key, List<DocTemplate> docTemplates, String refId) {
 		// Parse refId (e.g., EN-TMPL_RWDOS-1 → EN, TMPL_RWDOS, 1)
 	    String[] refParts = refId.split("-", 3);
