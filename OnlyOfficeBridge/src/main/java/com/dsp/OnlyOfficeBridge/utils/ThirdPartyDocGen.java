@@ -392,11 +392,11 @@ public class ThirdPartyDocGen {
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
 				inputList.forEach(map -> {
-					if (data.get("dsp2Key") != null) {
+					if (map.get("dsp2Key") != null) {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-								.findByDsp2Key((String) data.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+								.findByDsp2Key((String) map.get("dsp2Key"));
+						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
