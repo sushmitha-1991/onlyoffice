@@ -101,7 +101,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${pmb.resol.gen.template.id}")
 	String pmbResolTemplateId;
+	
+	@Value("${pc.gen.template.id}")
+	String pcTemplateId;
 
+	@Value("${sessional.resume.gen.template.id}")
+	String sessionalResumeTemplateId;
+	
+	@Value("${resume.of.work.gen.template.id}")
+	String resumeOfWorkTemplateId;
+	
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -250,7 +259,13 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pmbResolTemplateId)) {
 					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
 				}
-
+				if (templateId.equals(pcTemplateId)) {
+					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
+				}
+				if (templateId.equals(sessionalResumeTemplateId) || (templateId.equals(resumeOfWorkTemplateId))) {
+					return thirdPartyDocGen.genResumeOfWorkGeneration(key, docTemplates, refId);
+				}
+				
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {

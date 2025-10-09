@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -50,6 +51,7 @@ import org.docx4j.wml.R;
 import org.docx4j.wml.STBrType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
@@ -67,6 +69,7 @@ import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -101,6 +104,13 @@ public class ThirdPartyDocGen {
 	private String cdUrl;
 	@Value("${dsp2.base.url}")
 	private String dsp2Url;
+	@Value("${prov.calender.service.url}")
+	private String pcUrl;
+	@Value("${doc.convert.url}")
+	private String docConvertUrl;	
+	@Value("${resume.of.work.service.url}")
+	private String rowUrl;
+
 	@Autowired
 	private VerbatimClient verbatimClient;
 
@@ -353,7 +363,7 @@ public class ThirdPartyDocGen {
 	}
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
-		String url = cdUrl + "debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
+		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
 		System.out.println("url>>>>>>>" + url + " ==== " + token);
 		Map<String, Object> body;
 		if (token == null) {
@@ -385,11 +395,11 @@ public class ThirdPartyDocGen {
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
 				inputList.forEach(map -> {
-					if (data.get("dsp2Key") != null) {
+					if (map.get("dsp2Key") != null) {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-								.findByDsp2Key((String) data.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+								.findByDsp2Key((String) map.get("dsp2Key"));
+						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -1147,17 +1157,17 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_ls_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		int arr[]= {1};
+		int arr[] = { 1 };
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-				if (arr[0]++==dspKeys.size()) {
+				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
@@ -1179,17 +1189,17 @@ public class ThirdPartyDocGen {
 			replacements.put("meetingDateFullString", (String) fullDayInformationDTO.getMeetingDate());
 			ByteArrayResource resource = Utils.replacePlaceholders("verbatim/verbatim_rs_front_cover.docx",
 					replacements);
-			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+			files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		int arr[]= {1};
+		int arr[] = { 1 };
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-				if (arr[0]++==dspKeys.size()) {
+				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
@@ -2045,6 +2055,248 @@ public class ThirdPartyDocGen {
 		}
 
 		return null;
+	}
+
+	/* ----------------   Provisional Calender gen ---------------------------*/
+	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = pcUrl + "/provisionalcalendar/" + refId;
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage());
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+		final AtomicReference<String> htmlRef = new AtomicReference<>();
+		docTemplates.forEach(docTemplate -> {
+
+			if (docTemplate.getCode().equals("provisional_calender_content")) {
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+					if (data.get("content") != null) {
+						 String html = (String) data.get("content");
+						 htmlRef.set(html);
+					}
+			}
+			});
+		String html = htmlRef.get();
+		if (html == null) {
+		    throw new IllegalStateException("HTML content is missing for provisional calendar");
+		}
+		try {
+			//byte[] mergedBytes = mergeDocxFiles(html);
+			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+		return null;
+	}
+
+	public byte[] convertHtmlToDocx(String htmlContent) {
+		try {
+			System.out.println("### inside convertUrlToDocx");
+
+
+			RestTemplate restTemplate = new RestTemplate(); 
+
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentType(MediaType.APPLICATION_JSON);
+
+			// Build JSON payload
+			Map<String, String> payload = new HashMap<>();
+			payload.put("html", htmlContent);
+
+			HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
+
+//			// Call the /convert-to-odt endpoint
+//			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
+//					HttpMethod.POST, request, byte[].class);
+
+			System.out.println("#########"+docConvertUrl+"/convert-to-odt");
+            ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl+"/convert-to-odt",
+                    HttpMethod.POST, request, byte[].class);
+
+			return response.getBody();
+		} catch (Exception e) {
+			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
+		}
+	}
+	
+	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
+			String refId) {
+		System.out.println("Received refId: " + refId);
+		String[] refParts = refId.split("-");
+
+		if (refParts.length < 3) {
+			throw new IllegalArgumentException("Invalid refId format: " + refId);
+		}
+
+		String language = refParts[0];
+		String url;
+		Long houseId;
+		String abbr = null;
+		Long applicationId = null;
+
+		// Detect RS Flow
+		boolean isRsFlow = refParts[2].contentEquals("1");
+
+		// Build URL based on flow
+		if (isRsFlow) {
+			// RS Flow: EN-TMPL_RWDOS-1
+			abbr = refParts[1];
+			houseId = Long.parseLong(refParts[2]);
+			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
+					+ "&houseId=" + houseId;
+			System.out.println("Detected RS Flow: " + url);
+		} else {
+			// LS Flow: EN-87-2-32-432-342-893
+			abbr = refParts[1];
+			houseId = Long.parseLong(refParts[2]);
+			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
+					+ "&houseId=" + houseId;
+			System.out.println("Detected LS Flow: " + url);
+		}
+
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		// Call getTemplatePlaceholdersV2
+		Map<String, Object> body;
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			System.out.println(">>> Calling Placeholder API: " + url);
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+		} catch (Exception e) {
+			System.err.println("Error while calling Placeholder API: " + e.getMessage());
+			throw new RuntimeException("Failed to fetch placeholders from API", e);
+		}
+
+		if (body == null || body.get("data") == null) {
+			throw new RuntimeException("No placeholder data received from API for " + refId);
+		}
+
+		List<?> dataList = (List<?>) body.get("data");
+		if (dataList.isEmpty()) {
+			throw new RuntimeException("Empty placeholder list returned from API for " + refId);
+		}
+
+		Map<String, Object> firstEntry = (Map<String, Object>) dataList.get(0);
+		Map<String, Object> placeholders = (Map<String, Object>) firstEntry.get("placeholders");
+
+		// Extract placeholders
+		String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
+		String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
+
+		Map<String, String> map = new HashMap<>();
+		map.put("sessionNumber", sessionNumber);
+		map.put("sessionDate", sessionDate);
+
+		// Initialize file list
+		List<MargeFileDto> files = new LinkedList<>();
+
+		// Determine correct header template based on flow
+		String headerTemplateCode = isRsFlow ? "sessional_resume_gen_header" : "resume_of_work_gen_header";
+
+		// Replace placeholders in the header template
+		docTemplates.forEach(docTemplate -> {
+			if (headerTemplateCode.equals(docTemplate.getCode())) {
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
+				}
+			}
+		});
+
+		// LS FLOW: Fetch DSP2 keys and merge documents
+		if (!isRsFlow) {
+			List<Long> inputIds = new ArrayList<>();
+			for (int i = 3; i < refParts.length; i++) {
+				try {
+					inputIds.add(Long.parseLong(refParts[i]));
+				} catch (NumberFormatException ignored) {
+				}
+			}
+
+			System.out.println("Input IDs for DSP2 call: " + inputIds);
+
+			if (!inputIds.isEmpty()) {
+				String dsp2Url = rowUrl + "/get-dsp2keys";
+				System.out.print("calling resume of work :" + dsp2Url);
+
+				HttpEntity<List<Long>> dsp2Entity = new HttpEntity<>(inputIds, headers);
+				// Call the DSP2 API
+				Map<String, Object> dsp2Body;
+				try {
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> dsp2Response = restTemplate.exchange(dsp2Url, HttpMethod.POST, dsp2Entity,
+							Map.class);
+					dsp2Body = dsp2Response.getBody();
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to fetch DSP2 keys: " + e.getMessage(), e);
+				}
+
+				// Extract "data" directly as List<String>
+				List<String> dsp2Keys = new ArrayList<>();
+				if (dsp2Body != null && dsp2Body.get("data") instanceof List) {
+					List<?> rawList = (List<?>) dsp2Body.get("data");
+					rawList.forEach(item -> dsp2Keys.add(item.toString()));
+				}
+
+				System.out.println("DSP2 Keys fetched: " + dsp2Keys);
+
+				// Fetch documents for each DSP2 key and add to files
+				for (String dspKey : dsp2Keys) {
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+					metadataOpt.ifPresent(metadata -> {
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					});
+				}
+			}
+		}
+
+		// Merge all files and return DOCX
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+
+		} catch (Exception e) {
+			System.err.println("Error while merging sessional resume docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
 	}
 
 }
