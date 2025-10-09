@@ -2100,6 +2100,7 @@ public class ThirdPartyDocGen {
 			//byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
+			System.out.println("******** after saving openkm resource ***********");
 			return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
@@ -2132,7 +2133,8 @@ public class ThirdPartyDocGen {
 			System.out.println("#########"+docConvertUrl+"/convert-to-odt");
             ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl+"/convert-to-odt",
                     HttpMethod.POST, request, byte[].class);
-
+            System.out.println(" ********converting to odt response *****************");
+            System.out.println(response.getBody());
 			return response.getBody();
 		} catch (Exception e) {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
