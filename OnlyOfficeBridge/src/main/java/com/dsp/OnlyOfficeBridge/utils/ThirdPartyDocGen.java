@@ -51,6 +51,7 @@ import org.docx4j.wml.R;
 import org.docx4j.wml.STBrType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
@@ -68,6 +69,7 @@ import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -105,9 +107,10 @@ public class ThirdPartyDocGen {
 	@Value("${prov.calender.service.url}")
 	private String pcUrl;
 	@Value("${doc.convert.url}")
-	private String docConvertUrl;
-	
-	
+	private String docConvertUrl;	
+	@Value("${resume.of.work.service.url}")
+	private String rowUrl;
+
 	@Autowired
 	private VerbatimClient verbatimClient;
 
@@ -1158,13 +1161,13 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		int arr[]= {1};
+		int arr[] = { 1 };
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-				if (arr[0]++==dspKeys.size()) {
+				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
@@ -1190,13 +1193,13 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		int arr[]= {1};
+		int arr[] = { 1 };
 		dspKeys.forEach(dspKey -> {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
 				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-				if (arr[0]++==dspKeys.size()) {
+				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
@@ -2136,91 +2139,164 @@ public class ThirdPartyDocGen {
 		}
 	}
 	
-	public ResponseEntity<Resource> genSessionalResumeGeneration(String key, List<DocTemplate> docTemplates, String refId) {
-		// Parse refId (e.g., EN-TMPL_RWDOS-1 → EN, TMPL_RWDOS, 1)
-	    String[] refParts = refId.split("-", 3);
-	    String language = refParts.length > 0 ? refParts[0] : "EN";
-	    String abbr = refParts.length > 1 ? refParts[1] : "";
-	    Long houseId = Long.parseLong(refParts[2]);
+	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
+			String refId) {
+		System.out.println("Received refId: " + refId);
+		String[] refParts = refId.split("-");
 
-	    // Build the API URL dynamically
-	    String url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
-	    		+ "&houseId=" + houseId;
-	    System.out.println("API URL : "+url);
-	    if (token == null) {
-	        throw new IllegalStateException("Authorization token is missing");
-	    }
+		if (refParts.length < 3) {
+			throw new IllegalArgumentException("Invalid refId format: " + refId);
+		}
 
-	    HttpHeaders headers = new HttpHeaders();
-	    headers.set("Authorization", "Bearer " + token);
-	    headers.setContentType(MediaType.APPLICATION_JSON);
-	    HttpEntity<Void> entity = new HttpEntity<>(headers);
+		String language = refParts[0];
+		String url;
+		Long houseId;
+		String abbr = null;
+		Long applicationId = null;
 
-	    Map<String, Object> body;
-	    try {
-	        RestTemplate restTemplate = new RestTemplate();
-	        System.out.println(">>> Calling Placeholder API: " + url);
-	        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-	        body = response.getBody();
-	    } catch (Exception e) {
-	        System.err.println("Error while calling Placeholder API: " + e.getMessage());
-	        throw new RuntimeException("Failed to fetch placeholders from API", e);
-	    }
+		// Detect RS Flow
+		boolean isRsFlow = refParts[2].contentEquals("1");
 
-	    if (body == null || body.get("data") == null) {
-	        throw new RuntimeException("No placeholder data received from API for " + refId);
-	    }
+		// Build URL based on flow
+		if (isRsFlow) {
+			// RS Flow: EN-TMPL_RWDOS-1
+			abbr = refParts[1];
+			houseId = Long.parseLong(refParts[2]);
+			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
+					+ "&houseId=" + houseId;
+			System.out.println("Detected RS Flow: " + url);
+		} else {
+			// LS Flow: EN-87-2-32-432-342-893
+			abbr = refParts[1];
+			houseId = Long.parseLong(refParts[2]);
+			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
+					+ "&houseId=" + houseId;
+			System.out.println("Detected LS Flow: " + url);
+		}
 
-	    List<?> dataList = (List<?>) body.get("data");
-	    if (dataList.isEmpty()) {
-	        throw new RuntimeException("Empty placeholder list returned from API for " + refId);
-	    }
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
 
-	    Map<String, Object> firstEntry = (Map<String, Object>) dataList.get(0);
-	    Map<String, Object> placeholders = (Map<String, Object>) firstEntry.get("placeholders");
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-	    // Extract the placeholders you care about
-	    String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
-	    String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
+		// Call getTemplatePlaceholdersV2
+		Map<String, Object> body;
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			System.out.println(">>> Calling Placeholder API: " + url);
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+		} catch (Exception e) {
+			System.err.println("Error while calling Placeholder API: " + e.getMessage());
+			throw new RuntimeException("Failed to fetch placeholders from API", e);
+		}
 
-	    Map<String, String> map = new HashMap<>();
-	    map.put("sessionNumber", sessionNumber);
-	    map.put("sessionDate", sessionDate);
+		if (body == null || body.get("data") == null) {
+			throw new RuntimeException("No placeholder data received from API for " + refId);
+		}
 
-	    List<MargeFileDto> files = new LinkedList<>();
+		List<?> dataList = (List<?>) body.get("data");
+		if (dataList.isEmpty()) {
+			throw new RuntimeException("Empty placeholder list returned from API for " + refId);
+		}
 
-	    // Only apply for the header template
-	    docTemplates.forEach(docTemplate -> {
-	        if ("sessional_resume_gen_header".equals(docTemplate.getCode())) {
-	            try {
-	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-	                files.add(MargeFileDto.builder()
-	                        .file(resource.getByteArray())
-	                        .isBreak(false)
-	                        .build());
-	            } catch (Exception e) {
-	                throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
-	            }
-	        }
-	    });
+		Map<String, Object> firstEntry = (Map<String, Object>) dataList.get(0);
+		Map<String, Object> placeholders = (Map<String, Object>) firstEntry.get("placeholders");
 
-	    // Merge and return as downloadable DOCX
-	    try {
-	        byte[] mergedBytes = mergeDocxFiles(files);
-	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+		// Extract placeholders
+		String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
+		String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
 
-	        saveOpenKm(key, mergedResource);
+		Map<String, String> map = new HashMap<>();
+		map.put("sessionNumber", sessionNumber);
+		map.put("sessionDate", sessionDate);
 
-	        return ResponseEntity.ok()
-	                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_" + abbr + ".docx")
-	                .contentLength(mergedResource.contentLength())
-	                .body(mergedResource);
-	    } catch (Exception e) {
-	        System.err.println("Error while merging sessional resume docs: " + e.getMessage());
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-	    }
+		// Initialize file list
+		List<MargeFileDto> files = new LinkedList<>();
+
+		// Determine correct header template based on flow
+		String headerTemplateCode = isRsFlow ? "sessional_resume_gen_header" : "resume_of_work_gen_header";
+
+		// Replace placeholders in the header template
+		docTemplates.forEach(docTemplate -> {
+			if (headerTemplateCode.equals(docTemplate.getCode())) {
+				try {
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
+				}
+			}
+		});
+
+		// LS FLOW: Fetch DSP2 keys and merge documents
+		if (!isRsFlow) {
+			List<Long> inputIds = new ArrayList<>();
+			for (int i = 3; i < refParts.length; i++) {
+				try {
+					inputIds.add(Long.parseLong(refParts[i]));
+				} catch (NumberFormatException ignored) {
+				}
+			}
+
+			System.out.println("Input IDs for DSP2 call: " + inputIds);
+
+			if (!inputIds.isEmpty()) {
+				String dsp2Url = rowUrl + "/get-dsp2keys";
+				System.out.print("calling resume of work :" + dsp2Url);
+
+				HttpEntity<List<Long>> dsp2Entity = new HttpEntity<>(inputIds, headers);
+				// Call the DSP2 API
+				Map<String, Object> dsp2Body;
+				try {
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> dsp2Response = restTemplate.exchange(dsp2Url, HttpMethod.POST, dsp2Entity,
+							Map.class);
+					dsp2Body = dsp2Response.getBody();
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to fetch DSP2 keys: " + e.getMessage(), e);
+				}
+
+				// Extract "data" directly as List<String>
+				List<String> dsp2Keys = new ArrayList<>();
+				if (dsp2Body != null && dsp2Body.get("data") instanceof List) {
+					List<?> rawList = (List<?>) dsp2Body.get("data");
+					rawList.forEach(item -> dsp2Keys.add(item.toString()));
+				}
+
+				System.out.println("DSP2 Keys fetched: " + dsp2Keys);
+
+				// Fetch documents for each DSP2 key and add to files
+				for (String dspKey : dsp2Keys) {
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+					metadataOpt.ifPresent(metadata -> {
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+					});
+				}
+			}
+		}
+
+		// Merge all files and return DOCX
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+
+		} catch (Exception e) {
+			System.err.println("Error while merging sessional resume docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
 	}
-
 
 }
