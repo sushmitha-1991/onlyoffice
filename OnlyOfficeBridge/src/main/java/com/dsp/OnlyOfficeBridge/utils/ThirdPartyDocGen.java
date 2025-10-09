@@ -2097,7 +2097,7 @@ public class ThirdPartyDocGen {
 			//byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
-			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+			return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
