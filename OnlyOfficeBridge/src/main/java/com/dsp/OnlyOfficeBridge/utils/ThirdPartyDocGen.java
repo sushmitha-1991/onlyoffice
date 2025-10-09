@@ -2205,6 +2205,47 @@ public class ThirdPartyDocGen {
 		if (dataList.isEmpty()) {
 			throw new RuntimeException("Empty placeholder list returned from API for " + refId);
 		}
+		
+		LocalDate today = LocalDate.now();
+
+		String monthYear = today.format(DateTimeFormatter.ofPattern("MMMM, yyyy"));
+		String isoDate = today.toString(); // already in yyyy-MM-dd format
+
+		// 🔹 Convert Gregorian → Saka date
+		String sakaDate = null;
+		if (isoDate != null) {
+			try {
+				Map<String, String> requestPayload = new HashMap<>();
+				requestPayload.put("dateToConvert", isoDate);
+
+				RestTemplate restTemplate = new RestTemplate();
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+				Map<String, Object> bodyResp = response.getBody();
+				if (bodyResp != null && bodyResp.containsKey("data")) {
+					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+
+					// default locale → English
+					String locale = "en";
+					if (refId.endsWith("HI")) {
+						locale = "hi";
+					}
+					sakaDate = convertedDate.get(locale);
+				}
+			} catch (Exception e) {
+				System.err.println("Error fetching Saka date: " + e.getMessage());
+			}
+		}
+
+		// 🔹 Final displayDate = Gregorian + optional Saka
+		final String displayDate;
+		if (sakaDate != null) {
+			displayDate = monthYear + " / " + sakaDate + " (Saka)";
+		} else {
+			displayDate = monthYear;
+		}
 
 		Map<String, Object> firstEntry = (Map<String, Object>) dataList.get(0);
 		Map<String, Object> placeholders = (Map<String, Object>) firstEntry.get("placeholders");
@@ -2216,6 +2257,9 @@ public class ThirdPartyDocGen {
 		Map<String, String> map = new HashMap<>();
 		map.put("sessionNumber", sessionNumber);
 		map.put("sessionDate", sessionDate);
+		map.put("displayDate", displayDate);
+		map.put("todaysDate", monthYear);
+		map.put("sakaDate", sakaDate != null ? sakaDate : "");
 
 		// Initialize file list
 		List<MargeFileDto> files = new LinkedList<>();
