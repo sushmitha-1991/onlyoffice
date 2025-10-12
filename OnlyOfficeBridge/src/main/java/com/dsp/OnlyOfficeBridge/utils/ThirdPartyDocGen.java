@@ -2141,6 +2141,36 @@ public class ThirdPartyDocGen {
 		}
 	}
 	
+	public ResponseEntity<Resource> genTranslationNewVersionGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+
+			if (docTemplate.getCode().equals("new_version_dsp")) {
+
+						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+								.findByDsp2Key(refId);
+						ByteArrayResource resourceBody = utils
+								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					}
+				});
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Translationversion.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+
+		}
+		return null;
+	}
+	
 	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
 			String refId) {
 		System.out.println("Received refId: " + refId);
