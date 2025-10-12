@@ -2151,7 +2151,7 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("new_version_dsp")) {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-								.findByDsp2Key(dsp2Key);
+								.findByDsp2Key(refId);
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -2163,7 +2163,7 @@ public class ThirdPartyDocGen {
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
 			saveOpenKm(dsp2Key, mergedResource);
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Translationversion.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
 
