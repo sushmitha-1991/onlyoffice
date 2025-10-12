@@ -111,6 +111,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Value("${resume.of.work.gen.template.id}")
 	String resumeOfWorkTemplateId;
 	
+	@Value("${translation.version.template.id}")
+	String newVersionTranslationTemplateId;
+	
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -265,6 +268,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(sessionalResumeTemplateId) || (templateId.equals(resumeOfWorkTemplateId))) {
 					return thirdPartyDocGen.genResumeOfWorkGeneration(key, docTemplates, refId);
 				}
+				if (templateId.equals(newVersionTranslationTemplateId)) {
+					return thirdPartyDocGen.genTranslationNewVersionGeneration(key, docTemplates, refId);
+				}
+				
 				
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
