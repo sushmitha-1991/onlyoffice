@@ -51,7 +51,6 @@ import org.docx4j.wml.R;
 import org.docx4j.wml.STBrType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpEntity;
@@ -69,7 +68,6 @@ import com.dsp.OnlyOfficeBridge.dto.MargeFileDto;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -107,7 +105,7 @@ public class ThirdPartyDocGen {
 	@Value("${prov.calender.service.url}")
 	private String pcUrl;
 	@Value("${doc.convert.url}")
-	private String docConvertUrl;	
+	private String docConvertUrl;
 	@Value("${resume.of.work.service.url}")
 	private String rowUrl;
 
@@ -967,26 +965,26 @@ public class ThirdPartyDocGen {
 				targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
 			}
 
-            // 4) Merge Comments
-            Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
-            CommentsPart srcComments = srcMain.getCommentsPart();
-            if (srcComments != null && srcComments.getContents() != null) {
-                for (Comments.Comment c : srcComments.getContents().getComment()) {
-                    BigInteger oldId = c.getId();
-                    log.info("comment old id {}",oldId);
-                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
-                    c.setId(newId);
-                    commentIdMap.put(oldId, newId);
-                }
-                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-            }
+			// 4) Merge Comments
+			Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
+			CommentsPart srcComments = srcMain.getCommentsPart();
+			if (srcComments != null && srcComments.getContents() != null) {
+				for (Comments.Comment c : srcComments.getContents().getComment()) {
+					BigInteger oldId = c.getId();
+					log.info("comment old id {}", oldId);
+					BigInteger newId = BigInteger.valueOf(++maxCommentId);
+					c.setId(newId);
+					commentIdMap.put(oldId, newId);
+				}
+				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+			}
 
-            // 5) Append body content, fixing IDs
-            log.info("relIdMapping map {}",relIdMapping);
-            if (srcMain.getContent() != null) {
-                for (Object o : srcMain.getContent()) {
-                    Object clone = XmlUtils.deepCopy(o);
-                    String xml = XmlUtils.marshaltoString(clone, true);
+			// 5) Append body content, fixing IDs
+			log.info("relIdMapping map {}", relIdMapping);
+			if (srcMain.getContent() != null) {
+				for (Object o : srcMain.getContent()) {
+					Object clone = XmlUtils.deepCopy(o);
+					String xml = XmlUtils.marshaltoString(clone, true);
 
 					// Replace relIds
 
@@ -1055,27 +1053,28 @@ public class ThirdPartyDocGen {
 			}
 		}
 
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            targetPkg.save(baos);
-            return baos.toByteArray();
-        }
-    }
-    private static List<Integer> getMapKeyList(String xml, String rgx)
-    {
-        List<Integer> currId = new ArrayList<>();
-        try {
-            Pattern pr = Pattern.compile(rgx);
-            Matcher mr = pr.matcher(xml);
-            while(mr.find()) {
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+			targetPkg.save(baos);
+			return baos.toByteArray();
+		}
+	}
+
+	private static List<Integer> getMapKeyList(String xml, String rgx) {
+		List<Integer> currId = new ArrayList<>();
+		try {
+			Pattern pr = Pattern.compile(rgx);
+			Matcher mr = pr.matcher(xml);
+			while (mr.find()) {
 //                if(rgx.contains("commentReference")) {
 //                    log.info("commentReference id {} xml {}", mr.group(1), xml);
 //                }
-                currId.add(Integer.parseInt(mr.group(1)));
-            }
-        } catch (Exception ignored) {
-        }
-        return currId;
-    }
+				currId.add(Integer.parseInt(mr.group(1)));
+			}
+		} catch (Exception ignored) {
+		}
+		return currId;
+	}
+
 	private static P createPageBreak() {
 		ObjectFactory factory = Context.getWmlObjectFactory();
 		P p = factory.createP();
@@ -1596,12 +1595,20 @@ public class ThirdPartyDocGen {
 				String[] parts = refId.split("-");
 				int session = 0;
 				String gregorianDate = null;
+				String num = null;
+
 				if (parts.length > 2) {
 					session = Integer.parseInt(parts[1]);
-					gregorianDate = parts[2] + "-" + parts[3] + "-" + parts[4];
+
+					// Extract number after "B1NO"
+					if (parts[2].startsWith("B1NO")) {
+						num = parts[2].substring(4); // "20" from "B1NO20"
+					}
+
+					gregorianDate = parts[3] + "-" + parts[4] + "-" + parts[5];
 				}
 
-				map.put("num", String.valueOf(session));
+				map.put("num", num != null ? num : String.valueOf(session));
 
 // Convert session to words with ordinal + "SESSION"
 				map.put("numTotext", NumberToWordsConverter.convertToOrdinal(session) + " SESSION");
@@ -2057,7 +2064,7 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
-	/* ----------------   Provisional Calender gen ---------------------------*/
+	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = pcUrl + "/provisionalcalendar/" + refId;
@@ -2086,18 +2093,18 @@ public class ThirdPartyDocGen {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-					if (data.get("content") != null) {
-						 String html = (String) data.get("content");
-						 htmlRef.set(html);
-					}
+				if (data.get("content") != null) {
+					String html = (String) data.get("content");
+					htmlRef.set(html);
+				}
 			}
-			});
+		});
 		String html = htmlRef.get();
 		if (html == null) {
-		    throw new IllegalStateException("HTML content is missing for provisional calendar");
+			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
 		try {
-			//byte[] mergedBytes = mergeDocxFiles(html);
+			// byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
 			System.out.println("******** after saving openkm resource ***********");
@@ -2114,8 +2121,7 @@ public class ThirdPartyDocGen {
 		try {
 			System.out.println("### inside convertUrlToDocx");
 
-
-			RestTemplate restTemplate = new RestTemplate(); 
+			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
 			headers.setContentType(MediaType.APPLICATION_JSON);
@@ -2130,34 +2136,33 @@ public class ThirdPartyDocGen {
 //			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
 //					HttpMethod.POST, request, byte[].class);
 
-			System.out.println("#########"+docConvertUrl+"/html-to-odt");
-            ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl+"/html-to-odt",
-                    HttpMethod.POST, request, byte[].class);
-            System.out.println(" ********converting to odt response *****************");
-            System.out.println(response.getBody());
+			System.out.println("#########" + docConvertUrl + "/html-to-odt");
+			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/html-to-odt", HttpMethod.POST,
+					request, byte[].class);
+			System.out.println(" ********converting to odt response *****************");
+			System.out.println(response.getBody());
 			return response.getBody();
 		} catch (Exception e) {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
 		}
 	}
-	
+
 	public ResponseEntity<Resource> genTranslationNewVersionGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		
+
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("new_version_dsp")) {
 
-						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-								.findByDsp2Key(refId);
-						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(refId);
+				ByteArrayResource resourceBody = utils
+						.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					}
-				});
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+			}
+		});
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
@@ -2170,7 +2175,7 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
-	
+
 	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
 			String refId) {
 		System.out.println("Received refId: " + refId);
@@ -2235,7 +2240,7 @@ public class ThirdPartyDocGen {
 		if (dataList.isEmpty()) {
 			throw new RuntimeException("Empty placeholder list returned from API for " + refId);
 		}
-		
+
 		LocalDate today = LocalDate.now();
 
 		String monthYear = today.format(DateTimeFormatter.ofPattern("MMMM, yyyy"));
