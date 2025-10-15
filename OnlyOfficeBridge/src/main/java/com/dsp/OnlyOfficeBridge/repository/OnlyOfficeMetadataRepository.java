@@ -33,5 +33,11 @@ public interface OnlyOfficeMetadataRepository extends JpaRepository<OnlyOfficeMe
 	
 	@Query(value="select id FROM corrected_debate.history where allocation_input_id=:refId",nativeQuery=true)
 	Long getHistoryId(String refId);
+	
+	@Query(value="select lok_sabha_number from master.lok_sabha_masters where id=:id",nativeQuery=true)
+	String getLokSabhaNo(Long id);
+	
+	@Query(value="select session_number from master.lok_sabha_session_masters where id=:id",nativeQuery=true)
+	String getLokSabhaSessionNo(Long id);
 
 }
