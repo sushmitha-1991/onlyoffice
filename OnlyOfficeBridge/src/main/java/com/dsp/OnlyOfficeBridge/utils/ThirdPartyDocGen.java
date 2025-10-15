@@ -5,12 +5,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -451,9 +453,31 @@ public class ThirdPartyDocGen {
 			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_static_con")) {
+				Map<String, Object> result = (Map<String, Object>) body.get("data");
+				Map<String, Object> applicationInstanceDTO = (Map<String, Object>) result.get("applicationInstanceDTO");
+				String lokSabhaNo= onlyOfficeMetadataRepository.getLokSabhaNo(Long.valueOf(result.get("lokSabhaNo").toString()));
+				String lokSabhaSessionNo= onlyOfficeMetadataRepository.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
+			
+				String currYear=String.valueOf(LocalDate.now().getYear());
+				
 				Map<String, String> mapinput = new HashMap<>();
-//				mapinput.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
-				mapinput.put("date", "Friday 19 September, 2025" + "/" + "भाद्रपक्ष 28, 1947");
+				Date todaysDate=new Date();
+				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+				String formattedDate=formatter.format(todaysDate);
+				
+				LocalDate todayDate=LocalDate.now();
+				DateTimeFormatter formatterDay=DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
+				String formattedDateDay=todayDate.format(formatterDay);
+				
+				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate)+" (Saka)");
+				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessioninwords",NumberToWordsConverter.convertSessionNumberToWords(lokSabhaSessionNo));
+				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessionNo",lokSabhaSessionNo);
+				mapinput.put("year",currYear);
+				mapinput.put("lokSabhaNo",lokSabhaNo);
+				mapinput.put("docDate",applicationInstanceDTO.get("documentDate")!=null?applicationInstanceDTO.get("documentDate").toString():null);
+						
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
 							mapinput);
@@ -766,7 +790,7 @@ public class ThirdPartyDocGen {
 					// default locale → English
 					String locale = "en";
 					if (refId.endsWith("HI")) {
-						locale = "hi";
+						locale = "hi";	
 					}
 					sakaDate = convertedDate.get(locale);
 				}
@@ -2379,5 +2403,37 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
+	
+//	Convert Gregorian → Saka date common function
+	public String convertToSakaDate(String inputDate)
+	{
+		String sakaDate = null;
+		if(inputDate!=null)
+		{
+			try {
+				HttpHeaders headers = new HttpHeaders();
+				headers.set("Authorization", "Bearer " + token);
+				headers.setContentType(MediaType.APPLICATION_JSON);
+				HttpEntity<Void> entity = new HttpEntity<>(headers);
+				
+				Map<String, String> requestPayload = new HashMap<>();
+				requestPayload.put("dateToConvert", inputDate);
 
+				RestTemplate restTemplate = new RestTemplate();
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+				Map<String, Object> bodyResp = response.getBody();
+				if (bodyResp != null && bodyResp.containsKey("data")) {
+					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+
+					sakaDate = convertedDate.get("en");
+				}
+			} catch (Exception e) {
+				System.err.println("Error fetching Saka date: " + e.getMessage());
+			}
+		}
+		return sakaDate;
+	}
 }
