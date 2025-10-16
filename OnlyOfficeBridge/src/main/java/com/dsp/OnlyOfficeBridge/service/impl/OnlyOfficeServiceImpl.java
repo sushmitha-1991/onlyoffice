@@ -104,6 +104,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	
 	@Value("${pc.gen.template.id}")
 	String pcTemplateId;
+	
+	@Value("${pc.merge.gen.template.id}")
+	String pcMergeTemplateId;
 
 	@Value("${sessional.resume.gen.template.id}")
 	String sessionalResumeTemplateId;
@@ -271,7 +274,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(newVersionTranslationTemplateId)) {
 					return thirdPartyDocGen.genTranslationNewVersionGeneration(key, docTemplates, refId);
 				}
-				
+				if (templateId.equals(pcMergeTemplateId)) {
+					return thirdPartyDocGen.genProvisionalCalenderFinalGeneration(key, docTemplates, refId);
+				}
 				
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);

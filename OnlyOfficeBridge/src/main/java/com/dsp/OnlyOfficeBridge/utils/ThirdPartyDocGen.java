@@ -2170,6 +2170,67 @@ public class ThirdPartyDocGen {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
 		}
 	}
+	
+	public ResponseEntity<Resource> genProvisionalCalenderFinalGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = pcUrl + "/provisionalcalendar/" + refId;
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage());
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+		docTemplates.forEach(docTemplate -> {
+			if (docTemplate.getCode().equals("pc_merge_con")) {
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+				if (data.get("dsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("qbDsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("qbDsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+			}
+		});
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcFinalMerged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+
+		}
+		return null;
+	}
 
 	public ResponseEntity<Resource> genTranslationNewVersionGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
