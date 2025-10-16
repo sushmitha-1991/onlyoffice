@@ -260,10 +260,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					return thirdPartyDocGen.genSIRSGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(pmbTemplateId)) {
-					return thirdPartyDocGen.genPMBGeneration(key, docTemplates, refId);
+					return thirdPartyDocGen.genPMBGenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(pmbResolTemplateId)) {
-					return thirdPartyDocGen.genPMBResolGeneration(key, docTemplates, refId);
+					return thirdPartyDocGen.genPMBResolGenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(pcTemplateId)) {
 					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
