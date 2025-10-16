@@ -2040,7 +2040,7 @@ public class ThirdPartyDocGen {
 
 								if (!filteredBills.isEmpty()) {
 									try {
-										// 1️⃣ Header
+										// Header
 										Map<String, String> headerMap = new HashMap<>();
 										String headerText = switch (prefix) {
 										case "intro" -> "(i) Bills for Introduction";
@@ -2055,7 +2055,7 @@ public class ThirdPartyDocGen {
 												"pmb-ls/pmb_gen_con_header_common.docx", headerMap);
 										files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false)
 												.build());
-										// 2️⃣ Each bill content
+										// Each bill content
 										for (Map<String, Object> b : filteredBills) {
 											Map<String, String> contentMap = new HashMap<>();
 											int serialNo = (Integer) b.getOrDefault("serialNo", 0);
