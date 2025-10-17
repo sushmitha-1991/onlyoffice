@@ -5,12 +5,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -451,9 +453,31 @@ public class ThirdPartyDocGen {
 			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_static_con")) {
+				Map<String, Object> result = (Map<String, Object>) body.get("data");
+				Map<String, Object> applicationInstanceDTO = (Map<String, Object>) result.get("applicationInstanceDTO");
+				String lokSabhaNo= onlyOfficeMetadataRepository.getLokSabhaNo(Long.valueOf(result.get("lokSabhaNo").toString()));
+				String lokSabhaSessionNo= onlyOfficeMetadataRepository.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
+			
+				String currYear=String.valueOf(LocalDate.now().getYear());
+				
 				Map<String, String> mapinput = new HashMap<>();
-//				mapinput.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
-				mapinput.put("date", "Friday 19 September, 2025" + "/" + "भाद्रपक्ष 28, 1947");
+				Date todaysDate=new Date();
+				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+				String formattedDate=formatter.format(todaysDate);
+				
+				LocalDate todayDate=LocalDate.now();
+				DateTimeFormatter formatterDay=DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
+				String formattedDateDay=todayDate.format(formatterDay);
+				
+				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate)+" (Saka)");
+				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessioninwords",NumberToWordsConverter.convertSessionNumberToWords(lokSabhaSessionNo));
+				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessionNo",lokSabhaSessionNo);
+				mapinput.put("year",currYear);
+				mapinput.put("lokSabhaNo",lokSabhaNo);
+				mapinput.put("docDate",applicationInstanceDTO.get("documentDate")!=null?applicationInstanceDTO.get("documentDate").toString():null);
+						
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
 							mapinput);
@@ -765,8 +789,8 @@ public class ThirdPartyDocGen {
 
 					// default locale → English
 					String locale = "en";
-					if (refId.endsWith("HI")) {
-						locale = "hi";
+					if (refId != null && refId.toLowerCase().startsWith("hi_")) {
+					    locale = "hi";
 					}
 					sakaDate = convertedDate.get(locale);
 				}
@@ -1945,6 +1969,158 @@ public class ThirdPartyDocGen {
 
 		return null;
 	}
+	
+	public ResponseEntity<Resource> genPMBGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		docTemplates.forEach(docTemplate -> {
+			try {
+				// Templates that require API data
+				if (docTemplate.getCode().equals("pmb_gen_header") || docTemplate.getCode().equals("pmb_gen_ft")
+						|| docTemplate.getCode().equals("pmb_gen_con_intro_ls")
+						|| docTemplate.getCode().equals("pmb_gen_con_consid_ls")
+						|| docTemplate.getCode().equals("pmb_gen_con_with_ls")) {
+
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> response = restTemplate.exchange(
+							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
+							new HttpEntity<>(headers), Map.class);
+
+					Map<String, Object> body = response.getBody();
+					if (body != null && body.containsKey("data")) {
+						Map<String, Object> data = (Map<String, Object>) body.get("data");
+
+						// ===== HEADER =====
+						if (docTemplate.getCode().equals("pmb_gen_header")) {
+							Map<String, String> map = new HashMap<>();
+							String forDate = (String) data.get("forDate");
+							if (forDate != null) {
+								LocalDate parsedDate = LocalDate.parse(forDate);
+								DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy",
+										Locale.ENGLISH);
+								map.put("dateWithDay", parsedDate.format(formatter));
+							}
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+
+							ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+						}
+
+						// ===== FT =====
+						if (docTemplate.getCode().equals("pmb_gen_ft")) {
+							Map<String, String> map = new HashMap<>();
+							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+							map.put("currentDate", LocalDate.now().format(formatter));
+							map.put("sakaDate", (String) data.get("forDateSaka"));
+
+							ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+						}
+
+						// ===== LS Templates =====
+						if (docTemplate.getCode().equals("pmb_gen_con_intro_ls")
+								|| docTemplate.getCode().equals("pmb_gen_con_consid_ls")
+								|| docTemplate.getCode().equals("pmb_gen_con_with_ls")) {
+							List<Map<String, Object>> bills = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+
+							BiConsumer<String, String> processCategory = (categoryName, prefix) -> {
+								List<Map<String, Object>> filteredBills = bills.stream()
+										.filter(b -> categoryName.equals(b.get("billCategoryName")))
+										.sorted(Comparator.comparingInt(b -> (Integer) b.getOrDefault("serialNo", 0)))
+										.toList();
+
+								if (!filteredBills.isEmpty()) {
+									try {
+										// Header
+										Map<String, String> headerMap = new HashMap<>();
+										String headerText = switch (prefix) {
+										case "intro" -> "(i) Bills for Introduction";
+										case "consid" -> "(ii) Bills for Consideration and Passing";
+										case "with" -> "(iii) Bills for Withdrawal";
+										default -> "";
+										};
+										headerMap.put("billsFor", (String) headerText);
+										System.out.println("This is the headerMap for intro: " + headerMap);
+
+										ByteArrayResource headerRes = Utils.replacePlaceholders(
+												"pmb-ls/pmb_gen_con_header_common.docx", headerMap);
+										files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false)
+												.build());
+										// Each bill content
+										for (Map<String, Object> b : filteredBills) {
+											Map<String, String> contentMap = new HashMap<>();
+											int serialNo = (Integer) b.getOrDefault("serialNo", 0);
+											++serialNo;
+											String footerText = switch (prefix) {
+											case "intro" -> "ALSO to introduce the bill.";
+											case "consid" -> "ALSO to move that the Bill be passed.";
+											case "with" -> "ALSO to move that the bill with";
+											default -> "";
+											};
+											
+											contentMap.put("billNumber", (String) b.getOrDefault("billNumber", ""));
+											contentMap.put("serialNo", String.valueOf(serialNo));
+											contentMap.put("memberName",(String) b.getOrDefault("memberName", b.get("memberFullName")));
+											contentMap.put("billName", (String) b.getOrDefault("nameOfBill", ""));
+											contentMap.put("content", (String) b.getOrDefault("content", ""));
+											contentMap.put("footerForBill", footerText);
+
+											ByteArrayResource contentRes = Utils.replacePlaceholders(
+													"pmb-ls/content-pmb-billCommon-ls.docx", contentMap);
+											files.add(MargeFileDto.builder().file(contentRes.getByteArray())
+													.isBreak(false).build());
+										}
+									} catch (Exception e) {
+										throw new RuntimeException(
+												"Error generating PMB documents for category: " + prefix, e);
+									}
+								}
+							};
+
+							// Handle all three categories
+							if (docTemplate.getCode().equals("pmb_gen_con_intro_ls"))
+								processCategory.accept("PMB_BILL_INTRODUCTION", "intro");
+							else if (docTemplate.getCode().equals("pmb_gen_con_consid_ls"))
+								processCategory.accept("PMB_BILL_CONSIDERATION", "consid");
+							else if (docTemplate.getCode().equals("pmb_gen_con_with_ls"))
+								processCategory.accept("PMB_BILL_WITHDRAWL", "with");
+						}
+					}
+				} else {
+					// Templates that do not need API data
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				}
+
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+			}
+		});
+
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+
+		return null;
+	}
+
 
 	/**
 	 * @param key
@@ -2063,6 +2239,131 @@ public class ThirdPartyDocGen {
 
 		return null;
 	}
+	
+	public ResponseEntity<Resource> genPMBResolGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+	    System.out.println("#### here");
+	    if (token == null) {
+	        throw new IllegalStateException("Authorization token is missing");
+	    }
+
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("Authorization", "Bearer " + token);
+	    headers.setContentType(MediaType.APPLICATION_JSON);
+
+	    List<MargeFileDto> files = new LinkedList<>();
+
+	    docTemplates.forEach(docTemplate -> {
+	        try {
+	            if ("pmb_resol_gen_header".equals(docTemplate.getCode())
+	                    || "pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+
+	                RestTemplate restTemplate = new RestTemplate();
+	                ResponseEntity<Map> response = restTemplate.exchange(
+	                        dsp2Url + "/pmb/private-member-business/" + refId,
+	                        HttpMethod.GET,
+	                        new HttpEntity<>(headers),
+	                        Map.class
+	                );
+
+	                Map<String, Object> body = response.getBody();
+	                if (body != null && body.containsKey("data")) {
+	                    Map<String, Object> data = (Map<String, Object>) body.get("data");
+
+	                    // ================== HEADER ==================
+	                    if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
+	                        Map<String, String> headerMap = new HashMap<>();
+
+	                        // Format date
+	                        String forDate = (String) data.get("forDate");
+	                        if (forDate != null) {
+	                            LocalDate parsedDate = LocalDate.parse(forDate);
+	                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
+	                            headerMap.put("dateWithDay", parsedDate.format(formatter));
+	                        }
+	                        headerMap.put("sakaDate", (String) data.get("forDateSaka"));
+
+	                        // Add header first
+	                        try {
+	                            ByteArrayResource headerRes = Utils.replacePlaceholders("pmb-ls/pmb_resol_header_common.docx", headerMap);
+	                            files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
+	                        } catch (Exception e) {
+	                            throw new RuntimeException("Error creating resolution header", e);
+	                        }
+
+	                        // Get resolutions list
+	                        List<Map<String, Object>> details = (List<Map<String, Object>>) data.get("privateMemberBusinessDetails");
+	                        if (details != null && !details.isEmpty()) {
+	                            for (Map<String, Object> detail : details) {
+	                                Map<String, String> contentMap = new HashMap<>();
+
+	                                String memberName = (String) detail.get("memberFullName");
+	                                if (memberName == null || memberName.isEmpty()) {
+	                                    memberName = (String) detail.get("memberName");
+	                                }
+
+	                                Integer serialNo = (Integer) detail.get("serialNo");
+	                                if (serialNo == null || serialNo == 0) serialNo = 1;
+
+	                                String nameOfBill = (String) detail.get("nameOfBill");
+	                                String content = (String) detail.get("content");
+
+	                                contentMap.put("serialNo", String.valueOf(serialNo));
+	                                contentMap.put("memberName", memberName);
+	                                contentMap.put("billName", nameOfBill != null ? nameOfBill : "");
+	                                contentMap.put("content", content != null ? content : "");
+
+	                                // Each resolution content doc
+	                                try {
+	                                    ByteArrayResource contentRes = Utils.replacePlaceholders("pmb-ls/content-pmb-resolCommon.docx", contentMap);
+	                                    files.add(MargeFileDto.builder().file(contentRes.getByteArray()).isBreak(false).build());
+	                                } catch (Exception e) {
+	                                    throw new RuntimeException("Error creating resolution content for serial " + serialNo, e);
+	                                }
+	                            }
+	                        }
+	                    }
+
+	                    // ================== FT ==================
+	                    if ("pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+	                        Map<String, String> map = new HashMap<>();
+	                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+	                        map.put("currentDate", (String) LocalDate.now().format(formatter));
+	                        map.put("sakaDate", (String) data.get("forDateSaka"));
+
+	                        ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+	                        files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+	                    }
+	                }
+	            } else {
+	                // Templates that don’t need API data
+	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+	                files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+	            }
+
+	        } catch (Exception e) {
+	            throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+	        }
+	    });
+
+	    // Merge and return
+	    try {
+	        byte[] mergedBytes = mergeDocxFiles(files);
+	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+	        saveOpenKm(dsp2Key, mergedResource);
+
+	        return ResponseEntity.ok()
+	                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+	                .contentLength(mergedResource.contentLength())
+	                .body(mergedResource);
+
+	    } catch (Exception e) {
+	        log.error("Error merging files >>> {}", e.getMessage());
+	    }
+
+	    return null;
+	}
+
 
 	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
@@ -2145,6 +2446,67 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
 		}
+	}
+	
+	public ResponseEntity<Resource> genProvisionalCalenderFinalGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = pcUrl + "/provisionalcalendar/" + refId;
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println(body);
+		} catch (Exception e) {
+			System.err.println("Error during API call: " + e.getMessage());
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+		docTemplates.forEach(docTemplate -> {
+			if (docTemplate.getCode().equals("pc_merge_con")) {
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+				if (data.get("dsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("qbDsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("qbDsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+			}
+		});
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcFinalMerged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+
+		}
+		return null;
 	}
 
 	public ResponseEntity<Resource> genTranslationNewVersionGeneration(String dsp2Key, List<DocTemplate> docTemplates,
@@ -2379,5 +2741,37 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
+	
+//	Convert Gregorian → Saka date common function
+	public String convertToSakaDate(String inputDate)
+	{
+		String sakaDate = null;
+		if(inputDate!=null)
+		{
+			try {
+				HttpHeaders headers = new HttpHeaders();
+				headers.set("Authorization", "Bearer " + token);
+				headers.setContentType(MediaType.APPLICATION_JSON);
+				HttpEntity<Void> entity = new HttpEntity<>(headers);
+				
+				Map<String, String> requestPayload = new HashMap<>();
+				requestPayload.put("dateToConvert", inputDate);
 
+				RestTemplate restTemplate = new RestTemplate();
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
+
+				Map<String, Object> bodyResp = response.getBody();
+				if (bodyResp != null && bodyResp.containsKey("data")) {
+					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+
+					sakaDate = convertedDate.get("en");
+				}
+			} catch (Exception e) {
+				System.err.println("Error fetching Saka date: " + e.getMessage());
+			}
+		}
+		return sakaDate;
+	}
 }
