@@ -789,8 +789,8 @@ public class ThirdPartyDocGen {
 
 					// default locale → English
 					String locale = "en";
-					if (refId.endsWith("HI")) {
-						locale = "hi";	
+					if (refId != null && refId.toLowerCase().startsWith("hi_")) {
+					    locale = "hi";
 					}
 					sakaDate = convertedDate.get(locale);
 				}
