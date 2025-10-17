@@ -455,29 +455,34 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("cd_static_con")) {
 				Map<String, Object> result = (Map<String, Object>) body.get("data");
 				Map<String, Object> applicationInstanceDTO = (Map<String, Object>) result.get("applicationInstanceDTO");
-				String lokSabhaNo= onlyOfficeMetadataRepository.getLokSabhaNo(Long.valueOf(result.get("lokSabhaNo").toString()));
-				String lokSabhaSessionNo= onlyOfficeMetadataRepository.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
-			
-				String currYear=String.valueOf(LocalDate.now().getYear());
-				
+				String lokSabhaNo = onlyOfficeMetadataRepository
+						.getLokSabhaNo(Long.valueOf(result.get("lokSabhaNo").toString()));
+				String lokSabhaSessionNo = onlyOfficeMetadataRepository
+						.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
+
+				String currYear = String.valueOf(LocalDate.now().getYear());
+
 				Map<String, String> mapinput = new HashMap<>();
-				Date todaysDate=new Date();
+				Date todaysDate = new Date();
 				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-				String formattedDate=formatter.format(todaysDate);
-				
-				LocalDate todayDate=LocalDate.now();
-				DateTimeFormatter formatterDay=DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
-				String formattedDateDay=todayDate.format(formatterDay);
-				
-				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate)+" (Saka)");
-				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
-				mapinput.put("sessioninwords",NumberToWordsConverter.convertSessionNumberToWords(lokSabhaSessionNo));
-				mapinput.put("loksabhanoinwords",NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
-				mapinput.put("sessionNo",lokSabhaSessionNo);
-				mapinput.put("year",currYear);
-				mapinput.put("lokSabhaNo",lokSabhaNo);
-				mapinput.put("docDate",applicationInstanceDTO.get("documentDate")!=null?applicationInstanceDTO.get("documentDate").toString():null);
-						
+				String formattedDate = formatter.format(todaysDate);
+
+				LocalDate todayDate = LocalDate.now();
+				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
+				String formattedDateDay = todayDate.format(formatterDay);
+
+				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate) + " (Saka)");
+				mapinput.put("loksabhanoinwords", NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessioninwords", NumberToWordsConverter.convertSessionNumberToWords(lokSabhaSessionNo));
+				mapinput.put("loksabhanoinwords", NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
+				mapinput.put("sessionNo", lokSabhaSessionNo);
+				mapinput.put("year", currYear);
+				mapinput.put("lokSabhaNo", lokSabhaNo);
+				mapinput.put("docDate",
+						applicationInstanceDTO.get("documentDate") != null
+								? applicationInstanceDTO.get("documentDate").toString()
+								: null);
+
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
 							mapinput);
@@ -790,7 +795,7 @@ public class ThirdPartyDocGen {
 					// default locale → English
 					String locale = "en";
 					if (refId != null && refId.toLowerCase().startsWith("hi_")) {
-					    locale = "hi";
+						locale = "hi";
 					}
 					sakaDate = convertedDate.get(locale);
 				}
@@ -1482,32 +1487,42 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("bull1_gen_header")) {
 				Map<String, String> map = new HashMap<>();
 
-				// Extract number from refId (b1Init-12-2025-09-23 → 12)
+				// Example refId: b1Init-2-2025-10-17EN-T03:11PM
 				String[] parts = refId.split("-");
+				String gregorianDate = null;
+				String timePart = null;
+				String locale = "en"; // default
+
+				// Extract session/number
 				if (parts.length > 1) {
 					map.put("num", parts[1]);
 				}
 
-				// Extract date from refId (last part → 2025-09-23)
-				// Extract date from refId
-				String gregorianDate = null;
-				if (parts.length > 3) {
+				// Extract Gregorian date: parts[2]-parts[3]-parts[4] (e.g., 2025-10-17)
+				if (parts.length > 4) {
 					String dayPart = parts[4];
-					// Remove locale suffix if present
+
+					// Remove locale suffix (EN/HI)
 					if (dayPart.endsWith("EN") || dayPart.endsWith("HI")) {
+						locale = dayPart.substring(dayPart.length() - 2).toLowerCase(); // "en" or "hi"
 						dayPart = dayPart.substring(0, dayPart.length() - 2);
 					}
-					gregorianDate = parts[2] + "-" + parts[3] + "-" + dayPart; // yyyy-MM-dd
+
+					gregorianDate = parts[2] + "-" + parts[3] + "-" + dayPart;
 				}
 
+				// Extract time (after T)
+				if (parts.length > 5 && parts[5].startsWith("T")) {
+					timePart = parts[5].substring(1); // remove the 'T'
+				}
+
+				// === Convert Gregorian → Saka Date ===
 				String sakaDate = null;
 				if (gregorianDate != null) {
 					try {
-						// Prepare request body
 						Map<String, String> requestPayload = new HashMap<>();
 						requestPayload.put("dateToConvert", gregorianDate);
 
-						// Call API
 						RestTemplate restTemplate = new RestTemplate();
 						ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
 								HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
@@ -1516,24 +1531,14 @@ public class ThirdPartyDocGen {
 						if (bodyResp != null && bodyResp.containsKey("data")) {
 							Map<String, Object> data = (Map<String, Object>) bodyResp.get("data");
 							Map<String, String> convertedDate = (Map<String, String>) data.get("convertedDate");
-
-							// Default locale
-							String locale = "en"; // fallback
-
-							if (refId.endsWith("EN")) {
-								locale = "en";
-							} else if (refId.endsWith("HI")) {
-								locale = "hi";
-							}
-
-							sakaDate = convertedDate.get(locale); // "en" or "hi" based on refId
+							sakaDate = convertedDate.get(locale);
 						}
 					} catch (Exception e) {
 						log.error("Error fetching Saka date: {}", e.getMessage());
 					}
 				}
 
-				// Format Gregorian date in long format (e.g., Tuesday, September 23, 2025)
+				// === Format Gregorian date ===
 				DateTimeFormatter longFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM dd, yyyy", Locale.ENGLISH);
 				String formattedGregorianDate;
 				if (gregorianDate != null) {
@@ -1542,16 +1547,23 @@ public class ThirdPartyDocGen {
 					formattedGregorianDate = LocalDate.now().format(longFormatter);
 				}
 
-				// Final date: Gregorian + optional Saka
+				// === Final date value ===
 				if (sakaDate != null) {
 					map.put("date", formattedGregorianDate + " / " + sakaDate + " (Saka)");
 				} else {
 					map.put("date", formattedGregorianDate);
 				}
 
-				// Format current time in 12-hour format with uppercase AM/PM
-				DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
-				map.put("currentTime", LocalTime.now().format(timeFormatter));
+				// === Format time ===
+				if (timePart != null) {
+					// Convert "03:11PM" → "03:11 PM"
+					String formattedTime = timePart.replaceAll("(?i)(AM|PM)", " $1").toUpperCase().trim();
+					map.put("currentTime", formattedTime);
+				} else {
+					// fallback to system time
+					DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+					map.put("currentTime", LocalTime.now().format(timeFormatter));
+				}
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -1559,10 +1571,10 @@ public class ThirdPartyDocGen {
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
+
 			} else if (docTemplate.getCode().equals("bull1_gen_con")) {
 				Map<String, String> emptyMap = new HashMap<>();
 				try {
-					// Blank replacement since docx has no placeholders
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), emptyMap);
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				} catch (Exception e) {
@@ -1588,7 +1600,9 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
+			log.error("Error merging files: {}", e.getMessage());
 		}
+
 		return null;
 	}
 
@@ -1620,6 +1634,7 @@ public class ThirdPartyDocGen {
 				int session = 0;
 				String gregorianDate = null;
 				String num = null;
+				String timePart = null;
 
 				if (parts.length > 2) {
 					session = Integer.parseInt(parts[1]);
@@ -1630,6 +1645,11 @@ public class ThirdPartyDocGen {
 					}
 
 					gregorianDate = parts[3] + "-" + parts[4] + "-" + parts[5];
+
+					// Extract time part (after "T")
+					if (parts[6].startsWith("T")) {
+						timePart = parts[6].substring(1); // e.g., "03:11PM"
+					}
 				}
 
 				map.put("num", num != null ? num : String.valueOf(session));
@@ -1648,9 +1668,16 @@ public class ThirdPartyDocGen {
 				map.put("dateW/oDay", String.format("%d%s %s", day, daySuffix,
 						date.format(DateTimeFormatter.ofPattern("MMMM, yyyy")))); // 23rd September, 2025
 
-// Current time in 12-hour format with uppercase AM/PM
-				DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
-				map.put("currentTime", LocalTime.now().format(timeFormatter));
+				// Format time from refId (e.g., "03:11PM" → "03:11 PM")
+				if (timePart != null) {
+					// Add a space before AM/PM if missing
+					String formattedTime = timePart.replaceAll("(?i)(AM|PM)", " $1").toUpperCase().trim();
+					map.put("currentTime", formattedTime);
+				} else {
+					// Fallback to current time
+					DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
+					map.put("currentTime", LocalTime.now().format(timeFormatter));
+				}
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -1969,7 +1996,7 @@ public class ThirdPartyDocGen {
 
 		return null;
 	}
-	
+
 	public ResponseEntity<Resource> genPMBGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -2066,10 +2093,11 @@ public class ThirdPartyDocGen {
 											case "with" -> "ALSO to move that the bill with";
 											default -> "";
 											};
-											
+
 											contentMap.put("billNumber", (String) b.getOrDefault("billNumber", ""));
 											contentMap.put("serialNo", String.valueOf(serialNo));
-											contentMap.put("memberName",(String) b.getOrDefault("memberName", b.get("memberFullName")));
+											contentMap.put("memberName",
+													(String) b.getOrDefault("memberName", b.get("memberFullName")));
 											contentMap.put("billName", (String) b.getOrDefault("nameOfBill", ""));
 											contentMap.put("content", (String) b.getOrDefault("content", ""));
 											contentMap.put("footerForBill", footerText);
@@ -2120,7 +2148,6 @@ public class ThirdPartyDocGen {
 
 		return null;
 	}
-
 
 	/**
 	 * @param key
@@ -2239,131 +2266,133 @@ public class ThirdPartyDocGen {
 
 		return null;
 	}
-	
-	public ResponseEntity<Resource> genPMBResolGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
-	    System.out.println("#### here");
-	    if (token == null) {
-	        throw new IllegalStateException("Authorization token is missing");
-	    }
 
-	    HttpHeaders headers = new HttpHeaders();
-	    headers.set("Authorization", "Bearer " + token);
-	    headers.setContentType(MediaType.APPLICATION_JSON);
+	public ResponseEntity<Resource> genPMBResolGenerationV2(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		System.out.println("#### here");
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
 
-	    List<MargeFileDto> files = new LinkedList<>();
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
 
-	    docTemplates.forEach(docTemplate -> {
-	        try {
-	            if ("pmb_resol_gen_header".equals(docTemplate.getCode())
-	                    || "pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+		List<MargeFileDto> files = new LinkedList<>();
 
-	                RestTemplate restTemplate = new RestTemplate();
-	                ResponseEntity<Map> response = restTemplate.exchange(
-	                        dsp2Url + "/pmb/private-member-business/" + refId,
-	                        HttpMethod.GET,
-	                        new HttpEntity<>(headers),
-	                        Map.class
-	                );
+		docTemplates.forEach(docTemplate -> {
+			try {
+				if ("pmb_resol_gen_header".equals(docTemplate.getCode())
+						|| "pmb_resol_gen_ft".equals(docTemplate.getCode())) {
 
-	                Map<String, Object> body = response.getBody();
-	                if (body != null && body.containsKey("data")) {
-	                    Map<String, Object> data = (Map<String, Object>) body.get("data");
+					RestTemplate restTemplate = new RestTemplate();
+					ResponseEntity<Map> response = restTemplate.exchange(
+							dsp2Url + "/pmb/private-member-business/" + refId, HttpMethod.GET,
+							new HttpEntity<>(headers), Map.class);
 
-	                    // ================== HEADER ==================
-	                    if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
-	                        Map<String, String> headerMap = new HashMap<>();
+					Map<String, Object> body = response.getBody();
+					if (body != null && body.containsKey("data")) {
+						Map<String, Object> data = (Map<String, Object>) body.get("data");
 
-	                        // Format date
-	                        String forDate = (String) data.get("forDate");
-	                        if (forDate != null) {
-	                            LocalDate parsedDate = LocalDate.parse(forDate);
-	                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.ENGLISH);
-	                            headerMap.put("dateWithDay", parsedDate.format(formatter));
-	                        }
-	                        headerMap.put("sakaDate", (String) data.get("forDateSaka"));
+						// ================== HEADER ==================
+						if ("pmb_resol_gen_header".equals(docTemplate.getCode())) {
+							Map<String, String> headerMap = new HashMap<>();
 
-	                        // Add header first
-	                        try {
-	                            ByteArrayResource headerRes = Utils.replacePlaceholders("pmb-ls/pmb_resol_header_common.docx", headerMap);
-	                            files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
-	                        } catch (Exception e) {
-	                            throw new RuntimeException("Error creating resolution header", e);
-	                        }
+							// Format date
+							String forDate = (String) data.get("forDate");
+							if (forDate != null) {
+								LocalDate parsedDate = LocalDate.parse(forDate);
+								DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy",
+										Locale.ENGLISH);
+								headerMap.put("dateWithDay", parsedDate.format(formatter));
+							}
+							headerMap.put("sakaDate", (String) data.get("forDateSaka"));
 
-	                        // Get resolutions list
-	                        List<Map<String, Object>> details = (List<Map<String, Object>>) data.get("privateMemberBusinessDetails");
-	                        if (details != null && !details.isEmpty()) {
-	                            for (Map<String, Object> detail : details) {
-	                                Map<String, String> contentMap = new HashMap<>();
+							// Add header first
+							try {
+								ByteArrayResource headerRes = Utils
+										.replacePlaceholders("pmb-ls/pmb_resol_header_common.docx", headerMap);
+								files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
+							} catch (Exception e) {
+								throw new RuntimeException("Error creating resolution header", e);
+							}
 
-	                                String memberName = (String) detail.get("memberFullName");
-	                                if (memberName == null || memberName.isEmpty()) {
-	                                    memberName = (String) detail.get("memberName");
-	                                }
+							// Get resolutions list
+							List<Map<String, Object>> details = (List<Map<String, Object>>) data
+									.get("privateMemberBusinessDetails");
+							if (details != null && !details.isEmpty()) {
+								for (Map<String, Object> detail : details) {
+									Map<String, String> contentMap = new HashMap<>();
 
-	                                Integer serialNo = (Integer) detail.get("serialNo");
-	                                if (serialNo == null || serialNo == 0) serialNo = 1;
+									String memberName = (String) detail.get("memberFullName");
+									if (memberName == null || memberName.isEmpty()) {
+										memberName = (String) detail.get("memberName");
+									}
 
-	                                String nameOfBill = (String) detail.get("nameOfBill");
-	                                String content = (String) detail.get("content");
+									Integer serialNo = (Integer) detail.get("serialNo");
+									if (serialNo == null || serialNo == 0)
+										serialNo = 1;
 
-	                                contentMap.put("serialNo", String.valueOf(serialNo));
-	                                contentMap.put("memberName", memberName);
-	                                contentMap.put("billName", nameOfBill != null ? nameOfBill : "");
-	                                contentMap.put("content", content != null ? content : "");
+									String nameOfBill = (String) detail.get("nameOfBill");
+									String content = (String) detail.get("content");
 
-	                                // Each resolution content doc
-	                                try {
-	                                    ByteArrayResource contentRes = Utils.replacePlaceholders("pmb-ls/content-pmb-resolCommon.docx", contentMap);
-	                                    files.add(MargeFileDto.builder().file(contentRes.getByteArray()).isBreak(false).build());
-	                                } catch (Exception e) {
-	                                    throw new RuntimeException("Error creating resolution content for serial " + serialNo, e);
-	                                }
-	                            }
-	                        }
-	                    }
+									contentMap.put("serialNo", String.valueOf(serialNo));
+									contentMap.put("memberName", memberName);
+									contentMap.put("billName", nameOfBill != null ? nameOfBill : "");
+									contentMap.put("content", content != null ? content : "");
 
-	                    // ================== FT ==================
-	                    if ("pmb_resol_gen_ft".equals(docTemplate.getCode())) {
-	                        Map<String, String> map = new HashMap<>();
-	                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
-	                        map.put("currentDate", (String) LocalDate.now().format(formatter));
-	                        map.put("sakaDate", (String) data.get("forDateSaka"));
+									// Each resolution content doc
+									try {
+										ByteArrayResource contentRes = Utils
+												.replacePlaceholders("pmb-ls/content-pmb-resolCommon.docx", contentMap);
+										files.add(MargeFileDto.builder().file(contentRes.getByteArray()).isBreak(false)
+												.build());
+									} catch (Exception e) {
+										throw new RuntimeException(
+												"Error creating resolution content for serial " + serialNo, e);
+									}
+								}
+							}
+						}
 
-	                        ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-	                        files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-	                    }
-	                }
-	            } else {
-	                // Templates that don’t need API data
-	                ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
-	                files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-	            }
+						// ================== FT ==================
+						if ("pmb_resol_gen_ft".equals(docTemplate.getCode())) {
+							Map<String, String> map = new HashMap<>();
+							DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH);
+							map.put("currentDate", (String) LocalDate.now().format(formatter));
+							map.put("sakaDate", (String) data.get("forDateSaka"));
 
-	        } catch (Exception e) {
-	            throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
-	        }
-	    });
+							ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+						}
+					}
+				} else {
+					// Templates that don’t need API data
+					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				}
 
-	    // Merge and return
-	    try {
-	        byte[] mergedBytes = mergeDocxFiles(files);
-	        ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-	        saveOpenKm(dsp2Key, mergedResource);
+			} catch (Exception e) {
+				throw new RuntimeException("Error processing PMB data for template: " + docTemplate.getCode(), e);
+			}
+		});
 
-	        return ResponseEntity.ok()
-	                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-	                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
-	                .contentLength(mergedResource.contentLength())
-	                .body(mergedResource);
+		// Merge and return
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
 
-	    } catch (Exception e) {
-	        log.error("Error merging files >>> {}", e.getMessage());
-	    }
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
 
-	    return null;
+		} catch (Exception e) {
+			log.error("Error merging files >>> {}", e.getMessage());
+		}
+
+		return null;
 	}
-
 
 	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
@@ -2447,9 +2476,9 @@ public class ThirdPartyDocGen {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
 		}
 	}
-	
-	public ResponseEntity<Resource> genProvisionalCalenderFinalGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-			String refId) {
+
+	public ResponseEntity<Resource> genProvisionalCalenderFinalGeneration(String dsp2Key,
+			List<DocTemplate> docTemplates, String refId) {
 		String url = pcUrl + "/provisionalcalendar/" + refId;
 		Map<String, Object> body;
 		if (token == null) {
@@ -2741,19 +2770,17 @@ public class ThirdPartyDocGen {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
-	
+
 //	Convert Gregorian → Saka date common function
-	public String convertToSakaDate(String inputDate)
-	{
+	public String convertToSakaDate(String inputDate) {
 		String sakaDate = null;
-		if(inputDate!=null)
-		{
+		if (inputDate != null) {
 			try {
 				HttpHeaders headers = new HttpHeaders();
 				headers.set("Authorization", "Bearer " + token);
 				headers.setContentType(MediaType.APPLICATION_JSON);
 				HttpEntity<Void> entity = new HttpEntity<>(headers);
-				
+
 				Map<String, String> requestPayload = new HashMap<>();
 				requestPayload.put("dateToConvert", inputDate);
 
