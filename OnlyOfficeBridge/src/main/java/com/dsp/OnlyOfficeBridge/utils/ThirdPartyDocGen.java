@@ -581,13 +581,18 @@ public class ThirdPartyDocGen {
 					}
 				}
 			} else if ("verbatim_merge_con".equals(docTemplate.getCode())) {
+				int[] index = {1}; // to track the current position
 				List<String> dspKeys = (List<String>) finalBody.get("data");
 				dspKeys.forEach(dspKey -> {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 					metadataOpt.ifPresent(metadata -> {
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						if (index[0]++ == dspKeys.size()) {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						} else {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+						}
 					});
 				});
 			}
@@ -656,6 +661,7 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
+				int[] index = {1}; // to track the current position
 				// data is actually a list of dspKeys
 				List<String> dspKeys = (List<String>) body.get("data");
 				if (dspKeys != null) {
@@ -664,7 +670,11 @@ public class ThirdPartyDocGen {
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							if (index[0]++ == dspKeys.size()) {
+								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							} else {
+								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+							}
 						});
 					});
 				}
