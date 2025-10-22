@@ -2127,7 +2127,9 @@ public class ThirdPartyDocGen {
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
+		
 		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
