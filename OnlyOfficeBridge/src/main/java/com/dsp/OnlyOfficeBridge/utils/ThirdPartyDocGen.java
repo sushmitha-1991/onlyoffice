@@ -2443,6 +2443,9 @@ public class ThirdPartyDocGen {
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
+		
+		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
@@ -2513,21 +2516,21 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("pc_merge_con")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("dsp2Key") != null) {
-
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-				}
 				if (data.get("qbDsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("qbDsp2Key"));
 					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("dsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
