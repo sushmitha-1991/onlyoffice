@@ -73,6 +73,7 @@ import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ch.qos.logback.classic.Logger;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -2129,9 +2130,10 @@ public class ThirdPartyDocGen {
 		}
 		
 		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
-		
+		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
+			
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
 			System.out.println("******** after saving openkm resource ***********");
@@ -2146,8 +2148,10 @@ public class ThirdPartyDocGen {
 
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		try {
+			
 			System.out.println("### inside convertUrlToDocx");
 
+			log.info("inside convertUrlToDocx htmlContent:- {}",htmlContent);
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
