@@ -950,11 +950,11 @@ public class ThirdPartyDocGen {
 
 		// Track max IDs
 		int maxFootnoteId = targetFootnotes.getContents().getFootnote().stream().map(fn -> fn.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 		int maxEndnoteId = targetEndnotes.getContents().getEndnote().stream().map(en -> en.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 		int maxCommentId = targetComments.getContents().getComment().stream().map(c -> c.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 
 		// For each source file
 		for (int idx = 1; idx < files.size(); idx++) {
@@ -1020,7 +1020,6 @@ public class ThirdPartyDocGen {
 				}
 				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
 			}
-
 			// 5) Append body content, fixing IDs
 			log.info("relIdMapping map {}", relIdMapping);
 			if (srcMain.getContent() != null) {
