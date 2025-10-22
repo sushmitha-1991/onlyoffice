@@ -924,7 +924,10 @@ public class ThirdPartyDocGen {
 		WordprocessingMLPackage targetPkg = WordprocessingMLPackage
 				.load(new ByteArrayInputStream(files.get(0).getFile()));
 		MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
-
+        if(files.get(0).isBreak())
+        {
+            targetMain.getContent().add(createPageBreak());
+        }
 		// Ensure footnotes, endnotes, comments exist
 		FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
 		if (targetFootnotes == null) {
