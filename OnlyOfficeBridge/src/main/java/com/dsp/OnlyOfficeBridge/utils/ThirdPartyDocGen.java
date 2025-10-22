@@ -581,13 +581,18 @@ public class ThirdPartyDocGen {
 					}
 				}
 			} else if ("verbatim_merge_con".equals(docTemplate.getCode())) {
+				int[] index = {1}; // to track the current position
 				List<String> dspKeys = (List<String>) finalBody.get("data");
 				dspKeys.forEach(dspKey -> {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 					metadataOpt.ifPresent(metadata -> {
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						if (index[0]++ == dspKeys.size()) {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						} else {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+						}
 					});
 				});
 			}
@@ -656,6 +661,7 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
+				int[] index = {1}; // to track the current position
 				// data is actually a list of dspKeys
 				List<String> dspKeys = (List<String>) body.get("data");
 				if (dspKeys != null) {
@@ -664,7 +670,11 @@ public class ThirdPartyDocGen {
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							if (index[0]++ == dspKeys.size()) {
+								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+							} else {
+								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+							}
 						});
 					});
 				}
@@ -914,7 +924,10 @@ public class ThirdPartyDocGen {
 		WordprocessingMLPackage targetPkg = WordprocessingMLPackage
 				.load(new ByteArrayInputStream(files.get(0).getFile()));
 		MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
-
+        if(files.get(0).isBreak())
+        {
+            targetMain.getContent().add(createPageBreak());
+        }
 		// Ensure footnotes, endnotes, comments exist
 		FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
 		if (targetFootnotes == null) {
@@ -937,11 +950,11 @@ public class ThirdPartyDocGen {
 
 		// Track max IDs
 		int maxFootnoteId = targetFootnotes.getContents().getFootnote().stream().map(fn -> fn.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 		int maxEndnoteId = targetEndnotes.getContents().getEndnote().stream().map(en -> en.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 		int maxCommentId = targetComments.getContents().getComment().stream().map(c -> c.getId().intValue())
-				.max(Integer::compareTo).orElse(0);
+				.max(Integer::compareTo).orElse(100);
 
 		// For each source file
 		for (int idx = 1; idx < files.size(); idx++) {
@@ -1007,7 +1020,6 @@ public class ThirdPartyDocGen {
 				}
 				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
 			}
-
 			// 5) Append body content, fixing IDs
 			log.info("relIdMapping map {}", relIdMapping);
 			if (srcMain.getContent() != null) {
@@ -2433,6 +2445,9 @@ public class ThirdPartyDocGen {
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
+		
+		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
@@ -2503,21 +2518,21 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("pc_merge_con")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("dsp2Key") != null) {
-
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-				}
 				if (data.get("qbDsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("qbDsp2Key"));
 					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("dsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("dsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
