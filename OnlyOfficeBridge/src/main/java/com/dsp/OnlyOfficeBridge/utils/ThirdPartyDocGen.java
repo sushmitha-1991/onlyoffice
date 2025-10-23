@@ -2129,7 +2129,8 @@ public class ThirdPartyDocGen {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
 		
-		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+//		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		html = html.replace("\n", "");
 		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
