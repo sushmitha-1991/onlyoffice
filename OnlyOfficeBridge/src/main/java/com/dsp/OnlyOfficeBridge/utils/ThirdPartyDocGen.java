@@ -2452,7 +2452,8 @@ public class ThirdPartyDocGen {
 		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
-		html = html.replaceAll("src=\"[^\"]+\"", "src=\"" + localImagePath + "\"");
+		html = html.replace("https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07",localImagePath);
+//		html = html.replaceAll("src=\"[^\"]+\"", "src=\"" + localImagePath + "\"");
 
 		log.info("html after replace:- {}",html);
 		try {
