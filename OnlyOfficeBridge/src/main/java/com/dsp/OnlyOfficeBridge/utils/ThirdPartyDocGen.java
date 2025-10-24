@@ -2449,6 +2449,11 @@ public class ThirdPartyDocGen {
 		
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
+		String localImagePath = "images/emblem.jpg";
+
+//		 Replacing the URL in the src attribute
+		html = html.replaceAll("src=\"[^\"]+\"", "src=\"" + localImagePath + "\"");
+
 		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
