@@ -4,13 +4,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -73,7 +77,6 @@ import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import ch.qos.logback.classic.Logger;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -2112,6 +2115,16 @@ public class ThirdPartyDocGen {
 //			throw e;
 //		}
 
+		String imageUrl="https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07";
+		String base64Img="";
+		try (InputStream in = new URL(imageUrl).openStream()) {
+		    byte[] imageBytes = in.readAllBytes();
+		    String base64 = Base64.getEncoder().encodeToString(imageBytes);
+		     base64Img = "data:image/png;base64," + base64;
+		    System.out.println(base64Img);
+		} catch (IOException e) {
+		    e.printStackTrace();
+		}
 		List<MargeFileDto> files = new LinkedList<>();
 		final AtomicReference<String> htmlRef = new AtomicReference<>();
 		docTemplates.forEach(docTemplate -> {
@@ -2121,24 +2134,24 @@ public class ThirdPartyDocGen {
 //				if (data.get("content") != null) {
 //					String html = (String) data.get("content");
 				if(content != null) {
-					String html = content;
-					htmlRef.set(html);
+					htmlRef.set(content);
 				}
 			}
 		});
 		String html = htmlRef.get();
+		log.info("html before replace:- {}",html);
+		
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
 		
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
-		String localImagePath = "images/emblem.jpg";
+//		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
 		
-		html = html.replace("https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07",localImagePath);
-//		html = html.replaceAll("src=\"[^\"]+\"", "src=\"" + localImagePath + "\"");
+		html = html.replace(imageUrl,base64Img);
 
 		log.info("html after replace:- {}",html);
 		try {
