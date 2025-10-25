@@ -2150,9 +2150,9 @@ public class ThirdPartyDocGen {
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
 		html = html
-			    .replace("\\u00A0", " ")      // non-breaking space (NBSP)
-			    .replace("\\u200B", "")       // zero-width space (ZWSP)
-			    .replace("\\uFEFF", "");		// byte order mark (BOM)
+			    .replace("\u00A0", " ")      // non-breaking space (NBSP)
+			    .replace("\u200B", "")       // zero-width space (ZWSP)
+			    .replace("\uFEFF", "");		// byte order mark (BOM)
 //		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
