@@ -2467,16 +2467,18 @@ public class ThirdPartyDocGen {
 		
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
-		html = html
-			    .replace("\u00A0", " ")      // non-breaking space (NBSP)
-			    .replace("\u200B", "")       // zero-width space (ZWSP)
-			    .replace("\uFEFF", "");		// byte order mark (BOM)
+		
 //		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
 		
 		html = html.replace(imageUrl,base64Img);
 
+		html = html
+	            .replaceAll("[\\u00A0\\u200B\\u200C\\u200D\\uFEFF]", "")
+	            .replaceAll("\\s+", " ")
+	            .trim();
+		html = new String(html.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
