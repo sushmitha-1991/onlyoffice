@@ -2458,7 +2458,7 @@ public class ThirdPartyDocGen {
 				}
 			}
 		});
-		 html = new String(htmlRef.get().getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+		 html = htmlRef.get();
 		log.info("html before replace:- {}",html);
 		
 		if (html == null) {
@@ -2467,6 +2467,10 @@ public class ThirdPartyDocGen {
 		
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
+		html = html
+			    .replaceAll("\\u00A0", " ")      // non-breaking space (NBSP)
+			    .replaceAll("\\u200B", "")       // zero-width space (ZWSP)
+			    .replaceAll("\\uFEFF", "");		// byte order mark (BOM)
 //		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
