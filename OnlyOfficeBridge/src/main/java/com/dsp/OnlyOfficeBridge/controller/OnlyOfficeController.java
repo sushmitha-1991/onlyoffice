@@ -49,6 +49,12 @@ public class OnlyOfficeController {
 	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId) {
 		return onlyOfficeService.downloadByKey(key,templateId,refId);
 	}
+	
+//	only for pc html to doc conversion
+	@PostMapping("/download/{key}/{templateId}/{refId}")
+	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId,@RequestBody String content) {
+		return onlyOfficeService.downloadByKeyPc(key,templateId,refId,content);
+	}
 
 	@PostMapping("/callback")
 	public ResponseEntity<Map<String, Object>> handleCallback(@RequestParam("dsp2Key") String dsp2Key,@RequestParam("applicationId") String applicationId,

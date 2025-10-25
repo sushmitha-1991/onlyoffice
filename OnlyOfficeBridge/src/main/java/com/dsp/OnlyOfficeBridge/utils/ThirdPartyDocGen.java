@@ -2091,35 +2091,37 @@ public class ThirdPartyDocGen {
 
 	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-			String refId) {
-		String url = pcUrl + "/provisionalcalendar/" + refId;
-		Map<String, Object> body;
-		if (token == null) {
-			throw new IllegalStateException("Authorization token is missing");
-		}
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("Authorization", "Bearer " + token);
-		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-		HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-		try {
-			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-			body = response.getBody();
-			System.out.println(body);
-		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
-			throw e;
-		}
+			String refId,String content) {
+//		String url = pcUrl + "/provisionalcalendar/" + refId;
+//		Map<String, Object> body;
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			body = response.getBody();
+//			System.out.println(body);
+//		} catch (Exception e) {
+//			System.err.println("Error during API call: " + e.getMessage());
+//			throw e;
+//		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 		final AtomicReference<String> htmlRef = new AtomicReference<>();
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("content") != null) {
-					String html = (String) data.get("content");
+//				Map<String, Object> data = (Map<String, Object>) body.get("data");
+//				if (data.get("content") != null) {
+//					String html = (String) data.get("content");
+				if(content != null) {
+					String html = content;
 					htmlRef.set(html);
 				}
 			}
