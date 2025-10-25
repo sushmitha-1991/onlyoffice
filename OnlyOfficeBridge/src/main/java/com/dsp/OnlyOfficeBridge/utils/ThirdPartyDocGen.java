@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -2445,6 +2446,7 @@ public class ThirdPartyDocGen {
 		}
 		List<MargeFileDto> files = new LinkedList<>();
 		final AtomicReference<String> htmlRef = new AtomicReference<>();
+		String html="";
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
@@ -2456,7 +2458,7 @@ public class ThirdPartyDocGen {
 				}
 			}
 		});
-		String html = htmlRef.get();
+		 html = new String(htmlRef.get().getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 		log.info("html before replace:- {}",html);
 		
 		if (html == null) {
