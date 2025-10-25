@@ -2147,6 +2147,7 @@ public class ThirdPartyDocGen {
 		
 //		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
 		html = html.replace("\n", "");
+		html = html.replace("?", "");
 //		String localImagePath = "images/emblem.jpg";
 
 //		 Replacing the URL in the src attribute
