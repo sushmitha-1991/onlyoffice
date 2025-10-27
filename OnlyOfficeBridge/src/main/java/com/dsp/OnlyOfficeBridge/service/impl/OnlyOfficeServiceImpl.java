@@ -165,6 +165,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				String refId = payload.get("refId") == null ? "0" : payload.get("refId");
 				downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId + "/" + refId;
 			}
+			
 
 			// download-empty-docx
 			title = "Document-" + keyToUse + ".odt";
@@ -265,9 +266,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pmbResolTemplateId)) {
 					return thirdPartyDocGen.genPMBResolGenerationV2(key, docTemplates, refId);
 				}
-				if (templateId.equals(pcTemplateId)) {
-					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId);
-				}
 				if (templateId.equals(sessionalResumeTemplateId) || (templateId.equals(resumeOfWorkTemplateId))) {
 					return thirdPartyDocGen.genResumeOfWorkGeneration(key, docTemplates, refId);
 				}
@@ -276,6 +274,37 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 				if (templateId.equals(pcMergeTemplateId)) {
 					return thirdPartyDocGen.genProvisionalCalenderFinalGeneration(key, docTemplates, refId);
+				}
+				
+			} else {
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
+				if (metadataOpt.isPresent()) {
+					ByteArrayResource resource = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+							.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
+							.contentLength(resource.contentLength()).body(resource);
+				}
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+	}
+	
+	@Override
+	public ResponseEntity<Resource> downloadByKeyPc(String key, String templateId, String refId,String content) {
+		String[] keys = key.split(",");
+
+		try {
+			if (Integer.parseInt(templateId) > 0) {
+				List<DocTemplate> docTemplates = docTemplateRepository
+						.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId), Long.parseLong(templateId));
+				if (templateId.equals(pcTemplateId)) {
+					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId,content);
 				}
 				
 			} else {

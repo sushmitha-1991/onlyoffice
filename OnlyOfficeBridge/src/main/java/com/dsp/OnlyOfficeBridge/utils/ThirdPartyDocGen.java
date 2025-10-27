@@ -4,13 +4,18 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -2408,48 +2413,76 @@ public class ThirdPartyDocGen {
 
 	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-			String refId) {
-		String url = pcUrl + "/provisionalcalendar/" + refId;
-		Map<String, Object> body;
-		if (token == null) {
-			throw new IllegalStateException("Authorization token is missing");
-		}
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("Authorization", "Bearer " + token);
-		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-		HttpEntity<Void> entity = new HttpEntity<>(headers);
+			String refId,String content) {
+//		String url = pcUrl + "/provisionalcalendar/" + refId;
+//		Map<String, Object> body;
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			body = response.getBody();
+//			System.out.println(body);
+//		} catch (Exception e) {
+//			System.err.println("Error during API call: " + e.getMessage());
+//			throw e;
+//		}
 
-		try {
-			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-			body = response.getBody();
-			System.out.println(body);
-		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
-			throw e;
+		String imageUrl="https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07";
+		String base64Img="";
+		try (InputStream in = new URL(imageUrl).openStream()) {
+		    byte[] imageBytes = in.readAllBytes();
+		    String base64 = Base64.getEncoder().encodeToString(imageBytes);
+		     base64Img = "data:image/png;base64," + base64;
+		    System.out.println(base64Img);
+		} catch (IOException e) {
+		    e.printStackTrace();
 		}
-
 		List<MargeFileDto> files = new LinkedList<>();
 		final AtomicReference<String> htmlRef = new AtomicReference<>();
+		String html="";
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("content") != null) {
-					String html = (String) data.get("content");
-					htmlRef.set(html);
+//				Map<String, Object> data = (Map<String, Object>) body.get("data");
+//				if (data.get("content") != null) {
+//					String html = (String) data.get("content");
+				if(content != null) {
+					htmlRef.set(content);
 				}
 			}
 		});
-		String html = htmlRef.get();
+		 html = htmlRef.get();
+		log.info("html before replace:- {}",html);
+		
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
 		
-		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+//		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		html = html.replace("\n", "");
 		
+//		String localImagePath = "images/emblem.jpg";
+
+//		 Replacing the URL in the src attribute
+		
+		html = html.replace(imageUrl,base64Img);
+
+		html = html
+	            .replaceAll("[\\u00A0\\u200B\\u200C\\u200D\\uFEFF]", "")
+	            .replaceAll("\\s+", " ")
+	            .trim();
+		html = new String(html.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
+			
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
 			System.out.println("******** after saving openkm resource ***********");
@@ -2464,8 +2497,10 @@ public class ThirdPartyDocGen {
 
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		try {
+			
 			System.out.println("### inside convertUrlToDocx");
 
+			log.info("inside convertUrlToDocx htmlContent:- {}",htmlContent);
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -2518,21 +2553,21 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("pc_merge_con")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("qbDsp2Key") != null) {
-
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) data.get("qbDsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-				}
 				if (data.get("dsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
 					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("qbDsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("qbDsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
