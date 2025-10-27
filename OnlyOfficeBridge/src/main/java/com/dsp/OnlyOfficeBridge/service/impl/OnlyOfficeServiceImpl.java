@@ -184,6 +184,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
+		document.put("view",Map.of("zoomType", "fitWidth"));
 
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
