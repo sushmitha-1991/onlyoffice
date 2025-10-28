@@ -788,7 +788,16 @@ public class ThirdPartyDocGen {
 		}
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String synopsisDate = (String) data.get("synopsisDate"); // yyyy-MM-dd
+		// default locale → English
+		String locale = "en";
+		if (refId != null && refId.toLowerCase().startsWith("hi_")) {
+			locale = "hi";
+		}
+		// Pick proper formatted date
+		String synopsisDate = (String) data.get("synopsisDate");
+		String englishDate = (String) data.get("englishDate");
+		String hindiDate = (String) data.get("hindiDate");
+		String formattedDate = "en".equals(locale) ? englishDate : hindiDate;
 		List<String> dspKeys = (List<String>) data.get("dspKeys");
 
 		// 🔹 Convert Gregorian → Saka date
@@ -806,12 +815,7 @@ public class ThirdPartyDocGen {
 				if (bodyResp != null && bodyResp.containsKey("data")) {
 					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
 					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
-
-					// default locale → English
-					String locale = "en";
-					if (refId != null && refId.toLowerCase().startsWith("hi_")) {
-						locale = "hi";
-					}
+					
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
@@ -822,9 +826,13 @@ public class ThirdPartyDocGen {
 		// 🔹 Final displayDate = Gregorian + optional Saka
 		final String displayDate;
 		if (sakaDate != null) {
-			displayDate = synopsisDate + " / " + sakaDate + " (Saka)";
+			if ("hi".equals(locale)) {
+		        displayDate = formattedDate + " / " + sakaDate + " (शक)";
+		    } else {
+		        displayDate = formattedDate + " / " + sakaDate + " (Saka)";
+		    }
 		} else {
-			displayDate = synopsisDate;
+			displayDate = formattedDate;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
