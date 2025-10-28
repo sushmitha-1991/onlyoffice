@@ -190,7 +190,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		editorConfig.put("mode", "edit");
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
-		editorConfig.put("customization", Map.of("forcesave", true, "save", true, "zoom", 198));
+//		, "zoom", 198 fit to width commented for now
+		editorConfig.put("customization", Map.of("forcesave", true, "save", true));
 
 		// Final response
 		Map<String, Object> response = new HashMap<>();
