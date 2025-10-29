@@ -89,10 +89,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String synopsisEnLsTemplateId;
 	@Value("${synopsis.hi.ls.gen.template.id}")
 	String synopsisHiLsTemplateId;
-	@Value("${synopsis.sup.en.ls.gen.template.id}")
-	String synopsisSupEnLsTemplateId;
-	@Value("${synopsis.sup.hi.ls.gen.template.id}")
-	String synopsisSupHiLsTemplateId;
+	@Value("${synopsis.en.rs.gen.template.id}")
+	String synopsisEnRsTemplateId;
+	@Value("${synopsis.hi.rs.gen.template.id}")
+	String synopsisHiRsTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Value("${cd.gen.template.id}")
@@ -259,8 +259,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					return thirdPartyDocGen.genBulletin1RSGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(synopsisLsTemplateId) || templateId.equals(synopsisEnLsTemplateId)
-						|| templateId.equals(synopsisHiLsTemplateId) || templateId.equals(synopsisSupEnLsTemplateId)
-						|| templateId.equals(synopsisSupHiLsTemplateId)) {
+						|| templateId.equals(synopsisHiLsTemplateId) || templateId.equals(synopsisEnRsTemplateId)
+						|| templateId.equals(synopsisHiRsTemplateId)) {
 					return thirdPartyDocGen.genSynopsisGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(siRsTemplateId)) {

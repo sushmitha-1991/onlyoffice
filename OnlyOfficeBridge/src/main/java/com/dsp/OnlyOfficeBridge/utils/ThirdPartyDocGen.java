@@ -834,24 +834,33 @@ public class ThirdPartyDocGen {
 		} else {
 			displayDate = formattedDate;
 		}
-
+		boolean isSupplementary = refId.toLowerCase().endsWith("_sup");
 		List<MargeFileDto> files = new LinkedList<>();
 		docTemplates.forEach(docTemplate -> {
 			// HEADER
-			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header")) {
+			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header") || docTemplate.getCode().startsWith("synopsis_rs_gen_header")) {
 
 				Map<String, String> map = new HashMap<>();
 				map.put("synopsisDate", (String) displayDate);
 
 				try {
-					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					ByteArrayResource resource = null;
+					if(isSupplementary) {
+						if(refId.contains("en")) {
+							resource = Utils.replacePlaceholders("synopsis/en-header-synopsis-ls-sup.docx",	map);
+						} else if (refId.contains("hi")) {
+							resource = Utils.replacePlaceholders("synopsis/hi-header-synopsis-ls-sup.docx",	map);
+						}
+					} else {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
 			}
 			// CONTENT
-			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con")) {
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con") || docTemplate.getCode().startsWith("synopsis_rs_gen_con")) {
 
 				dspKeys.forEach(dspKey -> {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
@@ -863,7 +872,7 @@ public class ThirdPartyDocGen {
 				});
 			}
 			// FOOTER
-			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer")) {
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer") || docTemplate.getCode().startsWith("synopsis_rs_gen_footer")) {
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
