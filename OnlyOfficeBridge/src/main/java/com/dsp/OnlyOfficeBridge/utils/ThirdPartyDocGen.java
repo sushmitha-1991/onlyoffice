@@ -765,7 +765,7 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		String url = lobUrl + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
+		String url = dsp2Url + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
 		System.out.println("url>>>>>>>" + url);
 
 		Map<String, Object> body;
@@ -889,6 +889,66 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
+		});
+
+		// MERGE & SAVE
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
+	
+	public ResponseEntity<Resource> genMergedSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = dsp2Url + "/synopsis/synopsis/get-merged-synopsis-dspkeys/" + refId;
+		System.out.println("url>>>>>>>" + url);
+
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println("API response >>>>> " + body);
+		} catch (Exception e) {
+			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			throw e;
+		}
+
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		List<String> dspKeys = (List<String>) data.get("dspKeys");
+		
+		List<MargeFileDto> files = new LinkedList<>();
+		int arr[] = { 1 };
+		docTemplates.forEach(docTemplate -> {
+			// CONTENT
+			dspKeys.forEach(dspKey -> {
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+				metadataOpt.ifPresent(metadata -> {
+					ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+					if (arr[0]++ == dspKeys.size()) {
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					} else {
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+					}
+				});
+			});
 		});
 
 		// MERGE & SAVE
