@@ -2593,8 +2593,8 @@ public class ThirdPartyDocGen {
 //			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
 //					HttpMethod.POST, request, byte[].class);
 
-			System.out.println("#########" + docConvertUrl + "/html-to-odt");
-			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/html-to-odt", HttpMethod.POST,
+			System.out.println("#########" + docConvertUrl + "/convert-to-docx");
+			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/convert-to-docx", HttpMethod.POST,
 					request, byte[].class);
 			System.out.println(" ********converting to odt response *****************");
 			System.out.println(response.getBody());
