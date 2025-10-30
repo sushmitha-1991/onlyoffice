@@ -93,6 +93,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	String synopsisEnRsTemplateId;
 	@Value("${synopsis.hi.rs.gen.template.id}")
 	String synopsisHiRsTemplateId;
+	@Value("${synopsis.merge.gen.template.id}")
+	String synopsisMergeTemplateId;
 	@Value("${download.url}")
 	String downloadKmUrl;
 	@Value("${cd.gen.template.id}")
@@ -281,7 +283,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(pcMergeTemplateId)) {
 					return thirdPartyDocGen.genProvisionalCalenderFinalGeneration(key, docTemplates, refId);
 				}
-				
+				if (templateId.equals(synopsisMergeTemplateId)) {
+					return thirdPartyDocGen.genMergedSynopsisGeneration(key, docTemplates, refId);
+				}
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
