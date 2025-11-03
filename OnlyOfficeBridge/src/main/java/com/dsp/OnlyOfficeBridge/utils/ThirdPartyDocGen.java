@@ -311,7 +311,7 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
+		String url = "http://localhost:8100/translation/inputs/input-tab-view-status?status=Submitted&id=" + refId;
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -332,13 +332,30 @@ public class ThirdPartyDocGen {
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+		Map<String, Object> data = dataList.get(0);
+		String documentType = (String) data.get("documentType");
+		List<Map> inputList = (List<Map>) data.get("allocations");
+		Map<String, String> input = new HashMap<>();
+		ByteArrayResource resource = null;
+		
+		LocalDate todayDate = LocalDate.now();
+		DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
+		String formattedDateDay = todayDate.format(formatterDay);
 
+		input.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDateDay) + " (शक)");
+	        
+		if (StringUtils.equalsIgnoreCase(documentType, "Bulletin - Part II")) {
+            try {
+            	resource = Utils.replacePlaceholders("Bulletin - Part II.docx", input);
+				files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+                System.out.println("Added header for documentType: " + documentType);
+            } catch (Exception e) {
+                System.err.println("Error adding header: " + e.getMessage());
+            }
+	    }
 		docTemplates.forEach(docTemplate -> {
-
 			if (docTemplate.getCode().equals("trans_merge_con")) {
-				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
-				Map<String, Object> data = dataList.get(0);
-				List<Map> inputList = (List<Map>) data.get("allocations");
 				inputList.forEach(map -> {
 					if (map.get("dsp2Key") != null) {
 
