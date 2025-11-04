@@ -4,13 +4,18 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigInteger;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -760,7 +765,7 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		String url = lobUrl + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
+		String url = dsp2Url + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
 		System.out.println("url>>>>>>>" + url);
 
 		Map<String, Object> body;
@@ -783,7 +788,16 @@ public class ThirdPartyDocGen {
 		}
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String synopsisDate = (String) data.get("synopsisDate"); // yyyy-MM-dd
+		// default locale → English
+		String locale = "en";
+		if (refId != null && refId.toLowerCase().startsWith("hi_")) {
+			locale = "hi";
+		}
+		// Pick proper formatted date
+		String synopsisDate = (String) data.get("synopsisDate");
+		String englishDate = (String) data.get("englishDate");
+		String hindiDate = (String) data.get("hindiDate");
+		String formattedDate = "en".equals(locale) ? englishDate : hindiDate;
 		List<String> dspKeys = (List<String>) data.get("dspKeys");
 
 		// 🔹 Convert Gregorian → Saka date
@@ -801,12 +815,7 @@ public class ThirdPartyDocGen {
 				if (bodyResp != null && bodyResp.containsKey("data")) {
 					Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
 					Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
-
-					// default locale → English
-					String locale = "en";
-					if (refId != null && refId.toLowerCase().startsWith("hi_")) {
-						locale = "hi";
-					}
+					
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
@@ -817,28 +826,41 @@ public class ThirdPartyDocGen {
 		// 🔹 Final displayDate = Gregorian + optional Saka
 		final String displayDate;
 		if (sakaDate != null) {
-			displayDate = synopsisDate + " / " + sakaDate + " (Saka)";
+			if ("hi".equals(locale)) {
+		        displayDate = formattedDate + " / " + sakaDate + " (शक)";
+		    } else {
+		        displayDate = formattedDate + " / " + sakaDate + " (Saka)";
+		    }
 		} else {
-			displayDate = synopsisDate;
+			displayDate = formattedDate;
 		}
-
+		boolean isSupplementary = refId.toLowerCase().endsWith("_sup");
 		List<MargeFileDto> files = new LinkedList<>();
 		docTemplates.forEach(docTemplate -> {
 			// HEADER
-			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header")) {
+			if (docTemplate.getCode().startsWith("synopsis_ls_gen_header") || docTemplate.getCode().startsWith("synopsis_rs_gen_header")) {
 
 				Map<String, String> map = new HashMap<>();
 				map.put("synopsisDate", (String) displayDate);
 
 				try {
-					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					ByteArrayResource resource = null;
+					if(isSupplementary) {
+						if(refId.contains("en")) {
+							resource = Utils.replacePlaceholders("synopsis/en-header-synopsis-ls-sup.docx",	map);
+						} else if (refId.contains("hi")) {
+							resource = Utils.replacePlaceholders("synopsis/hi-header-synopsis-ls-sup.docx",	map);
+						}
+					} else {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
 			}
 			// CONTENT
-			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con")) {
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_con") || docTemplate.getCode().startsWith("synopsis_rs_gen_con")) {
 
 				dspKeys.forEach(dspKey -> {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
@@ -850,7 +872,7 @@ public class ThirdPartyDocGen {
 				});
 			}
 			// FOOTER
-			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer")) {
+			else if (docTemplate.getCode().startsWith("synopsis_ls_gen_footer") || docTemplate.getCode().startsWith("synopsis_rs_gen_footer")) {
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), new HashMap<>());
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
@@ -867,6 +889,66 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			}
+		});
+
+		// MERGE & SAVE
+		try {
+			byte[] mergedBytes = mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+
+			saveOpenKm(dsp2Key, mergedResource);
+
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+	}
+	
+	public ResponseEntity<Resource> genMergedSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = dsp2Url + "/synopsis/synopsis/get-merged-synopsis-dspkeys/" + refId;
+		System.out.println("url>>>>>>>" + url);
+
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+			System.out.println("API response >>>>> " + body);
+		} catch (Exception e) {
+			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			throw e;
+		}
+
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		List<String> dspKeys = (List<String>) data.get("dspKeys");
+		
+		List<MargeFileDto> files = new LinkedList<>();
+		int arr[] = { 1 };
+		docTemplates.forEach(docTemplate -> {
+			// CONTENT
+			dspKeys.forEach(dspKey -> {
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+				metadataOpt.ifPresent(metadata -> {
+					ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+					if (arr[0]++ == dspKeys.size()) {
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+					} else {
+						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+					}
+				});
+			});
 		});
 
 		// MERGE & SAVE
@@ -2408,48 +2490,76 @@ public class ThirdPartyDocGen {
 
 	/* ---------------- Provisional Calender gen --------------------------- */
 	public ResponseEntity<Resource> genProvisionalCalenderGeneration(String dsp2Key, List<DocTemplate> docTemplates,
-			String refId) {
-		String url = pcUrl + "/provisionalcalendar/" + refId;
-		Map<String, Object> body;
-		if (token == null) {
-			throw new IllegalStateException("Authorization token is missing");
-		}
-		HttpHeaders headers = new HttpHeaders();
-		headers.set("Authorization", "Bearer " + token);
-		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-		HttpEntity<Void> entity = new HttpEntity<>(headers);
+			String refId,String content) {
+//		String url = pcUrl + "/provisionalcalendar/" + refId;
+//		Map<String, Object> body;
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			body = response.getBody();
+//			System.out.println(body);
+//		} catch (Exception e) {
+//			System.err.println("Error during API call: " + e.getMessage());
+//			throw e;
+//		}
 
-		try {
-			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-			body = response.getBody();
-			System.out.println(body);
-		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
-			throw e;
+		String imageUrl="https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07";
+		String base64Img="";
+		try (InputStream in = new URL(imageUrl).openStream()) {
+		    byte[] imageBytes = in.readAllBytes();
+		    String base64 = Base64.getEncoder().encodeToString(imageBytes);
+		     base64Img = "data:image/png;base64," + base64;
+		    System.out.println(base64Img);
+		} catch (IOException e) {
+		    e.printStackTrace();
 		}
-
 		List<MargeFileDto> files = new LinkedList<>();
 		final AtomicReference<String> htmlRef = new AtomicReference<>();
+		String html="";
 		docTemplates.forEach(docTemplate -> {
 
 			if (docTemplate.getCode().equals("provisional_calender_content")) {
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("content") != null) {
-					String html = (String) data.get("content");
-					htmlRef.set(html);
+//				Map<String, Object> data = (Map<String, Object>) body.get("data");
+//				if (data.get("content") != null) {
+//					String html = (String) data.get("content");
+				if(content != null) {
+					htmlRef.set(content);
 				}
 			}
 		});
-		String html = htmlRef.get();
+		 html = htmlRef.get();
+		log.info("html before replace:- {}",html);
+		
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
 		}
 		
-		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+//		html = html.replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+		html = html.replace("\n", "");
 		
+//		String localImagePath = "images/emblem.jpg";
+
+//		 Replacing the URL in the src attribute
+		
+		html = html.replace(imageUrl,base64Img);
+
+		html = html
+	            .replaceAll("[\\u00A0\\u200B\\u200C\\u200D\\uFEFF]", "")
+	            .replaceAll("\\s+", " ")
+	            .trim();
+		html = new String(html.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+		log.info("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
+			
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
 			System.out.println("******** after saving openkm resource ***********");
@@ -2464,8 +2574,10 @@ public class ThirdPartyDocGen {
 
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		try {
+			
 			System.out.println("### inside convertUrlToDocx");
 
+			log.info("inside convertUrlToDocx htmlContent:- {}",htmlContent);
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -2481,8 +2593,8 @@ public class ThirdPartyDocGen {
 //			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
 //					HttpMethod.POST, request, byte[].class);
 
-			System.out.println("#########" + docConvertUrl + "/html-to-odt");
-			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/html-to-odt", HttpMethod.POST,
+			System.out.println("#########" + docConvertUrl + "/convert-to-docx");
+			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/convert-to-docx", HttpMethod.POST,
 					request, byte[].class);
 			System.out.println(" ********converting to odt response *****************");
 			System.out.println(response.getBody());
@@ -2518,21 +2630,21 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("pc_merge_con")) {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				if (data.get("qbDsp2Key") != null) {
-
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) data.get("qbDsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-				}
 				if (data.get("dsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
 					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+				}
+				if (data.get("qbDsp2Key") != null) {
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) data.get("qbDsp2Key"));
+					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
