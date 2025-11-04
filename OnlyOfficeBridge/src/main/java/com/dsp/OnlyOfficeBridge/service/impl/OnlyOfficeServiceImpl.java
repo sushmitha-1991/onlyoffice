@@ -160,7 +160,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		} else {
 			keyToUse = UUID.randomUUID().toString(); // new key even for edit
 			if (emptyFlg.equals("1")) {
-				downloadUrl = onlyOfficeUrl + "/only-office/download-empty-docx/" + fileName;
+				downloadUrl = onlyOfficeUrl + "/only-office/download-empty-docx/" + fileName + "/" + dsp2Key;
 			} else {
 				String refId = payload.get("refId") == null ? "0" : payload.get("refId");
 				downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId + "/" + refId;

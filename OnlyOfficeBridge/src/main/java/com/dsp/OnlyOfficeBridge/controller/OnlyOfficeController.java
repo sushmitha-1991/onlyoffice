@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.dsp.OnlyOfficeBridge.utils.LibreOfficeDocxReplacer;
+import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +39,8 @@ public class OnlyOfficeController {
 
 	@Autowired
 	private OnlyOfficeService onlyOfficeService;
-
+    @Autowired
+    ThirdPartyDocGen thirdPartyDocGen;
 	@PostMapping("/config")
 	public ResponseEntity<Map<String, Object>> getEditorConfig(@RequestBody Map<String, String> payload) {
 		Map<String, Object> response = onlyOfficeService.getEditorConfig(payload);
@@ -57,8 +59,8 @@ public class OnlyOfficeController {
 	}
 
 
-    @GetMapping("/download-empty-docx/{fileName}")
-    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName) throws IOException {
+    @GetMapping("/download-empty-docx/{fileName}/{dsp2Key}")
+    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName ,@PathVariable String dsp2Key) throws IOException {
         // Create an empty DOCX document
         XWPFDocument document = new XWPFDocument();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -66,7 +68,8 @@ public class OnlyOfficeController {
         document.close();
 
         byte[] docBytes = out.toByteArray();
-
+        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
+        thirdPartyDocGen.saveOpenKm(dsp2Key,mergedResource);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
