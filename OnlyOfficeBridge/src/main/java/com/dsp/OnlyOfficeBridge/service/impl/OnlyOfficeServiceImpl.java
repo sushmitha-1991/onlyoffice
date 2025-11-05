@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.time.LocalDateTime;
@@ -45,10 +46,13 @@ import com.dsp.OnlyOfficeBridge.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * 
  */
 @Service
+@Slf4j
 public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
@@ -637,4 +641,61 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 	}
 
+	public String convertDocxToText(String dspKey) {
+        try {
+            log.info("Converting DOCX to HTML for DSP Key: {}", dspKey);
+ 
+            Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+            if (metadataOpt.isEmpty()) {
+                log.warn("No metadata found for DSP Key: {}", dspKey);
+                return null;
+            }
+            OnlyOfficeMetadata metadata = metadataOpt.get();
+            ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+ 
+            if (resourceBody == null || resourceBody.getByteArray().length == 0) {
+                log.warn("Downloaded file is empty for DSP Key: {}", dspKey);
+                return null;
+            }
+ 
+            // Convert DOCX bytes to TXT
+            try (ByteArrayInputStream bis = new ByteArrayInputStream(resourceBody.getByteArray());
+            	     XWPFDocument document = new XWPFDocument(bis)) {
+
+            	    StringBuilder textBuilder = new StringBuilder();
+
+            	    document.getParagraphs().forEach(paragraph -> {
+            	        String text = paragraph.getText();
+            	        if (text != null && !text.trim().isEmpty()) {
+            	            textBuilder.append(text.trim()).append("\n");
+            	        }
+            	    });
+
+            	    String docText = textBuilder.toString().trim();
+
+            	    if (docText.isEmpty()) {
+            	        log.warn("Document content is empty for DSP Key: {}", dspKey);
+            	        return null; 
+            	    } else {
+            	        log.info("Document has content ({} chars)", docText.length());
+            	        log.info("Document has content :-\"{}\" ", docText);
+            	        return docText;
+            	    }
+
+            	} catch (IOException e) {
+            	    log.error("Error reading DOCX bytes for DSP Key: {}", dspKey, e);
+            	    throw new RuntimeException("Failed to process DOCX file", e);
+            	}
+//            WordprocessingMLPackage wordMLPackage =
+//                    WordprocessingMLPackage.load(new ByteArrayInputStream(resourceBody.getByteArray()));
+// 
+//            MainDocumentPart mainDocPart = wordMLPackage.getMainDocumentPart();
+//			String text = mainDocPart.getContent().toString();
+//            return text;
+// 
+        } catch (Exception e) {
+            log.error("Error converting DOCX to TEXT for DSP Key: {}", dspKey, e);
+            return null;
+        }
+    }
 }
