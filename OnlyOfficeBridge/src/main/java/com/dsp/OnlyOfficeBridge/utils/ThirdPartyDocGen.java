@@ -16,6 +16,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -332,13 +333,31 @@ public class ThirdPartyDocGen {
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+		Map<String, Object> data = dataList.get(0);
+		String documentType = (String) data.get("documentType");
+		String documentDate = (String) data.get("documentDate");
+		List<Map> inputList = (List<Map>) data.get("allocations");		
+		
+		// 🔹 Generate Display Date (Hindi + Saka)
+	    String displayDate = getDisplayDate(documentDate, headers);
+	    
+		// ---------------- HEADER ADDITION ----------------
+	    Map<String, String> headerInput = new HashMap<>();
+	    headerInput.put("date", displayDate);
 
+	    String headerPath = getHeaderPathByDocumentType(documentType);
+	    if (headerPath != null) {
+	        try {
+	            ByteArrayResource headerRes = Utils.replacePlaceholders(headerPath, headerInput);
+	            files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
+	            System.out.println("Added header for " + documentType);
+	        } catch (Exception e) {
+	            System.err.println("Error adding header for " + documentType + ": " + e.getMessage());
+	        }
+	    }
 		docTemplates.forEach(docTemplate -> {
-
 			if (docTemplate.getCode().equals("trans_merge_con")) {
-				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
-				Map<String, Object> data = dataList.get(0);
-				List<Map> inputList = (List<Map>) data.get("allocations");
 				inputList.forEach(map -> {
 					if (map.get("dsp2Key") != null) {
 
@@ -350,10 +369,19 @@ public class ThirdPartyDocGen {
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					}
 				});
-
-			}
-
+			}	
 		});
+		// ---------------- FOOTER ADDITION ----------------
+	    String footerPath = getFooterPathByDocumentType(documentType);
+	    if (footerPath != null) {
+	        try {
+	            ByteArrayResource footerRes = Utils.replacePlaceholders(footerPath, Collections.emptyMap());
+	            files.add(MargeFileDto.builder().file(footerRes.getByteArray()).isBreak(false).build());
+	            System.out.println("Added footer for " + documentType);
+	        } catch (Exception e) {
+	            System.err.println("Error adding footer for " + documentType + ": " + e.getMessage());
+	        }
+	    }
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
@@ -366,6 +394,89 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
+	
+	private String getHeaderPathByDocumentType(String documentType) {
+	    if (documentType == null) return null;
+	    switch (documentType.trim()) {
+	        case "Bulletin - Part II":
+	            return "/translation/ls/header-b2-ls.docx";
+	        case "Bulletin - Part I":
+	            return "/translation/ls/header-b1-ls.docx";
+	        case "LOB":
+	            return "/translation/ls/header-lob-ls.docx";
+//	        case "Synopsis of Debates":
+//	            return "/translation/ls/header-synopsis-ls.docx";
+	        default:
+	            return null; // or return a generic header if you want
+	    }
+	}
+
+	private String getFooterPathByDocumentType(String documentType) {
+	    if (documentType == null) return null;
+	    switch (documentType.trim()) {
+	        case "Bulletin - Part II":
+	            return "/translation/ls/footer-b1-b2-ls.docx";
+	        case "Bulletin - Part I":
+	            return "/translation/ls/footer-b1-b2-ls.docx";
+	        case "LOB":
+	            return "/translation/ls/footer-lob-ls.docx";
+//	        case "Synopsis of Debates":
+//	            return "/translation/ls/footer-synopsis-ls.docx";
+	        default:
+	            return null;
+	    }
+	}
+	
+	private String getDisplayDate(String documentDate, HttpHeaders headers) {
+	    if (documentDate == null) return "";
+
+	    try {
+	        // 🔹 Convert to LocalDate
+	        LocalDate date = LocalDate.parse(documentDate);
+
+	        // 🔹 Format in Hindi
+	        DateTimeFormatter hindiFormatter = DateTimeFormatter.ofPattern("EEEE, dd MMMM, yyyy", new Locale("hi", "IN"));
+	        String hindiDate = date.format(hindiFormatter);
+
+	        // 🔹 Fetch Saka Date via API
+	        String sakaDate = null;
+	        try {
+	            Map<String, String> requestPayload = new HashMap<>();
+	            requestPayload.put("dateToConvert", documentDate);
+
+	            RestTemplate restTemplate = new RestTemplate();
+	            ResponseEntity<Map> response = restTemplate.exchange(
+	            		dsp2Url + "/master/convert/to-saka-date",
+	                    HttpMethod.POST,
+	                    new HttpEntity<>(requestPayload, headers),
+	                    Map.class
+	            );
+
+	            Map<String, Object> bodyResp = response.getBody();
+	            if (bodyResp != null && bodyResp.containsKey("data")) {
+	                Map<String, Object> dataResp = (Map<String, Object>) bodyResp.get("data");
+	                Map<String, String> convertedDate = (Map<String, String>) dataResp.get("convertedDate");
+	                sakaDate = convertedDate.get("hi");
+	            }
+
+	        } catch (Exception e) {
+	            System.err.println("Error fetching Saka date: " + e.getMessage());
+	        }
+
+	        // 🔹 Combine both
+	        if (sakaDate != null && !sakaDate.isEmpty()) {
+	            return hindiDate + " / " + sakaDate + " (शक)";
+	        } else {
+	            return hindiDate;
+	        }
+
+	    } catch (Exception e) {
+	        System.err.println("Error formatting display date: " + e.getMessage());
+	        return documentDate; // fallback
+	    }
+	}
+
+
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
