@@ -399,11 +399,11 @@ public class ThirdPartyDocGen {
 	    if (documentType == null) return null;
 	    switch (documentType.trim()) {
 	        case "Bulletin - Part II":
-	            return "/translation/ls/header-b2-ls.docx";
+	            return "translation/ls/header-b2-ls.docx";
 	        case "Bulletin - Part I":
-	            return "/translation/ls/header-b1-ls.docx";
+	            return "translation/ls/header-b1-ls.docx";
 	        case "LOB":
-	            return "/translation/ls/header-lob-ls.docx";
+	            return "translation/ls/header-lob-ls.docx";
 //	        case "Synopsis of Debates":
 //	            return "/translation/ls/header-synopsis-ls.docx";
 	        default:
@@ -415,11 +415,11 @@ public class ThirdPartyDocGen {
 	    if (documentType == null) return null;
 	    switch (documentType.trim()) {
 	        case "Bulletin - Part II":
-	            return "/translation/ls/footer-b1-b2-ls.docx";
+	            return "translation/ls/footer-b1-b2-ls.docx";
 	        case "Bulletin - Part I":
-	            return "/translation/ls/footer-b1-b2-ls.docx";
+	            return "translation/ls/footer-b1-b2-ls.docx";
 	        case "LOB":
-	            return "/translation/ls/footer-lob-ls.docx";
+	            return "translation/ls/footer-lob-ls.docx";
 //	        case "Synopsis of Debates":
 //	            return "/translation/ls/footer-synopsis-ls.docx";
 	        default:
