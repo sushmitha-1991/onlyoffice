@@ -465,7 +465,7 @@ public class ThirdPartyDocGen {
 
 	        // 🔹 Combine both
 	        if (sakaDate != null && !sakaDate.isEmpty()) {
-	            return hindiDate + " / " + sakaDate + " (शक)";
+	            return hindiDate + "/" + sakaDate + "(शक)";
 	        } else {
 	            return hindiDate;
 	        }
