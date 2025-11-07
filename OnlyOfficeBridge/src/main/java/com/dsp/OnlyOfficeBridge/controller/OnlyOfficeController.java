@@ -11,12 +11,15 @@ import java.util.List;
 import java.util.Map;
 
 import com.dsp.OnlyOfficeBridge.utils.LibreOfficeDocxReplacer;
+import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
+
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 
 /**
@@ -38,7 +42,8 @@ public class OnlyOfficeController {
 
 	@Autowired
 	private OnlyOfficeService onlyOfficeService;
-
+    @Autowired
+    ThirdPartyDocGen thirdPartyDocGen;
 	@PostMapping("/config")
 	public ResponseEntity<Map<String, Object>> getEditorConfig(@RequestBody Map<String, String> payload) {
 		Map<String, Object> response = onlyOfficeService.getEditorConfig(payload);
@@ -63,8 +68,8 @@ public class OnlyOfficeController {
 	}
 
 
-    @GetMapping("/download-empty-docx/{fileName}")
-    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName) throws IOException {
+    @GetMapping("/download-empty-docx/{fileName}/{dsp2Key}")
+    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName ,@PathVariable String dsp2Key) throws IOException {
         // Create an empty DOCX document
         XWPFDocument document = new XWPFDocument();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -72,7 +77,8 @@ public class OnlyOfficeController {
         document.close();
 
         byte[] docBytes = out.toByteArray();
-
+        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
+        thirdPartyDocGen.saveOpenKm(dsp2Key,mergedResource);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
@@ -110,4 +116,28 @@ public class OnlyOfficeController {
                 .body(bb);
     }
 
+    @GetMapping("/validate-content")
+    public ResponseEntity<?> validateDocContent(@RequestParam String dsp2Key ) {
+        String data=onlyOfficeService.convertDocxToText(dsp2Key);
+        if(data != null) 
+        {
+        	 GenericResponse<String> response = new GenericResponse<>(
+                     HttpStatus.OK.value(),
+                     true,
+                     "Data saved Successfully",
+                     null
+             );
+             return ResponseEntity.ok(response);
+        }
+        else
+        {
+        	 GenericResponse<String> response = new GenericResponse<>(
+                     HttpStatus.OK.value(),
+                     false,
+                     "Data not Saved",
+                     null
+             );
+             return ResponseEntity.ok(response);
+        }
+	}
 }

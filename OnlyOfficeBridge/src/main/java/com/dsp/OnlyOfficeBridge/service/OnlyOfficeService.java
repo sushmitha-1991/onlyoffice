@@ -19,6 +19,8 @@ public interface OnlyOfficeService {
 
 	ResponseEntity<Resource> downloadByKey(String key,String templateId,String refId);
 	
+	public String convertDocxToText(String dspKey);
+	
 	ResponseEntity<Resource> downloadByKeyPc(String key,String templateId,String refId,String content);
 	
 	ResponseEntity<Resource> downloadByKeyV2(String key,String templateId,String refId);
