@@ -373,9 +373,26 @@ public class ThirdPartyDocGen {
 		});
 		// ---------------- FOOTER ADDITION ----------------
 	    String footerPath = getFooterPathByDocumentType(documentType);
+	    String date = getDisplayDate(documentDate, headers);
+
+	    String hindiDate = date;
+	    String sakaDate = "";
+
+	    // Check if Saka date is included
+	    if (date.contains("/")) {
+	        String[] parts = date.split("/");
+	        hindiDate = parts[0].trim();
+	        
+	        if (parts.length > 1) {
+	            sakaDate = parts[1].replace("(शक)", "").trim();
+	        }
+	    }
+	    Map<String, String> footerInput = new HashMap<>();
+	    footerInput.put("currentDate", hindiDate);
+	    footerInput.put("currentSakaDate", sakaDate);
 	    if (footerPath != null) {
 	        try {
-	            ByteArrayResource footerRes = Utils.replacePlaceholders(footerPath, Collections.emptyMap());
+	            ByteArrayResource footerRes = Utils.replacePlaceholders(footerPath, footerInput);
 	            files.add(MargeFileDto.builder().file(footerRes.getByteArray()).isBreak(false).build());
 	            System.out.println("Added footer for " + documentType);
 	        } catch (Exception e) {
@@ -402,7 +419,7 @@ public class ThirdPartyDocGen {
 	            return "translation/ls/header-b2-ls.docx";
 	        case "Bulletin - Part I":
 	            return "translation/ls/header-b1-ls.docx";
-	        case "LOB":
+	        case "List of Business":
 	            return "translation/ls/header-lob-ls.docx";
 //	        case "Synopsis of Debates":
 //	            return "/translation/ls/header-synopsis-ls.docx";
@@ -418,7 +435,7 @@ public class ThirdPartyDocGen {
 	            return "translation/ls/footer-b1-b2-ls.docx";
 	        case "Bulletin - Part I":
 	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "LOB":
+	        case "List of Business":
 	            return "translation/ls/footer-lob-ls.docx";
 //	        case "Synopsis of Debates":
 //	            return "/translation/ls/footer-synopsis-ls.docx";
@@ -465,7 +482,7 @@ public class ThirdPartyDocGen {
 
 	        // 🔹 Combine both
 	        if (sakaDate != null && !sakaDate.isEmpty()) {
-	            return hindiDate + " / " + sakaDate + " (शक)";
+	            return hindiDate + "/" + sakaDate + "(शक)";
 	        } else {
 	            return hindiDate;
 	        }
