@@ -312,7 +312,17 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
+		
+		// Detect House Type (LS or RS)
+	    String houseType = refId != null && refId.toLowerCase().contains("_rs") ? "rs" : "ls";
+	    
+	    // Clean refId before sending to API
+	    String cleanRefId = refId;
+	    if (cleanRefId != null) {
+	        cleanRefId = cleanRefId.replaceAll("(?i)_rs", "").replaceAll("(?i)_ls", "").trim();
+	    }
+
+		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + cleanRefId;
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -346,7 +356,7 @@ public class ThirdPartyDocGen {
 	    Map<String, String> headerInput = new HashMap<>();
 	    headerInput.put("date", displayDate);
 
-	    String headerPath = getHeaderPathByDocumentType(documentType);
+	    String headerPath = getHeaderPathByDocumentType(documentType, houseType);
 	    if (headerPath != null) {
 	        try {
 	            ByteArrayResource headerRes = Utils.replacePlaceholders(headerPath, headerInput);
@@ -372,7 +382,7 @@ public class ThirdPartyDocGen {
 			}	
 		});
 		// ---------------- FOOTER ADDITION ----------------
-	    String footerPath = getFooterPathByDocumentType(documentType);
+	    String footerPath = getFooterPathByDocumentType(documentType, houseType);
 	    String date = getDisplayDate(documentDate, headers);
 
 	    String hindiDate = date;
@@ -412,36 +422,42 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 	
-	private String getHeaderPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/header-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/header-b1-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/header-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/header-synopsis-ls.docx";
-	        default:
-	            return null; // or return a generic header if you want
-	    }
+	// ---------------- HEADER PATH LOGIC ----------------
+	private String getHeaderPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/"; // dynamic base path
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "header-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "header-b1-" + houseType + ".docx";
+		case "List of Business":
+			return base + "header-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "header-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 
-	private String getFooterPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/footer-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/footer-synopsis-ls.docx";
-	        default:
-	            return null;
-	    }
+	// ---------------- FOOTER PATH LOGIC ----------------
+	private String getFooterPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/";
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "List of Business":
+			return base + "footer-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "footer-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 	
 	private String getDisplayDate(String documentDate, HttpHeaders headers) {
