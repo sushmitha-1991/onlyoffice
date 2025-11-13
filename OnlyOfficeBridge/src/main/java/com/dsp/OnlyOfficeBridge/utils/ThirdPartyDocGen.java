@@ -287,8 +287,12 @@ public class ThirdPartyDocGen {
 
 			else {
 				ByteArrayResource resource = null;
+				Map<String, String> map = new HashMap<>();
+				Map<String, Object> data = (Map<String, Object>) body.get("data");
+				map.put("footerDate", (String) data.get("createdDate"));
+				map.put("footerSakaDate",(String) data.get("createdDateSaka"));
 				try {
-					Map map = new HashMap();
+//					Map map = new HashMap();
 					resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 				} catch (Exception e) {
 					throw new RuntimeException(e);
@@ -333,31 +337,34 @@ public class ThirdPartyDocGen {
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
-		List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
-		Map<String, Object> data = dataList.get(0);
-		String documentType = (String) data.get("documentType");
-		String documentDate = (String) data.get("documentDate");
-		List<Map> inputList = (List<Map>) data.get("allocations");		
-		
-		// 🔹 Generate Display Date (Hindi + Saka)
-	    String displayDate = getDisplayDate(documentDate, headers);
-	    
-		// ---------------- HEADER ADDITION ----------------
-	    Map<String, String> headerInput = new HashMap<>();
-	    headerInput.put("date", displayDate);
-
-	    String headerPath = getHeaderPathByDocumentType(documentType);
-	    if (headerPath != null) {
-	        try {
-	            ByteArrayResource headerRes = Utils.replacePlaceholders(headerPath, headerInput);
-	            files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
-	            System.out.println("Added header for " + documentType);
-	        } catch (Exception e) {
-	            System.err.println("Error adding header for " + documentType + ": " + e.getMessage());
-	        }
-	    }
+//		List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+//		Map<String, Object> data = dataList.get(0);
+//		String documentType = (String) data.get("documentType");
+//		String documentDate = (String) data.get("documentDate");
+//		List<Map> inputList = (List<Map>) data.get("allocations");		
+//		
+//		// 🔹 Generate Display Date (Hindi + Saka)
+//	    String displayDate = getDisplayDate(documentDate, headers);
+//	    
+//		// ---------------- HEADER ADDITION ----------------
+//	    Map<String, String> headerInput = new HashMap<>();
+//	    headerInput.put("date", displayDate);
+//
+//	    String headerPath = getHeaderPathByDocumentType(documentType);
+//	    if (headerPath != null) {
+//	        try {
+//	            ByteArrayResource headerRes = Utils.replacePlaceholders(headerPath, headerInput);
+//	            files.add(MargeFileDto.builder().file(headerRes.getByteArray()).isBreak(false).build());
+//	            System.out.println("Added header for " + documentType);
+//	        } catch (Exception e) {
+//	            System.err.println("Error adding header for " + documentType + ": " + e.getMessage());
+//	        }
+//	    }
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("trans_merge_con")) {
+				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
+				Map<String, Object> data = dataList.get(0);
+				List<Map> inputList = (List<Map>) data.get("allocations");
 				inputList.forEach(map -> {
 					if (map.get("dsp2Key") != null) {
 
@@ -371,34 +378,34 @@ public class ThirdPartyDocGen {
 				});
 			}	
 		});
-		// ---------------- FOOTER ADDITION ----------------
-	    String footerPath = getFooterPathByDocumentType(documentType);
-	    String date = getDisplayDate(documentDate, headers);
-
-	    String hindiDate = date;
-	    String sakaDate = "";
-
-	    // Check if Saka date is included
-	    if (date.contains("/")) {
-	        String[] parts = date.split("/");
-	        hindiDate = parts[0].trim();
-	        
-	        if (parts.length > 1) {
-	            sakaDate = parts[1].replace("(शक)", "").trim();
-	        }
-	    }
-	    Map<String, String> footerInput = new HashMap<>();
-	    footerInput.put("currentDate", hindiDate);
-	    footerInput.put("currentSakaDate", sakaDate);
-	    if (footerPath != null) {
-	        try {
-	            ByteArrayResource footerRes = Utils.replacePlaceholders(footerPath, footerInput);
-	            files.add(MargeFileDto.builder().file(footerRes.getByteArray()).isBreak(false).build());
-	            System.out.println("Added footer for " + documentType);
-	        } catch (Exception e) {
-	            System.err.println("Error adding footer for " + documentType + ": " + e.getMessage());
-	        }
-	    }
+//		// ---------------- FOOTER ADDITION ----------------
+//	    String footerPath = getFooterPathByDocumentType(documentType);
+//	    String date = getDisplayDate(documentDate, headers);
+//
+//	    String hindiDate = date;
+//	    String sakaDate = "";
+//
+//	    // Check if Saka date is included
+//	    if (date.contains("/")) {
+//	        String[] parts = date.split("/");
+//	        hindiDate = parts[0].trim();
+//	        
+//	        if (parts.length > 1) {
+//	            sakaDate = parts[1].replace("(शक)", "").trim();
+//	        }
+//	    }
+//	    Map<String, String> footerInput = new HashMap<>();
+//	    footerInput.put("currentDate", hindiDate);
+//	    footerInput.put("currentSakaDate", sakaDate);
+//	    if (footerPath != null) {
+//	        try {
+//	            ByteArrayResource footerRes = Utils.replacePlaceholders(footerPath, footerInput);
+//	            files.add(MargeFileDto.builder().file(footerRes.getByteArray()).isBreak(false).build());
+//	            System.out.println("Added footer for " + documentType);
+//	        } catch (Exception e) {
+//	            System.err.println("Error adding footer for " + documentType + ": " + e.getMessage());
+//	        }
+//	    }
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
