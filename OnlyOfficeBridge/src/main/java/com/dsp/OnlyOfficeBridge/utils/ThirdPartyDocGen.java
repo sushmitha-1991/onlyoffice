@@ -37,26 +37,12 @@ import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
 import org.docx4j.model.structure.HeaderFooterPolicy;
 import org.docx4j.model.structure.SectionWrapper;
+import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.Part;
-import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPartAbstractImage;
-import org.docx4j.openpackaging.parts.WordprocessingML.CommentsPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.EndnotesPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.FooterPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.FootnotesPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.HeaderPart;
-import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
+import org.docx4j.openpackaging.parts.WordprocessingML.*;
 import org.docx4j.relationships.Relationship;
-import org.docx4j.wml.Br;
-import org.docx4j.wml.CTEndnotes;
-import org.docx4j.wml.CTFootnotes;
-import org.docx4j.wml.CTFtnEdn;
-import org.docx4j.wml.Comments;
-import org.docx4j.wml.ObjectFactory;
-import org.docx4j.wml.P;
-import org.docx4j.wml.R;
-import org.docx4j.wml.STBrType;
+import org.docx4j.wml.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -1131,191 +1117,273 @@ public class ThirdPartyDocGen {
 //            return baos.toByteArray();
 //        }
 //    }
+private static class IdMaps {
+    Map<BigInteger, BigInteger> abstractNumIdMap = new LinkedHashMap<>();
+    Map<BigInteger, BigInteger> numIdMap = new LinkedHashMap<>();
+}
+    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
+            throws Docx4JException {
 
+        IdMaps maps = new IdMaps();
+
+        Numbering targetContent = targetPart.getContents();
+        Numbering srcContent = srcPart.getContents();
+
+        int maxAbstractNumId = 0;
+        if (targetContent.getAbstractNum() != null && !targetContent.getAbstractNum().isEmpty()) {
+            for (Numbering.AbstractNum an : targetContent.getAbstractNum()) {
+                if (an.getAbstractNumId() != null) {
+                    maxAbstractNumId = Math.max(maxAbstractNumId, an.getAbstractNumId().intValue());
+                }
+            }
+        }
+
+        int maxNumId = 0;
+        if (targetContent.getNum() != null && !targetContent.getNum().isEmpty()) {
+            for (Numbering.Num n : targetContent.getNum()) {
+                if (n.getNumId() != null) {
+                    maxNumId = Math.max(maxNumId, n.getNumId().intValue());
+                }
+            }
+        }
+
+        // copy abstractNum entries (deep copy then assign new abstractNumId)
+        if (srcContent.getAbstractNum() != null) {
+            for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
+                Numbering.AbstractNum copyAbs = (Numbering.AbstractNum) XmlUtils.deepCopy(srcAbs);
+                BigInteger oldAbstractId = srcAbs.getAbstractNumId();
+                BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
+                copyAbs.setAbstractNumId(newAbstractId);
+                maps.abstractNumIdMap.put(oldAbstractId, newAbstractId);
+                targetContent.getAbstractNum().add(copyAbs);
+            }
+        }
+
+        // copy num entries (deep copy then assign new numId and remap abstractNumId reference inside num)
+        if (srcContent.getNum() != null) {
+            for (Numbering.Num srcNum : srcContent.getNum()) {
+                Numbering.Num copyNum = (Numbering.Num) XmlUtils.deepCopy(srcNum);
+                BigInteger oldNumId = srcNum.getNumId();
+                BigInteger newNumId = BigInteger.valueOf(++maxNumId);
+                copyNum.setNumId(newNumId);
+
+                // remap abstractNumId inside copyNum if present
+                if (copyNum.getAbstractNumId() != null && copyNum.getAbstractNumId().getVal() != null) {
+                    BigInteger oldAbsRef = copyNum.getAbstractNumId().getVal();
+                    BigInteger mappedAbs = maps.abstractNumIdMap.get(oldAbsRef);
+                    if (mappedAbs != null) {
+                        copyNum.getAbstractNumId().setVal(mappedAbs);
+                    } // else leave as-is (best-effort)
+                }
+
+                maps.numIdMap.put(oldNumId, newNumId);
+                targetContent.getNum().add(copyNum);
+            }
+        }
+
+        return maps;
+    }
 	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
-		if (files == null || files.isEmpty()) {
-			throw new IllegalArgumentException("No files to merge");
-		}
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("No files to merge");
+        }
 
-		// Load first file as base
-		WordprocessingMLPackage targetPkg = WordprocessingMLPackage
-				.load(new ByteArrayInputStream(files.get(0).getFile()));
-		MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
+        // Load first file as base
+        WordprocessingMLPackage targetPkg = WordprocessingMLPackage
+                .load(new ByteArrayInputStream(files.get(0).getFile()));
+        MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
         if(files.get(0).isBreak())
         {
             targetMain.getContent().add(createPageBreak());
         }
-		// Ensure footnotes, endnotes, comments exist
-		FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
-		if (targetFootnotes == null) {
-			targetFootnotes = new FootnotesPart();
-			targetFootnotes.setContents(new CTFootnotes());
-			targetMain.addTargetPart(targetFootnotes);
-		}
-		EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
-		if (targetEndnotes == null) {
-			targetEndnotes = new EndnotesPart();
-			targetEndnotes.setContents(new CTEndnotes());
-			targetMain.addTargetPart(targetEndnotes);
-		}
-		CommentsPart targetComments = targetMain.getCommentsPart();
-		if (targetComments == null) {
-			targetComments = new CommentsPart();
-			targetComments.setContents(new Comments());
-			targetMain.addTargetPart(targetComments);
-		}
+        // Ensure footnotes, endnotes, comments exist
+        FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
+        if (targetFootnotes == null) {
+            targetFootnotes = new FootnotesPart();
+            targetFootnotes.setContents(new CTFootnotes());
+            targetMain.addTargetPart(targetFootnotes);
+        }
+        EndnotesPart targetEndnotes = getEndnotesPart(targetPkg);
+        if (targetEndnotes == null) {
+            targetEndnotes = new EndnotesPart();
+            targetEndnotes.setContents(new CTEndnotes());
+            targetMain.addTargetPart(targetEndnotes);
+        }
+        CommentsPart targetComments = targetMain.getCommentsPart();
+        if (targetComments == null) {
+            targetComments = new CommentsPart();
+            targetComments.setContents(new Comments());
+            targetMain.addTargetPart(targetComments);
+        }
 
-		// Track max IDs
-		int maxFootnoteId = targetFootnotes.getContents().getFootnote().stream().map(fn -> fn.getId().intValue())
-				.max(Integer::compareTo).orElse(100);
-		int maxEndnoteId = targetEndnotes.getContents().getEndnote().stream().map(en -> en.getId().intValue())
-				.max(Integer::compareTo).orElse(100);
-		int maxCommentId = targetComments.getContents().getComment().stream().map(c -> c.getId().intValue())
-				.max(Integer::compareTo).orElse(100);
+        // Track max IDs
+        int maxFootnoteId = targetFootnotes.getContents().getFootnote().stream().map(fn -> fn.getId().intValue())
+                .max(Integer::compareTo).orElse(100);
+        int maxEndnoteId = targetEndnotes.getContents().getEndnote().stream().map(en -> en.getId().intValue())
+                .max(Integer::compareTo).orElse(100);
+        int maxCommentId = targetComments.getContents().getComment().stream().map(c -> c.getId().intValue())
+                .max(Integer::compareTo).orElse(100);
 
-		// For each source file
-		for (int idx = 1; idx < files.size(); idx++) {
-			WordprocessingMLPackage srcPkg = WordprocessingMLPackage
-					.load(new ByteArrayInputStream(files.get(idx).getFile()));
-			MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
+        // For each source file
+        for (int idx = 1; idx < files.size(); idx++) {
+            WordprocessingMLPackage srcPkg = WordprocessingMLPackage
+                    .load(new ByteArrayInputStream(files.get(idx).getFile()));
+            MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
 
-			// 1) Copy images
-			Map<String, String> relIdMapping = new HashMap<>();
-			for (Part p : srcPkg.getParts().getParts().values()) {
-				if (p instanceof BinaryPart && p.getPartName() != null
-						&& p.getPartName().getName().startsWith("/word/media/")) {
-					BinaryPart srcBin = (BinaryPart) p;
-					ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
-					srcBin.writeDataToOutputStream(imgOut);
-					BinaryPartAbstractImage newImgPart = BinaryPartAbstractImage.createImagePart(targetPkg,
-							imgOut.toByteArray());
-					Relationship newRel = newImgPart.getSourceRelationship();
-					if (newRel != null) {
-						for (Relationship srcRel : srcBin.getSourceRelationships()) {
-							relIdMapping.put(srcRel.getId(), newRel.getId());
-						}
-					}
-				}
-			}
+            // 1) Copy images
+            Map<String, String> relIdMapping = new HashMap<>();
+            for (Part p : srcPkg.getParts().getParts().values()) {
+                if (p instanceof BinaryPart && p.getPartName() != null
+                        && p.getPartName().getName().startsWith("/word/media/")) {
+                    BinaryPart srcBin = (BinaryPart) p;
+                    ByteArrayOutputStream imgOut = new ByteArrayOutputStream();
+                    srcBin.writeDataToOutputStream(imgOut);
+                    BinaryPartAbstractImage newImgPart = BinaryPartAbstractImage.createImagePart(targetPkg,
+                            imgOut.toByteArray());
+                    Relationship newRel = newImgPart.getSourceRelationship();
+                    if (newRel != null) {
+                        for (Relationship srcRel : srcBin.getSourceRelationships()) {
+                            relIdMapping.put(srcRel.getId(), newRel.getId());
+                        }
+                    }
+                }
+            }
+// 2) Merge Numbering (and get mapping for numId)
+            NumberingDefinitionsPart srcNumbering = srcMain.getNumberingDefinitionsPart();
+            IdMaps numberingMaps = null;
+            if (srcNumbering != null) {
+                NumberingDefinitionsPart tgtNumbering = targetMain.getNumberingDefinitionsPart();
+                numberingMaps = mergeNumbering(srcNumbering, tgtNumbering);
+            } else {
+                numberingMaps = new IdMaps(); // empty maps
+            }
+            // 2) Merge Footnotes
+            Map<BigInteger, BigInteger> footnoteIdMap = new LinkedHashMap<>();
+            FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
+            if (srcFootnotes != null && srcFootnotes.getContents() != null) {
+                for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
+                    BigInteger oldId = fn.getId();
+                    BigInteger newId = BigInteger.valueOf(++maxFootnoteId);
+                    fn.setId(newId);
+                    footnoteIdMap.put(oldId, newId);
+                }
+                targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
+            }
 
-			// 2) Merge Footnotes
-			Map<BigInteger, BigInteger> footnoteIdMap = new LinkedHashMap<>();
-			FootnotesPart srcFootnotes = srcMain.getFootnotesPart();
-			if (srcFootnotes != null && srcFootnotes.getContents() != null) {
-				for (CTFtnEdn fn : srcFootnotes.getContents().getFootnote()) {
-					BigInteger oldId = fn.getId();
-					BigInteger newId = BigInteger.valueOf(++maxFootnoteId);
-					fn.setId(newId);
-					footnoteIdMap.put(oldId, newId);
-				}
-				targetFootnotes.getContents().getFootnote().addAll(srcFootnotes.getContents().getFootnote());
-			}
+            // 3) Merge Endnotes
+            Map<BigInteger, BigInteger> endnoteIdMap = new LinkedHashMap<>();
+            EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
+            if (srcEndnotes != null && srcEndnotes.getContents() != null) {
+                for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
+                    BigInteger oldId = en.getId();
+                    BigInteger newId = BigInteger.valueOf(++maxEndnoteId);
+                    en.setId(newId);
+                    endnoteIdMap.put(oldId, newId);
+                }
+                targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
+            }
 
-			// 3) Merge Endnotes
-			Map<BigInteger, BigInteger> endnoteIdMap = new LinkedHashMap<>();
-			EndnotesPart srcEndnotes = getEndnotesPart(srcPkg);
-			if (srcEndnotes != null && srcEndnotes.getContents() != null) {
-				for (CTFtnEdn en : srcEndnotes.getContents().getEndnote()) {
-					BigInteger oldId = en.getId();
-					BigInteger newId = BigInteger.valueOf(++maxEndnoteId);
-					en.setId(newId);
-					endnoteIdMap.put(oldId, newId);
-				}
-				targetEndnotes.getContents().getEndnote().addAll(srcEndnotes.getContents().getEndnote());
-			}
+            // 4) Merge Comments
+            Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
+            CommentsPart srcComments = srcMain.getCommentsPart();
+            if (srcComments != null && srcComments.getContents() != null) {
+                for (Comments.Comment c : srcComments.getContents().getComment()) {
+                    BigInteger oldId = c.getId();
+                    log.info("comment old id {}", oldId);
+                    BigInteger newId = BigInteger.valueOf(++maxCommentId);
+                    c.setId(newId);
+                    commentIdMap.put(oldId, newId);
+                }
+                targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
+            }
+            // 5) Append body content, fixing IDs
+            log.info("relIdMapping map {}", relIdMapping);
+            if (srcMain.getContent() != null) {
+                for (Object o : srcMain.getContent()) {
+                    Object clone = XmlUtils.deepCopy(o);
+                    String xml = XmlUtils.marshaltoString(clone, true);
 
-			// 4) Merge Comments
-			Map<BigInteger, BigInteger> commentIdMap = new LinkedHashMap<>();
-			CommentsPart srcComments = srcMain.getCommentsPart();
-			if (srcComments != null && srcComments.getContents() != null) {
-				for (Comments.Comment c : srcComments.getContents().getComment()) {
-					BigInteger oldId = c.getId();
-					log.info("comment old id {}", oldId);
-					BigInteger newId = BigInteger.valueOf(++maxCommentId);
-					c.setId(newId);
-					commentIdMap.put(oldId, newId);
-				}
-				targetComments.getContents().getComment().addAll(srcComments.getContents().getComment());
-			}
-			// 5) Append body content, fixing IDs
-			log.info("relIdMapping map {}", relIdMapping);
-			if (srcMain.getContent() != null) {
-				for (Object o : srcMain.getContent()) {
-					Object clone = XmlUtils.deepCopy(o);
-					String xml = XmlUtils.marshaltoString(clone, true);
+                    // Replace relIds
 
-					// Replace relIds
+                    for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
+                        xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
+                        xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
+                    }
+                    // Replace footnote IDs
 
-					for (Map.Entry<String, String> e : relIdMapping.entrySet()) {
-						xml = xml.replace("r:embed=\"" + e.getKey() + "\"", "r:embed=\"" + e.getValue() + "\"");
-						xml = xml.replace("r:id=\"" + e.getKey() + "\"", "r:id=\"" + e.getValue() + "\"");
-					}
-					// Replace footnote IDs
+                    List<Integer> currIdFootnote = getMapKeyList(xml, "w:footnoteReference[^>]*w:id=\"(\\d+)\"");
+                    for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
+                        if (currIdFootnote.contains(e.getKey().intValue())) {
+                            xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
+                                    "w:footnoteReference w:id=\"" + e.getValue() + "\"");
+                            currIdFootnote.remove(Integer.getInteger(e.getKey().toString()));
+                        }
+                    }
+                    // Replace endnote IDs
+                    for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
+                        xml = xml.replace("w:endnoteReference w:id=\"" + e.getKey() + "\"",
+                                "w:endnoteReference w:id=\"" + e.getValue() + "\"");
+                    }
+                    // Replace comment IDs
+                    List<Integer> currId = getMapKeyList(xml, "w:commentReference[^>]*w:id=\"(\\d+)\"");
 
-					List<Integer> currIdFootnote = getMapKeyList(xml, "w:footnoteReference[^>]*w:id=\"(\\d+)\"");
-					for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
-						if (currIdFootnote.contains(e.getKey().intValue())) {
-							xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
-									"w:footnoteReference w:id=\"" + e.getValue() + "\"");
-							currIdFootnote.remove(Integer.getInteger(e.getKey().toString()));
-						}
-					}
-					// Replace endnote IDs
-					for (Map.Entry<BigInteger, BigInteger> e : endnoteIdMap.entrySet()) {
-						xml = xml.replace("w:endnoteReference w:id=\"" + e.getKey() + "\"",
-								"w:endnoteReference w:id=\"" + e.getValue() + "\"");
-					}
-					// Replace comment IDs
-					List<Integer> currId = getMapKeyList(xml, "w:commentReference[^>]*w:id=\"(\\d+)\"");
+                    for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
 
-					for (Map.Entry<BigInteger, BigInteger> e : commentIdMap.entrySet()) {
+                        if (currId.contains(e.getKey().intValue())) {
+                            xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
+                                    "w:commentReference w:id=\"" + e.getValue() + "\"");
+                            xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
+                                    "w:commentRangeStart w:id=\"" + e.getValue() + "\"");
+                            xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
+                                    "w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
+                            currId.remove(Integer.getInteger(e.getKey().toString()));
+                        }
 
-						if (currId.contains(e.getKey().intValue())) {
-							xml = xml.replace("w:commentReference w:id=\"" + e.getKey() + "\"",
-									"w:commentReference w:id=\"" + e.getValue() + "\"");
-							xml = xml.replace("w:commentRangeStart w:id=\"" + e.getKey() + "\"",
-									"w:commentRangeStart w:id=\"" + e.getValue() + "\"");
-							xml = xml.replace("w:commentRangeEnd w:id=\"" + e.getKey() + "\"",
-									"w:commentRangeEnd w:id=\"" + e.getValue() + "\"");
-							currId.remove(Integer.getInteger(e.getKey().toString()));
-						}
+                    }
+                    // Replace numbering numId references using numberingMaps.numIdMap
+                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
+                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
+                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
+                                    "w:numId w:val=\"" + e.getValue() + "\"");
+                            // Also cover alternative formatting if present
+                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
+                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
+                        }
+                    }
+                    Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    targetMain.getContent().add(fixed);
+                }
+            }
 
-					}
+            // 6) Copy headers/footers (simple best-effort)
+            List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
+            if (sections != null) {
+                HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
+                if (srcPolicy != null) {
+                    if (srcPolicy.getDefaultHeader() != null) {
+                        HeaderPart clonedHeader = new HeaderPart();
+                        clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
+                        targetMain.addTargetPart(clonedHeader);
+                    }
+                    if (srcPolicy.getDefaultFooter() != null) {
+                        FooterPart clonedFooter = new FooterPart();
+                        clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
+                        targetMain.addTargetPart(clonedFooter);
+                    }
+                }
+            }
 
-					Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
-					targetMain.getContent().add(fixed);
-				}
-			}
+            // Optional page break
+            if (files.get(idx).isBreak()) {
+                targetMain.getContent().add(createPageBreak());
+            }
+        }
 
-			// 6) Copy headers/footers (simple best-effort)
-			List<SectionWrapper> sections = srcPkg.getDocumentModel().getSections();
-			if (sections != null) {
-				HeaderFooterPolicy srcPolicy = sections.get(0).getHeaderFooterPolicy();
-				if (srcPolicy != null) {
-					if (srcPolicy.getDefaultHeader() != null) {
-						HeaderPart clonedHeader = new HeaderPart();
-						clonedHeader.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultHeader().getContents()));
-						targetMain.addTargetPart(clonedHeader);
-					}
-					if (srcPolicy.getDefaultFooter() != null) {
-						FooterPart clonedFooter = new FooterPart();
-						clonedFooter.setContents(XmlUtils.deepCopy(srcPolicy.getDefaultFooter().getContents()));
-						targetMain.addTargetPart(clonedFooter);
-					}
-				}
-			}
-
-			// Optional page break
-			if (files.get(idx).isBreak()) {
-				targetMain.getContent().add(createPageBreak());
-			}
-		}
-
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-			targetPkg.save(baos);
-			return baos.toByteArray();
-		}
-	}
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            targetPkg.save(baos);
+            return baos.toByteArray();
+        }
+    }
 
 	private static List<Integer> getMapKeyList(String xml, String rgx) {
 		List<Integer> currId = new ArrayList<>();
