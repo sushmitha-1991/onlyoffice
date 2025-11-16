@@ -77,7 +77,7 @@ public class OnlyOfficeController {
 //        document.write(out);
 //        document.close();
         Map<String, String> map = new HashMap<>();
-        ByteArrayResource resource = Utils.replacePlaceholders("/blank/blank.docx", map);
+        ByteArrayResource resource = Utils.replacePlaceholders("blank/blank.docx", map);
 //        byte[] docBytes = out.toByteArray();
 //        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
         thirdPartyDocGen.saveOpenKm(dsp2Key,resource);
