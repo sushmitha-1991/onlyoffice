@@ -1123,8 +1123,9 @@ private static class IdMaps {
 }
     private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
             throws Docx4JException {
-
         IdMaps maps = new IdMaps();
+        if(targetPart==null) return maps;
+
 
         Numbering targetContent = targetPart.getContents();
         Numbering srcContent = srcPart.getContents();
