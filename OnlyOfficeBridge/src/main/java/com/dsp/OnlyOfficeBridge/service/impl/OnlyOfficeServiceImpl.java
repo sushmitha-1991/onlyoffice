@@ -204,9 +204,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 //		, "zoom", 198 fit to width commented for now
 		editorConfig.put("customization", Map.of("forcesave", true, "save", true));
 //		set default editor language to english-India
-		editorConfig.put("lang", "en-IN");
-        editorConfig.put("language","en-IN");
-        editorConfig.put("region","IN");
+//		editorConfig.put("lang", "en-IN");
+//        editorConfig.put("language","en-IN");
+//        editorConfig.put("region","IN");
 
 		// Final response
 		Map<String, Object> response = new HashMap<>();
