@@ -7,6 +7,7 @@ package com.dsp.OnlyOfficeBridge.controller;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,23 +70,24 @@ public class OnlyOfficeController {
 
 
     @GetMapping("/download-empty-docx/{fileName}/{dsp2Key}")
-    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName ,@PathVariable String dsp2Key) throws IOException {
+    public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName ,@PathVariable String dsp2Key) throws Exception {
         // Create an empty DOCX document
-        XWPFDocument document = new XWPFDocument();
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        document.write(out);
-        document.close();
-
-        byte[] docBytes = out.toByteArray();
-        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
-        thirdPartyDocGen.saveOpenKm(dsp2Key,mergedResource);
+        //XWPFDocument document = new XWPFDocument();
+//        ByteArrayOutputStream out = new ByteArrayOutputStream();
+//        document.write(out);
+//        document.close();
+        Map<String, String> map = new HashMap<>();
+        ByteArrayResource resource = Utils.replacePlaceholders("/blank/blank.docx", map);
+//        byte[] docBytes = out.toByteArray();
+//        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
+        thirdPartyDocGen.saveOpenKm(dsp2Key,resource);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         headers.setContentDispositionFormData("attachment", fileName);
 
         return ResponseEntity.ok()
                 .headers(headers)
-                .body(docBytes);
+                .body(resource.getByteArray());
     }
 
 
