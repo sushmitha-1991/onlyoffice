@@ -19,7 +19,7 @@ public interface OnlyOfficeService {
 
 	ResponseEntity<Resource> downloadByKey(String key,String templateId,String refId);
 	
-	public String convertDocxToText(String dspKey);
+	public Boolean convertDocxToText(String dspKey);
 	
 	ResponseEntity<Resource> downloadByKeyPc(String key,String templateId,String refId,String content);
 	

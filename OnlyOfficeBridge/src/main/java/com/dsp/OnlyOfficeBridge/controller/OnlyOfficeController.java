@@ -120,8 +120,8 @@ public class OnlyOfficeController {
 
     @GetMapping("/validate-content")
     public ResponseEntity<?> validateDocContent(@RequestParam String dsp2Key ) {
-        String data=onlyOfficeService.convertDocxToText(dsp2Key);
-        if(data != null) 
+        Boolean data=onlyOfficeService.convertDocxToText(dsp2Key);
+        if(data == true) 
         {
         	 GenericResponse<String> response = new GenericResponse<>(
                      HttpStatus.OK.value(),
