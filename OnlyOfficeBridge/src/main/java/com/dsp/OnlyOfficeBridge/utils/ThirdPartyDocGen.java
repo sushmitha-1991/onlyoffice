@@ -785,6 +785,12 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw e;
 		}
+		// Extract "data" → which is a Map now
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		// Extract mergeDsp2Keys from new response
+		List<String> dspKeys = data != null ? (List<String>) data.get("mergeDsp2Keys") : Collections.emptyList();
+		List<String> missingTurns = data != null ? (List<String>) data.get("missingTurns") : Collections.emptyList();
+
 		String[] parts = refId.split("_", 4);
 		String committeeName = parts[3];
 		List<MargeFileDto> files = new LinkedList<>();
@@ -792,7 +798,6 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
-//			AtomicInteger docCounter = new AtomicInteger(1);
 
 			// Decide which template code should be used
 			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
@@ -801,7 +806,6 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 				map.put("meetingDate", parts[1]);
 				map.put("abbr", parts[2]);
-//				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -810,22 +814,40 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
-				int[] index = {1}; // to track the current position
-				// data is actually a list of dspKeys
-				List<String> dspKeys = (List<String>) body.get("data");
+				int total = dspKeys != null ? dspKeys.size() : 0;
+				int[] index = { 1 };
+
 				if (dspKeys != null) {
-					dspKeys.forEach(dspKey -> {
+					for (String dspKey : dspKeys) {
+
+						// 1️ Add DSP2 FILE
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							if (index[0]++ == dspKeys.size()) {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-							} else {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
-							}
+
+							boolean isLast = index[0] == total;
+
+							files.add(
+									MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast).build());
 						});
-					});
+
+						// 2️ AFTER FIRST DSP2 -> ADD MISSING TURNS PAGE
+						if (index[0] == 1 && missingTurns != null && !missingTurns.isEmpty()) {
+							try {
+								Map<String, String> missingTurnsReplace = new HashMap<>();
+								String missingTurnLines = String.join(",\r\n", missingTurns);
+								missingTurnsReplace.put("missingTurn", missingTurnLines);
+								ByteArrayResource resource = Utils
+										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnsReplace);
+								files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+							} catch (Exception e) {
+								throw new RuntimeException("Error generating missing turns page", e);
+							}
+						}
+
+						index[0]++; // increment AFTER processing each key
+					}
 				}
 			}
 		});
