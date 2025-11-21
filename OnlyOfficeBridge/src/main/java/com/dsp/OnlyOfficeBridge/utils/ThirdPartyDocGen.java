@@ -1090,35 +1090,7 @@ public class ThirdPartyDocGen {
 		}
 	}
 
-//    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-//        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
-//        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
-//
-//        for (int i = 0; i < margeFileDtos.size(); i++) {
-//            MargeFileDto fileBytes = margeFileDtos.get(i);
-//
-//            AlternativeFormatInputPart afiPart = new AlternativeFormatInputPart(
-//                    new org.docx4j.openpackaging.parts.PartName("/part" + i + ".docx"));
-//            afiPart.setBinaryData(fileBytes.getFile());
-//
-//            afiPart.setContentType(
-//                    new org.docx4j.openpackaging.contenttype.ContentType(
-//                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-//
-//            Relationship altChunkRel = mainPart.addTargetPart(afiPart);
-//
-//            // Insert AltChunk into main document
-//            org.docx4j.wml.CTAltChunk ac =
-//                    Context.getWmlObjectFactory().createCTAltChunk();
-//            ac.setId(altChunkRel.getId());
-//            mainPart.addObject(ac);
-//        }
-//
-//        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-//            targetPkg.save(baos);
-//            return baos.toByteArray();
-//        }
-//    }
+
 private static class IdMaps {
     Map<BigInteger, BigInteger> abstractNumIdMap = new LinkedHashMap<>();
     Map<BigInteger, BigInteger> numIdMap = new LinkedHashMap<>();
@@ -1222,63 +1194,7 @@ private static class IdMaps {
         return maps;
     }
 
-    private static void breakListContinuity(MainDocumentPart targetMain){
 
-        P p = Context.getWmlObjectFactory().createP();
-        PPr pPr = Context.getWmlObjectFactory().createPPr();
-
-        // Explicitly remove numbering
-        pPr.setNumPr(null);
-        p.setPPr(pPr);
-
-        targetMain.getContent().add(p);
-    }
-    private static void detachLastNumberedParagraph(MainDocumentPart targetMain) {
-
-        List<Object> content = targetMain.getContent();
-
-        for (int i = content.size() - 1; i >= 0; i--) {
-
-            Object obj = XmlUtils.unwrap(content.get(i));
-
-            // Normal paragraph
-            if (obj instanceof P) {
-                P p = (P) obj;
-                if (p.getPPr() != null && p.getPPr().getNumPr() != null) {
-                    p.getPPr().setNumPr(null);
-                    return;
-                }
-            }
-
-            // If paragraph is inside a table
-            if (obj instanceof Tbl) {
-                Tbl tbl = (Tbl) obj;
-
-                for (Object rowObj : tbl.getContent()) {
-                    Tr tr = (Tr) XmlUtils.unwrap(rowObj);
-
-                    for (Object cellObj : tr.getContent()) {
-                        Tc tc = (Tc) XmlUtils.unwrap(cellObj);
-
-                        for (Object inner : tc.getContent()) {
-                            Object inside = XmlUtils.unwrap(inner);
-
-                            if (inside instanceof P) {
-                                P p = (P) inside;
-
-                                if (p.getPPr() != null
-                                        && p.getPPr().getNumPr() != null) {
-
-                                    p.getPPr().setNumPr(null);
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
 
@@ -1305,65 +1221,7 @@ private static class IdMaps {
             }
         }
     }
-    /**
-     * Helper to remap w:numId w:val="old" → "new" in a small XML fragment.
-     */
-    private static String remapNumIdsInXml(String xml, Map<BigInteger, BigInteger> numIdMap) {
-        if (numIdMap == null || numIdMap.isEmpty() || xml == null || xml.isEmpty()) {
-            return xml;
-        }
-        for (Map.Entry<BigInteger, BigInteger> e : numIdMap.entrySet()) {
-            String oldVal = e.getKey().toString();
-            String newVal = e.getValue().toString();
-            // simple, but works for Word's usual pattern: <w:numId w:val="X"/>
-            xml = xml.replace("w:numId w:val=\"" + oldVal + "\"", "w:numId w:val=\"" + newVal + "\"");
-        }
-        return xml;
-    }
-    private static void normalizeNumbering(NumberingDefinitionsPart numberingPart) {
 
-        if (numberingPart == null) return;
-        try {
-            Numbering numbering = numberingPart.getContents();
-
-            for (Numbering.AbstractNum abs : numbering.getAbstractNum()) {
-
-                if (abs.getLvl() == null || abs.getLvl().isEmpty()) continue;
-
-                Lvl referenceLvl = abs.getLvl().get(0);
-
-                for (int i = 0; i <= 8; i++) {
-
-                    boolean found = false;
-
-                    for (Lvl lvl : abs.getLvl()) {
-                        if (lvl.getIlvl().intValue() == i) {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found) {
-
-                        Lvl newLvl = Context.getWmlObjectFactory().createLvl();
-                        newLvl.setIlvl(BigInteger.valueOf(i));
-
-                        if (referenceLvl.getNumFmt() != null) {
-                            newLvl.setNumFmt(XmlUtils.deepCopy(referenceLvl.getNumFmt()));
-                        }
-
-                        if (referenceLvl.getLvlText() != null) {
-                            newLvl.setLvlText(XmlUtils.deepCopy(referenceLvl.getLvlText()));
-                        }
-
-                        abs.getLvl().add(newLvl);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
 
     public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
@@ -1412,8 +1270,7 @@ private static class IdMaps {
             WordprocessingMLPackage srcPkg = WordprocessingMLPackage
                     .load(new ByteArrayInputStream(files.get(idx).getFile()));
             MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
-            detachLastNumberedParagraph(targetMain);
-            breakListContinuity(targetMain);
+
             // 1) Copy images
             Map<String, String> relIdMapping = new HashMap<>();
             for (Part p : srcPkg.getParts().getParts().values()) {
@@ -1526,16 +1383,7 @@ private static class IdMaps {
                         }
 
                     }
-                    // Replace numbering numId references using numberingMaps.numIdMap
-//                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
-//                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
-//                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
-//                                    "w:numId w:val=\"" + e.getValue() + "\"");
-//                            // Also cover alternative formatting if present
-//                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
-//                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
-//                        }
-//                    }
+
 
                     Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
                     if (numberingMaps != null && numberingMaps.numIdMap != null) {
