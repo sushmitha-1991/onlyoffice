@@ -66,6 +66,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 @Slf4j
 @Component
@@ -1121,11 +1123,16 @@ private static class IdMaps {
     Map<BigInteger, BigInteger> abstractNumIdMap = new LinkedHashMap<>();
     Map<BigInteger, BigInteger> numIdMap = new LinkedHashMap<>();
 }
-    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
-            throws Docx4JException {
+    /**
+     * Merge numbering of srcPart into targetPart.
+     * Assumes targetPart is NOT null.
+     */
+    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart,
+                                         NumberingDefinitionsPart targetPart) throws Docx4JException {
         IdMaps maps = new IdMaps();
-        if(targetPart==null) return maps;
-
+        if (targetPart == null || srcPart == null) {
+            return maps;
+        }
 
         Numbering targetContent = targetPart.getContents();
         Numbering srcContent = srcPart.getContents();
@@ -1151,7 +1158,21 @@ private static class IdMaps {
         // copy abstractNum entries (deep copy then assign new abstractNumId)
         if (srcContent.getAbstractNum() != null) {
             for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
-                Numbering.AbstractNum copyAbs = (Numbering.AbstractNum) XmlUtils.deepCopy(srcAbs);
+                Numbering.AbstractNum copyAbs = XmlUtils.deepCopy(srcAbs);
+                if (copyAbs.getLvl() != null) {
+                    for (Lvl lvl : copyAbs.getLvl()) {
+                        if (lvl.getIlvl() != null && lvl.getIlvl().intValue() == 0) {
+                            if (lvl.getStart() == null) {
+                                Lvl.Start start = Context.getWmlObjectFactory().createLvlStart();
+                                start.setVal(BigInteger.ONE);
+                                lvl.setStart(start);
+                            } else {
+                                lvl.getStart().setVal(BigInteger.ONE);
+                            }
+
+                        }
+                    }
+                }
                 BigInteger oldAbstractId = srcAbs.getAbstractNumId();
                 BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
                 copyAbs.setAbstractNumId(newAbstractId);
@@ -1163,9 +1184,25 @@ private static class IdMaps {
         // copy num entries (deep copy then assign new numId and remap abstractNumId reference inside num)
         if (srcContent.getNum() != null) {
             for (Numbering.Num srcNum : srcContent.getNum()) {
-                Numbering.Num copyNum = (Numbering.Num) XmlUtils.deepCopy(srcNum);
+                Numbering.Num copyNum = XmlUtils.deepCopy(srcNum);
+
+                copyNum.getLvlOverride().clear();
+
+                Numbering.Num.LvlOverride lvlOverride =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverride();
+                lvlOverride.setIlvl(BigInteger.ZERO);
+
+                Numbering.Num.LvlOverride.StartOverride start =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverrideStartOverride();
+                start.setVal(BigInteger.ONE);
+
+                lvlOverride.setStartOverride(start);
+                copyNum.getLvlOverride().add(lvlOverride);
+
                 BigInteger oldNumId = srcNum.getNumId();
+
                 BigInteger newNumId = BigInteger.valueOf(++maxNumId);
+                log.info("oldNumId {} newNumId {}",oldNumId,newNumId);
                 copyNum.setNumId(newNumId);
 
                 // remap abstractNumId inside copyNum if present
@@ -1174,7 +1211,7 @@ private static class IdMaps {
                     BigInteger mappedAbs = maps.abstractNumIdMap.get(oldAbsRef);
                     if (mappedAbs != null) {
                         copyNum.getAbstractNumId().setVal(mappedAbs);
-                    } // else leave as-is (best-effort)
+                    }
                 }
 
                 maps.numIdMap.put(oldNumId, newNumId);
@@ -1184,7 +1221,152 @@ private static class IdMaps {
 
         return maps;
     }
-	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+
+    private static void breakListContinuity(MainDocumentPart targetMain){
+
+        P p = Context.getWmlObjectFactory().createP();
+        PPr pPr = Context.getWmlObjectFactory().createPPr();
+
+        // Explicitly remove numbering
+        pPr.setNumPr(null);
+        p.setPPr(pPr);
+
+        targetMain.getContent().add(p);
+    }
+    private static void detachLastNumberedParagraph(MainDocumentPart targetMain) {
+
+        List<Object> content = targetMain.getContent();
+
+        for (int i = content.size() - 1; i >= 0; i--) {
+
+            Object obj = XmlUtils.unwrap(content.get(i));
+
+            // Normal paragraph
+            if (obj instanceof P) {
+                P p = (P) obj;
+                if (p.getPPr() != null && p.getPPr().getNumPr() != null) {
+                    p.getPPr().setNumPr(null);
+                    return;
+                }
+            }
+
+            // If paragraph is inside a table
+            if (obj instanceof Tbl) {
+                Tbl tbl = (Tbl) obj;
+
+                for (Object rowObj : tbl.getContent()) {
+                    Tr tr = (Tr) XmlUtils.unwrap(rowObj);
+
+                    for (Object cellObj : tr.getContent()) {
+                        Tc tc = (Tc) XmlUtils.unwrap(cellObj);
+
+                        for (Object inner : tc.getContent()) {
+                            Object inside = XmlUtils.unwrap(inner);
+
+                            if (inside instanceof P) {
+                                P p = (P) inside;
+
+                                if (p.getPPr() != null
+                                        && p.getPPr().getNumPr() != null) {
+
+                                    p.getPPr().setNumPr(null);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
+
+        if (obj instanceof P) {
+            P p = (P) obj;
+
+            if (p.getPPr() != null &&
+                    p.getPPr().getNumPr() != null &&
+                    p.getPPr().getNumPr().getNumId() != null &&
+                    p.getPPr().getNumPr().getNumId().getVal() != null) {
+
+                BigInteger oldId = p.getPPr().getNumPr().getNumId().getVal();
+
+                if (numIdMap.containsKey(oldId)) {
+                    p.getPPr().getNumPr().getNumId()
+                            .setVal(numIdMap.get(oldId));
+                }
+            }
+        }
+
+        if (obj instanceof ContentAccessor) {
+            for (Object child : ((ContentAccessor) obj).getContent()) {
+                remapNumIdInContent(child, numIdMap);
+            }
+        }
+    }
+    /**
+     * Helper to remap w:numId w:val="old" → "new" in a small XML fragment.
+     */
+    private static String remapNumIdsInXml(String xml, Map<BigInteger, BigInteger> numIdMap) {
+        if (numIdMap == null || numIdMap.isEmpty() || xml == null || xml.isEmpty()) {
+            return xml;
+        }
+        for (Map.Entry<BigInteger, BigInteger> e : numIdMap.entrySet()) {
+            String oldVal = e.getKey().toString();
+            String newVal = e.getValue().toString();
+            // simple, but works for Word's usual pattern: <w:numId w:val="X"/>
+            xml = xml.replace("w:numId w:val=\"" + oldVal + "\"", "w:numId w:val=\"" + newVal + "\"");
+        }
+        return xml;
+    }
+    private static void normalizeNumbering(NumberingDefinitionsPart numberingPart) {
+
+        if (numberingPart == null) return;
+        try {
+            Numbering numbering = numberingPart.getContents();
+
+            for (Numbering.AbstractNum abs : numbering.getAbstractNum()) {
+
+                if (abs.getLvl() == null || abs.getLvl().isEmpty()) continue;
+
+                Lvl referenceLvl = abs.getLvl().get(0);
+
+                for (int i = 0; i <= 8; i++) {
+
+                    boolean found = false;
+
+                    for (Lvl lvl : abs.getLvl()) {
+                        if (lvl.getIlvl().intValue() == i) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+
+                        Lvl newLvl = Context.getWmlObjectFactory().createLvl();
+                        newLvl.setIlvl(BigInteger.valueOf(i));
+
+                        if (referenceLvl.getNumFmt() != null) {
+                            newLvl.setNumFmt(XmlUtils.deepCopy(referenceLvl.getNumFmt()));
+                        }
+
+                        if (referenceLvl.getLvlText() != null) {
+                            newLvl.setLvlText(XmlUtils.deepCopy(referenceLvl.getLvlText()));
+                        }
+
+                        abs.getLvl().add(newLvl);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
         if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("No files to merge");
         }
@@ -1230,7 +1412,8 @@ private static class IdMaps {
             WordprocessingMLPackage srcPkg = WordprocessingMLPackage
                     .load(new ByteArrayInputStream(files.get(idx).getFile()));
             MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
-
+            detachLastNumberedParagraph(targetMain);
+            breakListContinuity(targetMain);
             // 1) Copy images
             Map<String, String> relIdMapping = new HashMap<>();
             for (Part p : srcPkg.getParts().getParts().values()) {
@@ -1255,6 +1438,8 @@ private static class IdMaps {
             if (srcNumbering != null) {
                 NumberingDefinitionsPart tgtNumbering = targetMain.getNumberingDefinitionsPart();
                 numberingMaps = mergeNumbering(srcNumbering, tgtNumbering);
+//                forceAbstractLevelStartOne(tgtNumbering);
+               // normalizeNumbering(tgtNumbering);
             } else {
                 numberingMaps = new IdMaps(); // empty maps
             }
@@ -1342,16 +1527,20 @@ private static class IdMaps {
 
                     }
                     // Replace numbering numId references using numberingMaps.numIdMap
-                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
-                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
-                                    "w:numId w:val=\"" + e.getValue() + "\"");
-                            // Also cover alternative formatting if present
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
-                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
-                        }
-                    }
+//                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
+//                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
+//                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
+//                                    "w:numId w:val=\"" + e.getValue() + "\"");
+//                            // Also cover alternative formatting if present
+//                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
+//                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
+//                        }
+//                    }
+
                     Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
+                        remapNumIdInContent(fixed, numberingMaps.numIdMap);
+                    }
                     targetMain.getContent().add(fixed);
                 }
             }
