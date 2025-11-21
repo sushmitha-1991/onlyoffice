@@ -646,7 +646,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		}
 	}
 
-	public String convertDocxToText(String dspKey) {
+	public Boolean convertDocxToText(String dspKey) {
         try {
             log.info("Converting DOCX to HTML for DSP Key: {}", dspKey);
  
@@ -666,38 +666,42 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             // Convert DOCX bytes to TXT
             try (ByteArrayInputStream bis = new ByteArrayInputStream(resourceBody.getByteArray());
             	     XWPFDocument document = new XWPFDocument(bis)) {
+            	if(document.getParagraphs().size()>0)
+            	{
+            		return true;
+            	}
+            	else
+            	{
+            		return false;
+            	}
+//            	    StringBuilder textBuilder = new StringBuilder();
 
-            	    StringBuilder textBuilder = new StringBuilder();
+//            	    log.warn("paragraph before loop: {}", document.getParagraphs());
+//            	    document.getParagraphs().forEach(paragraph -> {
+//            	    	log.warn("paragraph: {}", document.getParagraphs());
+//            	        String text = paragraph.getText();
+//            	        log.warn("paragraph text: {}", paragraph.getText());
+//            	        if (text != null && !text.trim().isEmpty()) {
+//            	            textBuilder.append(text.trim()).append("\n");
+//            	            log.warn("text builder append: {}", textBuilder.toString());  
+//            	        }
+//            	    });
 
-            	    document.getParagraphs().forEach(paragraph -> {
-            	        String text = paragraph.getText();
-            	        if (text != null && !text.trim().isEmpty()) {
-            	            textBuilder.append(text.trim()).append("\n");
-            	        }
-            	    });
+//            	    String docText = textBuilder.toString().trim();
 
-            	    String docText = textBuilder.toString().trim();
-
-            	    if (docText.isEmpty()) {
-            	        log.warn("Document content is empty for DSP Key: {}", dspKey);
-            	        return null; 
-            	    } else {
-            	        log.info("Document has content ({} chars)", docText.length());
-            	        log.info("Document has content :-\"{}\" ", docText);
-            	        return docText;
-            	    }
+//            	    if (docText.isEmpty()) {
+//            	        log.warn("Document content is empty for DSP Key: {}", dspKey);
+//            	        return null; 
+//            	    } else {
+//            	        log.info("Document has content ({} chars)", docText.length());
+//            	        log.info("Document has content :-\"{}\" ", docText);
+//            	        return docText;
+//            	    }
 
             	} catch (IOException e) {
             	    log.error("Error reading DOCX bytes for DSP Key: {}", dspKey, e);
             	    throw new RuntimeException("Failed to process DOCX file", e);
             	}
-//            WordprocessingMLPackage wordMLPackage =
-//                    WordprocessingMLPackage.load(new ByteArrayInputStream(resourceBody.getByteArray()));
-// 
-//            MainDocumentPart mainDocPart = wordMLPackage.getMainDocumentPart();
-//			String text = mainDocPart.getContent().toString();
-//            return text;
-// 
         } catch (Exception e) {
             log.error("Error converting DOCX to TEXT for DSP Key: {}", dspKey, e);
             return null;

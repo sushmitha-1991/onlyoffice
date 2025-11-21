@@ -77,7 +77,14 @@ public class OnlyOfficeController {
 //        document.write(out);
 //        document.close();
         Map<String, String> map = new HashMap<>();
-        ByteArrayResource resource = Utils.replacePlaceholders("blank/blank.docx", map);
+        ByteArrayResource resource;
+        if(fileName.equalsIgnoreCase("Translator-translated.docx"))
+        {
+        	 resource = Utils.replacePlaceholders("translation/blank/blank.docx", map);
+        }
+        else {
+         resource = Utils.replacePlaceholders("blank/blank.docx", map);
+        }
 //        byte[] docBytes = out.toByteArray();
 //        ByteArrayResource mergedResource = new ByteArrayResource(docBytes);
         thirdPartyDocGen.saveOpenKm(dsp2Key,resource);
@@ -120,8 +127,8 @@ public class OnlyOfficeController {
 
     @GetMapping("/validate-content")
     public ResponseEntity<?> validateDocContent(@RequestParam String dsp2Key ) {
-        String data=onlyOfficeService.convertDocxToText(dsp2Key);
-        if(data != null) 
+        Boolean data=onlyOfficeService.convertDocxToText(dsp2Key);
+        if(data == true) 
         {
         	 GenericResponse<String> response = new GenericResponse<>(
                      HttpStatus.OK.value(),
