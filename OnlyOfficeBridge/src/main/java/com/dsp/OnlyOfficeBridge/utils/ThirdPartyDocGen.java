@@ -66,6 +66,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 @Slf4j
 @Component
@@ -1088,44 +1090,21 @@ public class ThirdPartyDocGen {
 		}
 	}
 
-//    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-//        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
-//        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
-//
-//        for (int i = 0; i < margeFileDtos.size(); i++) {
-//            MargeFileDto fileBytes = margeFileDtos.get(i);
-//
-//            AlternativeFormatInputPart afiPart = new AlternativeFormatInputPart(
-//                    new org.docx4j.openpackaging.parts.PartName("/part" + i + ".docx"));
-//            afiPart.setBinaryData(fileBytes.getFile());
-//
-//            afiPart.setContentType(
-//                    new org.docx4j.openpackaging.contenttype.ContentType(
-//                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-//
-//            Relationship altChunkRel = mainPart.addTargetPart(afiPart);
-//
-//            // Insert AltChunk into main document
-//            org.docx4j.wml.CTAltChunk ac =
-//                    Context.getWmlObjectFactory().createCTAltChunk();
-//            ac.setId(altChunkRel.getId());
-//            mainPart.addObject(ac);
-//        }
-//
-//        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-//            targetPkg.save(baos);
-//            return baos.toByteArray();
-//        }
-//    }
+
 private static class IdMaps {
     Map<BigInteger, BigInteger> abstractNumIdMap = new LinkedHashMap<>();
     Map<BigInteger, BigInteger> numIdMap = new LinkedHashMap<>();
 }
-    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
-            throws Docx4JException {
+    /**
+     * Merge numbering of srcPart into targetPart.
+     * Assumes targetPart is NOT null.
+     */
+    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart,
+                                         NumberingDefinitionsPart targetPart) throws Docx4JException {
         IdMaps maps = new IdMaps();
-        if(targetPart==null) return maps;
-
+        if (targetPart == null || srcPart == null) {
+            return maps;
+        }
 
         Numbering targetContent = targetPart.getContents();
         Numbering srcContent = srcPart.getContents();
@@ -1151,7 +1130,21 @@ private static class IdMaps {
         // copy abstractNum entries (deep copy then assign new abstractNumId)
         if (srcContent.getAbstractNum() != null) {
             for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
-                Numbering.AbstractNum copyAbs = (Numbering.AbstractNum) XmlUtils.deepCopy(srcAbs);
+                Numbering.AbstractNum copyAbs = XmlUtils.deepCopy(srcAbs);
+                if (copyAbs.getLvl() != null) {
+                    for (Lvl lvl : copyAbs.getLvl()) {
+                        if (lvl.getIlvl() != null && lvl.getIlvl().intValue() == 0) {
+                            if (lvl.getStart() == null) {
+                                Lvl.Start start = Context.getWmlObjectFactory().createLvlStart();
+                                start.setVal(BigInteger.ONE);
+                                lvl.setStart(start);
+                            } else {
+                                lvl.getStart().setVal(BigInteger.ONE);
+                            }
+
+                        }
+                    }
+                }
                 BigInteger oldAbstractId = srcAbs.getAbstractNumId();
                 BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
                 copyAbs.setAbstractNumId(newAbstractId);
@@ -1163,9 +1156,25 @@ private static class IdMaps {
         // copy num entries (deep copy then assign new numId and remap abstractNumId reference inside num)
         if (srcContent.getNum() != null) {
             for (Numbering.Num srcNum : srcContent.getNum()) {
-                Numbering.Num copyNum = (Numbering.Num) XmlUtils.deepCopy(srcNum);
+                Numbering.Num copyNum = XmlUtils.deepCopy(srcNum);
+
+                copyNum.getLvlOverride().clear();
+
+                Numbering.Num.LvlOverride lvlOverride =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverride();
+                lvlOverride.setIlvl(BigInteger.ZERO);
+
+                Numbering.Num.LvlOverride.StartOverride start =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverrideStartOverride();
+                start.setVal(BigInteger.ONE);
+
+                lvlOverride.setStartOverride(start);
+                copyNum.getLvlOverride().add(lvlOverride);
+
                 BigInteger oldNumId = srcNum.getNumId();
+
                 BigInteger newNumId = BigInteger.valueOf(++maxNumId);
+                log.info("oldNumId {} newNumId {}",oldNumId,newNumId);
                 copyNum.setNumId(newNumId);
 
                 // remap abstractNumId inside copyNum if present
@@ -1174,7 +1183,7 @@ private static class IdMaps {
                     BigInteger mappedAbs = maps.abstractNumIdMap.get(oldAbsRef);
                     if (mappedAbs != null) {
                         copyNum.getAbstractNumId().setVal(mappedAbs);
-                    } // else leave as-is (best-effort)
+                    }
                 }
 
                 maps.numIdMap.put(oldNumId, newNumId);
@@ -1184,7 +1193,38 @@ private static class IdMaps {
 
         return maps;
     }
-	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+
+
+
+    private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
+
+        if (obj instanceof P) {
+            P p = (P) obj;
+
+            if (p.getPPr() != null &&
+                    p.getPPr().getNumPr() != null &&
+                    p.getPPr().getNumPr().getNumId() != null &&
+                    p.getPPr().getNumPr().getNumId().getVal() != null) {
+
+                BigInteger oldId = p.getPPr().getNumPr().getNumId().getVal();
+
+                if (numIdMap.containsKey(oldId)) {
+                    p.getPPr().getNumPr().getNumId()
+                            .setVal(numIdMap.get(oldId));
+                }
+            }
+        }
+
+        if (obj instanceof ContentAccessor) {
+            for (Object child : ((ContentAccessor) obj).getContent()) {
+                remapNumIdInContent(child, numIdMap);
+            }
+        }
+    }
+
+
+
+    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
         if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("No files to merge");
         }
@@ -1255,6 +1295,8 @@ private static class IdMaps {
             if (srcNumbering != null) {
                 NumberingDefinitionsPart tgtNumbering = targetMain.getNumberingDefinitionsPart();
                 numberingMaps = mergeNumbering(srcNumbering, tgtNumbering);
+//                forceAbstractLevelStartOne(tgtNumbering);
+               // normalizeNumbering(tgtNumbering);
             } else {
                 numberingMaps = new IdMaps(); // empty maps
             }
@@ -1341,17 +1383,12 @@ private static class IdMaps {
                         }
 
                     }
-                    // Replace numbering numId references using numberingMaps.numIdMap
-                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
-                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
-                                    "w:numId w:val=\"" + e.getValue() + "\"");
-                            // Also cover alternative formatting if present
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
-                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
-                        }
-                    }
+
+
                     Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
+                        remapNumIdInContent(fixed, numberingMaps.numIdMap);
+                    }
                     targetMain.getContent().add(fixed);
                 }
             }
