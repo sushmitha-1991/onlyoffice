@@ -174,7 +174,7 @@ public class ThirdPartyDocGen {
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
 				});
 
 			}
@@ -267,7 +267,7 @@ public class ThirdPartyDocGen {
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
+						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
 					}
 				});
 
