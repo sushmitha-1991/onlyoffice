@@ -91,7 +91,7 @@ public abstract class DocGeneratorBase {
 			throw new IllegalStateException("Authorization token is missing");
 		}
 		
-		System.out.println("token>>>>>>>" + token);
+		log.debug("token>>>>>>> {}", token);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.set("Authorization", "Bearer " + token);
@@ -111,9 +111,9 @@ public abstract class DocGeneratorBase {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("Response Body: " + body);
+			log.debug("Response Body: {}", body);
 		} catch (Exception e) {
-			System.err.println("Error during API call-B2: " + e.getMessage());
+			log.error("Error during API call-B2: {}" + e.getMessage());
 			throw e;
 		}
 		
@@ -153,14 +153,14 @@ public abstract class DocGeneratorBase {
 			try (FileOutputStream fos = new FileOutputStream(tempFile)) {
 				fos.write(resource.getByteArray());
 			}
-			System.out.println(">>> Calling Upload to OpenKm");
+			log.debug(">>> Calling Upload to OpenKm");
 			String documentName = dsp2Key + ".docx";
 
 			// 2. Upload to OpenKM
 			String openKmResponse = uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
 					"ApplicationInstance", "1");
 
-			System.out.println(">>> Download completed" + openKmResponse);
+			log.debug(">>> Download completed {}", openKmResponse);
 
 			// 3. Parse OpenKM response
 			ObjectMapper objectMapper = new ObjectMapper();
@@ -168,7 +168,7 @@ public abstract class DocGeneratorBase {
 			JsonNode dataNode = rootNode.path("data");
 			String documentUuid = dataNode.path("documentUuid").asText();
 
-			System.out.println(">>> documentUuid - " + documentUuid);
+			log.debug(">>> documentUuid - ", documentUuid);
 
 			// 4. Build OpenKM download URL
 			String downloadUrl = downloadOkmUrl + documentUuid;
@@ -184,11 +184,11 @@ public abstract class DocGeneratorBase {
 				metadata.setUpdatedBy(1L);
 				metadata.setUpdatedAt(LocalDateTime.now());
 				metadata.setDocumentKey(documentUuid);
-				System.out.println(">>> Updated existing OnlyOfficeMetadata record");
+				log.debug(">>> Updated existing OnlyOfficeMetadata record");
 			} else {
 				metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(documentUuid).dsp2Key(dsp2Key)
 						.downloadUrl(downloadUrl).onlyOfficeUrl(downloadUrl).createdBy(1L).updatedBy(1L).build();
-				System.out.println(">>> Created new OnlyOfficeMetadata record");
+				log.debug(">>> Created new OnlyOfficeMetadata record");
 			}
 
 			onlyOfficeMetadataRepository.save(metadata);

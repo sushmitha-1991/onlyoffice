@@ -32,7 +32,7 @@ public class TranslatorGenerator extends DocGeneratorBase implements IDocGenerat
 //		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
 
 		String url = baseUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}", url);
 		return url;
 	}
 	
@@ -41,17 +41,17 @@ public class TranslatorGenerator extends DocGeneratorBase implements IDocGenerat
 
 		super.url = getBaseUrl(refId);
 
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
+		log.debug("dsp2key>>>>>>> {}", dsp2Key);
 	
 		Map<String, Object> body = getResponse();
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("trans_merge_con")) {
-				System.out.println("inside trans_merge_con");
+				log.debug("inside trans_merge_con");
 				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
@@ -60,7 +60,7 @@ public class TranslatorGenerator extends DocGeneratorBase implements IDocGenerat
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
+						log.debug("searching by dsp2key in only office meta data {}", map.get("dsp2Key"));
 						ByteArrayResource resourceBody = 
 								downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
