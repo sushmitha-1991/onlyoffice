@@ -305,6 +305,16 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
+//		// Detect House Type (LS or RS)
+//	    String houseType = refId != null && refId.toLowerCase().contains("_rs") ? "rs" : "ls";
+//	    
+//	    // Clean refId before sending to API
+//	    String cleanRefId = refId;
+//	    if (cleanRefId != null) {
+//	        cleanRefId = cleanRefId.replaceAll("(?i)_rs", "").replaceAll("(?i)_ls", "").trim();
+//	    }
+//
+//		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + cleanRefId;
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -407,36 +417,42 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 	
-	private String getHeaderPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/header-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/header-b1-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/header-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/header-synopsis-ls.docx";
-	        default:
-	            return null; // or return a generic header if you want
-	    }
+	// ---------------- HEADER PATH LOGIC ----------------
+	private String getHeaderPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/"; // dynamic base path
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "header-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "header-b1-" + houseType + ".docx";
+		case "List of Business":
+			return base + "header-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "header-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 
-	private String getFooterPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/footer-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/footer-synopsis-ls.docx";
-	        default:
-	            return null;
-	    }
+	// ---------------- FOOTER PATH LOGIC ----------------
+	private String getFooterPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/";
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "List of Business":
+			return base + "footer-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "footer-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 	
 	private String getDisplayDate(String documentDate, HttpHeaders headers) {
@@ -764,6 +780,12 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw e;
 		}
+		// Extract "data" → which is a Map now
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		// Extract mergeDsp2Keys from new response
+		List<String> dspKeys = data != null ? (List<String>) data.get("mergeDsp2Keys") : Collections.emptyList();
+		List<String> missingTurns = data != null ? (List<String>) data.get("missingTurns") : Collections.emptyList();
+
 		String[] parts = refId.split("_", 4);
 		String committeeName = parts[3];
 		List<MargeFileDto> files = new LinkedList<>();
@@ -771,7 +793,6 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
-//			AtomicInteger docCounter = new AtomicInteger(1);
 
 			// Decide which template code should be used
 			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
@@ -780,7 +801,6 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 				map.put("meetingDate", parts[1]);
 				map.put("abbr", parts[2]);
-//				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -789,22 +809,45 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
-				int[] index = {1}; // to track the current position
-				// data is actually a list of dspKeys
-				List<String> dspKeys = (List<String>) body.get("data");
+				int total = dspKeys != null ? dspKeys.size() : 0;
+				int[] index = { 1 };
+
 				if (dspKeys != null) {
-					dspKeys.forEach(dspKey -> {
+					for (String dspKey : dspKeys) {
+
+						// 1️ Add DSP2 FILE
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 						metadataOpt.ifPresent(metadata -> {
 							ByteArrayResource resourceBody = utils
 									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							if (index[0]++ == dspKeys.size()) {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-							} else {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
-							}
+
+							boolean isLast = index[0] == total;
+
+							files.add(
+									MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast).build());
 						});
-					});
+
+						// 2️ AFTER FIRST DSP2 -> ADD MISSING TURNS PAGE
+						if (index[0] == 1 && missingTurns != null && !missingTurns.isEmpty()) {
+							try {
+								for (String turn : missingTurns) {
+
+									Map<String, String> missingTurnsReplace = new HashMap<>();
+									missingTurnsReplace.put("missingTurn", turn); // ONE turn per file
+
+									ByteArrayResource resource = Utils.replacePlaceholders(
+											"verbatim/content-missing-hour.docx", missingTurnsReplace);
+
+									files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true)
+											.build());
+								}
+							} catch (Exception e) {
+								throw new RuntimeException("Error generating missing turns page", e);
+							}
+						}
+
+						index[0]++; // increment AFTER processing each key
+					}
 				}
 			}
 		});
