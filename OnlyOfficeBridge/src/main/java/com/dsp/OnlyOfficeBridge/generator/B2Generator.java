@@ -32,14 +32,14 @@ public class B2Generator extends DocGeneratorBase implements IDocGenerator {
 
 //		String url = bulletin2Url + "/get-generate-doc/" + refId;
 		String url = baseUrl + "/bulletin2/get-generate-doc/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> : {}", url);
 		return url;
 	}
 	
 	@Override
 	public ResponseEntity<Resource> generate(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
+		log.debug("dsp2key>>>>>>> {}", dsp2Key);
 
 		super.url = getBaseUrl(refId);
 	
@@ -48,7 +48,7 @@ public class B2Generator extends DocGeneratorBase implements IDocGenerator {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("bull2_gen_header")) {
 				Map<String, String> map = new HashMap<>();

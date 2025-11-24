@@ -32,7 +32,7 @@ public class LobGenerator extends DocGeneratorBase implements IDocGenerator {
 	String getBaseUrl(String refId) {
 
 		String url = baseUrl + "/lob/generate-doc-id/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}", url);
 		return url;
 	}
 	
@@ -46,7 +46,7 @@ public class LobGenerator extends DocGeneratorBase implements IDocGenerator {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
@@ -81,7 +81,7 @@ public class LobGenerator extends DocGeneratorBase implements IDocGenerator {
 						}
 						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 
-						System.out.println(">>> Find by DSP2Key: " + map.get("dsp2Key"));
+						log.debug(">>> Find by DSP2Key: {}", map.get("dsp2Key"));
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));

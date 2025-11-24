@@ -132,7 +132,7 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>>", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("bull2_gen_header")) {
 				Map<String, String> map = new HashMap<>();
@@ -217,9 +217,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: " + e.getMessage());
 			throw e;
 		}
 
@@ -328,9 +328,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -488,7 +488,7 @@ public class ThirdPartyDocGen {
 	            }
 
 	        } catch (Exception e) {
-	            System.err.println("Error fetching Saka date: " + e.getMessage());
+	            log.error("Error fetching Saka date: {} ", e.getMessage());
 	        }
 
 	        // 🔹 Combine both
@@ -499,7 +499,7 @@ public class ThirdPartyDocGen {
 	        }
 
 	    } catch (Exception e) {
-	        System.err.println("Error formatting display date: " + e.getMessage());
+	        log.error("Error formatting display date: {} ", e.getMessage());
 	        return documentDate; // fallback
 	    }
 	}
@@ -508,7 +508,7 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		log.debug("url>>>>>>> {} === {}", url,token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -522,19 +522,19 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("{}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {}", e.getMessage());
 			throw e;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_merge_con")) {
-				System.out.println("inside cd_merge_con");
+				log.debug("inside cd_merge_con");
 				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
@@ -543,7 +543,7 @@ public class ThirdPartyDocGen {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
+						log.debug("searching by dsp2key in only office meta data {}", map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -571,7 +571,7 @@ public class ThirdPartyDocGen {
 			String refId) {
 		Long historyId = onlyOfficeMetadataRepository.getHistoryId(refId);
 		String url = cdUrl + "/debate/history/get/" + historyId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		log.debug("url>>>>>>> {} ==== {}", url,token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -585,16 +585,16 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {} ", e.getMessage());
 			throw e;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_static_con")) {
 				Map<String, Object> result = (Map<String, Object>) body.get("data");
@@ -635,13 +635,13 @@ public class ThirdPartyDocGen {
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
-				System.out.println("inside cd_static_con");
+				log.debug("inside cd_static_con");
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				if (data.get("dsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -687,11 +687,11 @@ public class ThirdPartyDocGen {
 		Map<String, Object> body = null;
 		try {
 			RestTemplate restTemplate = new RestTemplate();
-			System.out.println(">>> url - " + url);
+			log.debug(">>> url - {} ", url);
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling verbatim API: " + e.getMessage());
+			log.error("Error while calling verbatim API: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -753,7 +753,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			log.error("Error while merging verbatim docs: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -863,7 +863,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_hour_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging hour verbatim docs: " + e.getMessage());
+			log.error("Error while merging hour verbatim docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -884,7 +884,7 @@ public class ThirdPartyDocGen {
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling Lok Sabha API: " + e.getMessage());
+			log.error("Error while calling Lok Sabha API: {} ",e.getMessage());
 			throw e;
 		}
 
@@ -924,7 +924,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sow_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging SOW docs: " + e.getMessage());
+			log.error("Error while merging SOW docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -932,7 +932,7 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = dsp2Url + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}",url);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -947,9 +947,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("API response >>>>> " + body);
+			log.debug("API response >>>>> {}" + body);
 		} catch (Exception e) {
-			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			log.error("Error during API call Synopsis: {}", e.getMessage());
 			throw e;
 		}
 
@@ -985,7 +985,7 @@ public class ThirdPartyDocGen {
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {}" + e.getMessage());
 			}
 		}
 
@@ -1068,7 +1068,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			log.error("Error while merging Synopsis docs: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -1076,7 +1076,7 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genMergedSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = dsp2Url + "/synopsis/synopsis/get-merged-synopsis-dspkeys/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}", url);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -1091,9 +1091,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("API response >>>>> " + body);
+			log.debug("API response >>>>> {} ", body);
 		} catch (Exception e) {
-			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			log.error("Error during API call Synopsis: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -1128,7 +1128,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			log.error("Error while merging Synopsis docs: {}" + e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -1217,7 +1217,7 @@ private static class IdMaps {
                 BigInteger oldNumId = srcNum.getNumId();
 
                 BigInteger newNumId = BigInteger.valueOf(++maxNumId);
-                log.info("oldNumId {} newNumId {}",oldNumId,newNumId);
+                log.debug("oldNumId {} newNumId {}",oldNumId,newNumId);
                 copyNum.setNumId(newNumId);
 
                 // remap abstractNumId inside copyNum if present
@@ -1375,7 +1375,7 @@ private static class IdMaps {
             if (srcComments != null && srcComments.getContents() != null) {
                 for (Comments.Comment c : srcComments.getContents().getComment()) {
                     BigInteger oldId = c.getId();
-                    log.info("comment old id {}", oldId);
+                    log.debug("comment old id {}", oldId);
                     BigInteger newId = BigInteger.valueOf(++maxCommentId);
                     c.setId(newId);
                     commentIdMap.put(oldId, newId);
@@ -1627,7 +1627,7 @@ private static class IdMaps {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			log.error("Error while merging verbatim docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -1656,7 +1656,7 @@ private static class IdMaps {
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error during API call-B2 RS: " + e.getMessage());
+			log.error("Error during API call-B2 RS: {}", e.getMessage());
 			throw e;
 		}
 
@@ -1753,7 +1753,7 @@ private static class IdMaps {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response body :- {}",body);
 		} catch (Exception e) {
 			throw e;
 		}
@@ -2454,7 +2454,7 @@ private static class IdMaps {
 										default -> "";
 										};
 										headerMap.put("billsFor", (String) headerText);
-										System.out.println("This is the headerMap for intro: " + headerMap);
+										log.debug("This is the headerMap for intro: {}" + headerMap);
 
 										ByteArrayResource headerRes = Utils.replacePlaceholders(
 												"pmb-ls/pmb_gen_con_header_common.docx", headerMap);
@@ -2535,7 +2535,7 @@ private static class IdMaps {
 	 */
 	public ResponseEntity<Resource> genPMBResolGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("#### here");
+		log.debug("#### here");
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
 		}
@@ -2647,7 +2647,7 @@ private static class IdMaps {
 
 	public ResponseEntity<Resource> genPMBResolGenerationV2(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("#### here");
+		log.debug("#### here");
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
 		}
@@ -2795,13 +2795,13 @@ private static class IdMaps {
 //			throw e;
 //		}
 
-		String imageUrl="https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07";
+		String imageUrl=downloadKmUrl+"900e055f-6420-452e-9546-46059432ee07";
 		String base64Img="";
 		try (InputStream in = new URL(imageUrl).openStream()) {
 		    byte[] imageBytes = in.readAllBytes();
 		    String base64 = Base64.getEncoder().encodeToString(imageBytes);
 		     base64Img = "data:image/png;base64," + base64;
-		    System.out.println(base64Img);
+		    log.debug("base64 image:- {}",base64Img);
 		} catch (IOException e) {
 		    e.printStackTrace();
 		}
@@ -2820,7 +2820,7 @@ private static class IdMaps {
 			}
 		});
 		 html = htmlRef.get();
-		log.info("html before replace:- {}",html);
+		log.debug("html before replace:- {}",html);
 		
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
@@ -2840,13 +2840,13 @@ private static class IdMaps {
 	            .replaceAll("\\s+", " ")
 	            .trim();
 		html = new String(html.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-		log.info("html after replace:- {}",html);
+		log.debug("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
 			
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
-			System.out.println("******** after saving openkm resource ***********");
+			log.debug("******** after saving openkm resource ***********");
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
@@ -2859,9 +2859,9 @@ private static class IdMaps {
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		try {
 			
-			System.out.println("### inside convertUrlToDocx");
+			log.debug("### inside convertUrlToDocx");
 
-			log.info("inside convertUrlToDocx htmlContent:- {}",htmlContent);
+			log.debug("inside convertUrlToDocx htmlContent:- {}",htmlContent);
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -2877,11 +2877,11 @@ private static class IdMaps {
 //			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
 //					HttpMethod.POST, request, byte[].class);
 
-			System.out.println("#########" + docConvertUrl + "/convert-to-docx");
+			log.debug("######### {}",docConvertUrl,"/convert-to-docx");
 			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/convert-to-docx", HttpMethod.POST,
 					request, byte[].class);
-			System.out.println(" ********converting to odt response *****************");
-			System.out.println(response.getBody());
+			log.debug(" ********converting to odt response *****************");
+			log.debug("response {}",response.getBody());
 			return response.getBody();
 		} catch (Exception e) {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
@@ -2904,9 +2904,9 @@ private static class IdMaps {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body:- {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {}", e.getMessage());
 			throw e;
 		}
 
@@ -2918,7 +2918,7 @@ private static class IdMaps {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -2928,7 +2928,7 @@ private static class IdMaps {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("qbDsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("qbDsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -2980,7 +2980,7 @@ private static class IdMaps {
 
 	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("Received refId: " + refId);
+		log.debug("Received refId: {}", refId);
 		String[] refParts = refId.split("-");
 
 		if (refParts.length < 3) {
@@ -3003,14 +3003,14 @@ private static class IdMaps {
 			houseId = Long.parseLong(refParts[2]);
 			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
 					+ "&houseId=" + houseId;
-			System.out.println("Detected RS Flow: " + url);
+			log.debug("Detected RS Flow: {}", url);
 		} else {
 			// LS Flow: EN-87-2-32-432-342-893
 			abbr = refParts[1];
 			houseId = Long.parseLong(refParts[2]);
 			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
 					+ "&houseId=" + houseId;
-			System.out.println("Detected LS Flow: " + url);
+			log.debug("Detected LS Flow: {}", url);
 		}
 
 		if (token == null) {
@@ -3026,11 +3026,11 @@ private static class IdMaps {
 		Map<String, Object> body;
 		try {
 			RestTemplate restTemplate = new RestTemplate();
-			System.out.println(">>> Calling Placeholder API: " + url);
+			log.debug(">>> Calling Placeholder API: {}", url);
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling Placeholder API: " + e.getMessage());
+			log.error("Error while calling Placeholder API: {}", e.getMessage());
 			throw new RuntimeException("Failed to fetch placeholders from API", e);
 		}
 
@@ -3072,7 +3072,7 @@ private static class IdMaps {
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {}", e.getMessage());
 			}
 		}
 
@@ -3126,11 +3126,11 @@ private static class IdMaps {
 				}
 			}
 
-			System.out.println("Input IDs for DSP2 call: " + inputIds);
+			log.debug("Input IDs for DSP2 call: {}", inputIds);
 
 			if (!inputIds.isEmpty()) {
 				String dsp2Url = rowUrl + "/get-dsp2keys";
-				System.out.print("calling resume of work :" + dsp2Url);
+				log.debug("calling resume of work : {}", dsp2Url);
 
 				HttpEntity<List<Long>> dsp2Entity = new HttpEntity<>(inputIds, headers);
 				// Call the DSP2 API
@@ -3151,7 +3151,7 @@ private static class IdMaps {
 					rawList.forEach(item -> dsp2Keys.add(item.toString()));
 				}
 
-				System.out.println("DSP2 Keys fetched: " + dsp2Keys);
+				log.debug("DSP2 Keys fetched: {}", dsp2Keys);
 
 				// Fetch documents for each DSP2 key and add to files
 				for (String dspKey : dsp2Keys) {
@@ -3177,7 +3177,7 @@ private static class IdMaps {
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 
 		} catch (Exception e) {
-			System.err.println("Error while merging sessional resume docs: " + e.getMessage());
+			log.error("Error while merging sessional resume docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -3207,7 +3207,7 @@ private static class IdMaps {
 					sakaDate = convertedDate.get("en");
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {} ", e.getMessage());
 			}
 		}
 		return sakaDate;

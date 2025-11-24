@@ -50,7 +50,7 @@ public class VerbatimHourlyGenerator extends DocGeneratorBase implements IDocGen
 	@Override
 	public ResponseEntity<Resource> generate(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
+		log.debug("dsp2key>>>>>>> {}", dsp2Key);
 
 		super.url = getBaseUrl(refId);
 	
@@ -60,7 +60,7 @@ public class VerbatimHourlyGenerator extends DocGeneratorBase implements IDocGen
 	    List<MargeFileDto> files = new LinkedList<>();
 
 	    docTemplates.forEach(docTemplate -> {
-	        System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+	        log.debug("Doc Template UUID >>> {}", docTemplate.getDocUuid());
 	        
 	        if (docTemplate.getCode().equals("verbatim_hour_gen_header")) {
 	            Map<String, String> map = new HashMap<>();
