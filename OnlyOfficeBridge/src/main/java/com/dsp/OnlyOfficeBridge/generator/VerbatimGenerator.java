@@ -59,7 +59,7 @@ public class VerbatimGenerator extends DocGeneratorBase implements IDocGenerator
 	@Override
 	public ResponseEntity<Resource> generate(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 
-		System.out.println("dsp2key>>>>>>>" + dsp2Key);
+		log.debug("dsp2key>>>>>>> {}", dsp2Key);
 
 		super.url = getBaseUrl(refId);
 	
@@ -68,7 +68,7 @@ public class VerbatimGenerator extends DocGeneratorBase implements IDocGenerator
 
 	    List<MargeFileDto> files = new LinkedList<>();
 	    docTemplates.forEach(docTemplate -> {
-	        System.out.println("Doc Template UUID >>> " + docTemplate.getDocUuid());
+	        log.debug("Doc Template UUID >>> {}", docTemplate.getDocUuid());
 
 	        // handle /get-verbatim-turn-abbr/
 	        if (url.contains("/get-verbatim-turn-abbr/")) {
