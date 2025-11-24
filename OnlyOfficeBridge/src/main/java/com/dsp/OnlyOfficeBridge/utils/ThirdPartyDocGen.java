@@ -780,7 +780,7 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw e;
 		}
-		// Extract "data" → which is a Map now
+		// Extract "data" -> which is a Map now
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
 		// Extract mergeDsp2Keys from new response
 		List<String> dspKeys = data != null ? (List<String>) data.get("mergeDsp2Keys") : Collections.emptyList();
@@ -809,45 +809,69 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
-				int total = dspKeys != null ? dspKeys.size() : 0;
-				int[] index = { 1 };
 
-				if (dspKeys != null) {
-					for (String dspKey : dspKeys) {
+				try {
+					// Extract turnMap (new structure)
+					List<Map<String, String>> turnMap = data != null ? (List<Map<String, String>>) data.get("turnMap")
+							: Collections.emptyList();
 
-						// 1️ Add DSP2 FILE
-						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-						metadataOpt.ifPresent(metadata -> {
-							ByteArrayResource resourceBody = utils
-									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+					int total = turnMap.size();
+					int index = 1;
 
-							boolean isLast = index[0] == total;
+					for (Map<String, String> turnEntry : turnMap) {
 
-							files.add(
-									MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast).build());
-						});
+						String turn = turnEntry.get("turn"); // formatted: "0900"
+						String dsp2Key = turnEntry.get("dsp2Key"); // uuid OR ""
 
-						// 2️ AFTER FIRST DSP2 -> ADD MISSING TURNS PAGE
-						if (index[0] == 1 && missingTurns != null && !missingTurns.isEmpty()) {
+						boolean isLast = index == total;
+
+						if (dsp2Key != null && !dsp2Key.isBlank()) {
+							// 1️ Add DSP2 FILE
 							try {
-								for (String turn : missingTurns) {
+								Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+										.findByDsp2Key(dsp2Key);
 
-									Map<String, String> missingTurnsReplace = new HashMap<>();
-									missingTurnsReplace.put("missingTurn", turn); // ONE turn per file
+								if (metadataOpt.isPresent()) {
 
-									ByteArrayResource resource = Utils.replacePlaceholders(
-											"verbatim/content-missing-hour.docx", missingTurnsReplace);
+									ByteArrayResource resourceBody = utils
+											.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-									files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true)
+									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
 											.build());
+								} else {
+									System.err.println("WARN: DSP2Key " + dsp2Key + " not found in metadata table");
 								}
+
 							} catch (Exception e) {
-								throw new RuntimeException("Error generating missing turns page", e);
+								System.err.println("ERROR: Failed downloading DSP2 file for key: " + dsp2Key);
+								e.printStackTrace();
+							}
+
+						} else {
+							// 2️ Add MISSING TURN PAGE
+							try {
+								Map<String, String> missingTurnMap = new HashMap<>();
+								missingTurnMap.put("missingTurn", turn);
+
+								ByteArrayResource resource = Utils
+										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnMap);
+
+								files.add(
+										MargeFileDto.builder().file(resource.getByteArray()).isBreak(!isLast).build());
+
+							} catch (Exception e) {
+								System.err.println("ERROR: Failed generating missing turn page for " + turn);
+								e.printStackTrace();
 							}
 						}
 
-						index[0]++; // increment AFTER processing each key
+						index++;
 					}
+
+				} catch (Exception e) {
+					System.err.println("ERROR: Failed processing turnMap block");
+					e.printStackTrace();
+					throw new RuntimeException("Error processing hourly verbatim content", e);
 				}
 			}
 		});
