@@ -828,12 +828,17 @@ public class ThirdPartyDocGen {
 						// 2️ AFTER FIRST DSP2 -> ADD MISSING TURNS PAGE
 						if (index[0] == 1 && missingTurns != null && !missingTurns.isEmpty()) {
 							try {
-								Map<String, String> missingTurnsReplace = new HashMap<>();
-								String missingTurnLines = String.join(",\r\n", missingTurns);
-								missingTurnsReplace.put("missingTurn", missingTurnLines);
-								ByteArrayResource resource = Utils
-										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnsReplace);
-								files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+								for (String turn : missingTurns) {
+
+									Map<String, String> missingTurnsReplace = new HashMap<>();
+									missingTurnsReplace.put("missingTurn", turn); // ONE turn per file
+
+									ByteArrayResource resource = Utils.replacePlaceholders(
+											"verbatim/content-missing-hour.docx", missingTurnsReplace);
+
+									files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true)
+											.build());
+								}
 							} catch (Exception e) {
 								throw new RuntimeException("Error generating missing turns page", e);
 							}
