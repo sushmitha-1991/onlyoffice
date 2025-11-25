@@ -8,4 +8,5 @@ import lombok.Data;
 public class MargeFileDto {
     byte[] file;
     boolean isBreak;
+    String orientation;
 }

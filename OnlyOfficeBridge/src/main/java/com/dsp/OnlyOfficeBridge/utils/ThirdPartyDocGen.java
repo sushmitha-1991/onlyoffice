@@ -43,6 +43,7 @@ import org.docx4j.openpackaging.parts.Part;
 import org.docx4j.openpackaging.parts.WordprocessingML.*;
 import org.docx4j.relationships.Relationship;
 import org.docx4j.wml.*;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -151,6 +152,12 @@ public class ThirdPartyDocGen {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				List<Map> inputList = (List<Map>) data.get("inputList");
 				inputList.forEach(map -> {
+                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+                            .findByDsp2Key((String) map.get("dsp2Key"));
+
+                    ByteArrayResource resourceBody = utils
+                            .downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+                    String orientation = getOrientation(resourceBody.getByteArray());
 					Map<String, String> map1 = new HashMap<>();
 					map1.put("bulletinNo", map.get("bulletinNo").toString());
 					map1.put("branch", (String) map.get("officeName"));
@@ -166,15 +173,11 @@ public class ThirdPartyDocGen {
 //                        e.printStackTrace();
 						throw new RuntimeException(e);
 					}
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).orientation(orientation).build());
 
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) map.get("dsp2Key"));
 
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).orientation(orientation).build());
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).orientation(orientation).build());
 				});
 
 			}
@@ -1336,8 +1339,11 @@ private static class IdMaps {
         for (int idx = 1; idx < files.size(); idx++) {
             WordprocessingMLPackage srcPkg = WordprocessingMLPackage
                     .load(new ByteArrayInputStream(files.get(idx).getFile()));
+            if("LANDSCAPE".equalsIgnoreCase(files.get(idx).getOrientation()))
+            {
+                convertToLandscape(srcPkg);
+            }
             MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
-
             // 1) Copy images
             Map<String, String> relIdMapping = new HashMap<>();
             for (Part p : srcPkg.getParts().getParts().values()) {
@@ -1480,7 +1486,8 @@ private static class IdMaps {
 
             // Optional page break
             if (files.get(idx).isBreak()) {
-                targetMain.getContent().add(createPageBreak());
+//                targetMain.getContent().add(createPageBreak());
+                insertSectionBreak(targetMain, srcMain);
             }
         }
 
@@ -1516,6 +1523,82 @@ private static class IdMaps {
 		p.getContent().add(run);
 		return p;
 	}
+    private static void insertSectionBreak(MainDocumentPart targetMain, MainDocumentPart srcMain) {
+
+        Body srcBody = srcMain.getJaxbElement().getBody();
+
+        if (srcBody == null || srcBody.getSectPr() == null) {
+            return;
+        }
+
+        SectPr srcSectPr = XmlUtils.deepCopy(srcBody.getSectPr());
+
+        P sectionBreakPara = Context.getWmlObjectFactory().createP();
+        PPr ppr = Context.getWmlObjectFactory().createPPr();
+
+        ppr.setSectPr(srcSectPr);
+        sectionBreakPara.setPPr(ppr);
+
+        targetMain.getContent().add(sectionBreakPara);
+    }
+    public static String getOrientation(byte[] file) {
+        String orientation = "PORTRAIT";
+        try {
+            WordprocessingMLPackage pkg = WordprocessingMLPackage
+                    .load(new ByteArrayInputStream(file));
+            Body body = pkg.getMainDocumentPart().getJaxbElement().getBody();
+            SectPr sectPr = body.getSectPr();
+
+            // Default Word behavior: portrait
+
+
+            if (sectPr != null && sectPr.getPgSz() != null) {
+                SectPr.PgSz pgSz = sectPr.getPgSz();
+
+                // Check explicit orientation attribute
+                if (pgSz.getOrient() != null && pgSz.getOrient().value().equals("landscape")) {
+                    orientation = "LANDSCAPE";
+                } else {
+                    // Fallback: check width vs height
+                    if (pgSz.getW().intValue() > pgSz.getH().intValue()) {
+                        orientation = "LANDSCAPE";
+                    }
+                }
+            }
+        } catch (Exception e) {
+            orientation = "PORTRAIT";
+        }
+
+        return orientation;
+    }
+    public static void convertToLandscape(WordprocessingMLPackage pkg) {
+
+        MainDocumentPart mainPart = pkg.getMainDocumentPart();
+        Body body = mainPart.getJaxbElement().getBody();
+
+        if (body.getSectPr() == null) {
+            body.setSectPr(Context.getWmlObjectFactory().createSectPr());
+        }
+
+        SectPr sectPr = body.getSectPr();
+
+        if (sectPr.getPgSz() == null) {
+            sectPr.setPgSz(Context.getWmlObjectFactory().createSectPrPgSz());
+        }
+
+        SectPr.PgSz pgSz = sectPr.getPgSz();
+
+        // Read current dimensions
+        BigInteger width = pgSz.getW();
+        BigInteger height = pgSz.getH();
+
+        // Swap height and width
+        pgSz.setW(height);
+        pgSz.setH(width);
+
+        // Set orientation to landscape
+        pgSz.setOrient(STPageOrientation.LANDSCAPE);
+    }
 
 	// Helper to locate EndnotesPart in a package
 	private static EndnotesPart getEndnotesPart(WordprocessingMLPackage pkg) {
