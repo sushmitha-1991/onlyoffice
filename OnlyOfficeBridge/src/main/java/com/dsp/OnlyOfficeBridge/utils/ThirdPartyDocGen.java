@@ -43,6 +43,7 @@ import org.docx4j.openpackaging.parts.Part;
 import org.docx4j.openpackaging.parts.WordprocessingML.*;
 import org.docx4j.relationships.Relationship;
 import org.docx4j.wml.*;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -66,6 +67,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 @Slf4j
 @Component
@@ -130,7 +133,7 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>>", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("bull2_gen_header")) {
 				Map<String, String> map = new HashMap<>();
@@ -149,10 +152,16 @@ public class ThirdPartyDocGen {
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				List<Map> inputList = (List<Map>) data.get("inputList");
 				inputList.forEach(map -> {
+                    Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+                            .findByDsp2Key((String) map.get("dsp2Key"));
+
+                    ByteArrayResource resourceBody = utils
+                            .downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+                    String orientation = getOrientation(resourceBody.getByteArray());
 					Map<String, String> map1 = new HashMap<>();
 					map1.put("bulletinNo", map.get("bulletinNo").toString());
 					map1.put("branch", (String) map.get("officeName"));
-					map1.put("subject", (String) map.get("subject"));
+					map1.put("subject", map.get("subject").toString().toUpperCase());
 					Map<String, String> mapLine = new HashMap<>();
 					ByteArrayResource resource = null;
 					ByteArrayResource resourceLine = null;
@@ -164,15 +173,11 @@ public class ThirdPartyDocGen {
 //                        e.printStackTrace();
 						throw new RuntimeException(e);
 					}
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).orientation(orientation).build());
 
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-							.findByDsp2Key((String) map.get("dsp2Key"));
 
-					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).orientation(orientation).build());
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).orientation(orientation).build());
 				});
 
 			}
@@ -215,9 +220,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: " + e.getMessage());
 			throw e;
 		}
 
@@ -265,7 +270,7 @@ public class ThirdPartyDocGen {
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
+						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
 					}
 				});
 
@@ -303,6 +308,16 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
+//		// Detect House Type (LS or RS)
+//	    String houseType = refId != null && refId.toLowerCase().contains("_rs") ? "rs" : "ls";
+//	    
+//	    // Clean refId before sending to API
+//	    String cleanRefId = refId;
+//	    if (cleanRefId != null) {
+//	        cleanRefId = cleanRefId.replaceAll("(?i)_rs", "").replaceAll("(?i)_ls", "").trim();
+//	    }
+//
+//		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + cleanRefId;
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -316,9 +331,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -405,36 +420,42 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 	
-	private String getHeaderPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/header-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/header-b1-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/header-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/header-synopsis-ls.docx";
-	        default:
-	            return null; // or return a generic header if you want
-	    }
+	// ---------------- HEADER PATH LOGIC ----------------
+	private String getHeaderPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/"; // dynamic base path
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "header-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "header-b1-" + houseType + ".docx";
+		case "List of Business":
+			return base + "header-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "header-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 
-	private String getFooterPathByDocumentType(String documentType) {
-	    if (documentType == null) return null;
-	    switch (documentType.trim()) {
-	        case "Bulletin - Part II":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "Bulletin - Part I":
-	            return "translation/ls/footer-b1-b2-ls.docx";
-	        case "List of Business":
-	            return "translation/ls/footer-lob-ls.docx";
-//	        case "Synopsis of Debates":
-//	            return "/translation/ls/footer-synopsis-ls.docx";
-	        default:
-	            return null;
-	    }
+	// ---------------- FOOTER PATH LOGIC ----------------
+	private String getFooterPathByDocumentType(String documentType, String houseType) {
+		if (documentType == null)
+			return null;
+		String base = "translation/" + houseType + "/";
+		switch (documentType.trim()) {
+		case "Bulletin - Part II":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "Bulletin - Part I":
+			return base + "footer-b1-b2-" + houseType + ".docx";
+		case "List of Business":
+			return base + "footer-lob-" + houseType + ".docx";
+		case "Synopsis of Debates":
+			return base + "footer-synopsis-" + houseType + ".docx";
+		default:
+			return null;
+		}
 	}
 	
 	private String getDisplayDate(String documentDate, HttpHeaders headers) {
@@ -470,7 +491,7 @@ public class ThirdPartyDocGen {
 	            }
 
 	        } catch (Exception e) {
-	            System.err.println("Error fetching Saka date: " + e.getMessage());
+	            log.error("Error fetching Saka date: {} ", e.getMessage());
 	        }
 
 	        // 🔹 Combine both
@@ -481,7 +502,7 @@ public class ThirdPartyDocGen {
 	        }
 
 	    } catch (Exception e) {
-	        System.err.println("Error formatting display date: " + e.getMessage());
+	        log.error("Error formatting display date: {} ", e.getMessage());
 	        return documentDate; // fallback
 	    }
 	}
@@ -490,7 +511,7 @@ public class ThirdPartyDocGen {
 
 	public ResponseEntity<Resource> genCdGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = cdUrl + "/debate/lang-inputs/input-tab-view-status?status=Submitted&id=" + refId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		log.debug("url>>>>>>> {} === {}", url,token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -504,19 +525,19 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("{}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {}", e.getMessage());
 			throw e;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_merge_con")) {
-				System.out.println("inside cd_merge_con");
+				log.debug("inside cd_merge_con");
 				List<Map<String, Object>> dataList = (List<Map<String, Object>>) body.get("data");
 				Map<String, Object> data = dataList.get(0);
 				List<Map> inputList = (List<Map>) data.get("allocations");
@@ -525,7 +546,7 @@ public class ThirdPartyDocGen {
 
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
-						System.out.println("searching by dsp2key in only office meta data" + map.get("dsp2Key"));
+						log.debug("searching by dsp2key in only office meta data {}", map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -553,7 +574,7 @@ public class ThirdPartyDocGen {
 			String refId) {
 		Long historyId = onlyOfficeMetadataRepository.getHistoryId(refId);
 		String url = cdUrl + "/debate/history/get/" + historyId;
-		System.out.println("url>>>>>>>" + url + " ==== " + token);
+		log.debug("url>>>>>>> {} ==== {}", url,token);
 		Map<String, Object> body;
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
@@ -567,16 +588,16 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body : {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {} ", e.getMessage());
 			throw e;
 		}
 
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-			System.out.println("header uuid >>>>" + docTemplate.getDocUuid());
+			log.debug("header uuid >>>> {}", docTemplate.getDocUuid());
 
 			if (docTemplate.getCode().equals("cd_static_con")) {
 				Map<String, Object> result = (Map<String, Object>) body.get("data");
@@ -617,13 +638,13 @@ public class ThirdPartyDocGen {
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
-				System.out.println("inside cd_static_con");
+				log.debug("inside cd_static_con");
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				if (data.get("dsp2Key") != null) {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -669,11 +690,11 @@ public class ThirdPartyDocGen {
 		Map<String, Object> body = null;
 		try {
 			RestTemplate restTemplate = new RestTemplate();
-			System.out.println(">>> url - " + url);
+			log.debug(">>> url - {} ", url);
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling verbatim API: " + e.getMessage());
+			log.error("Error while calling verbatim API: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -735,7 +756,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			log.error("Error while merging verbatim docs: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -762,6 +783,12 @@ public class ThirdPartyDocGen {
 		} catch (Exception e) {
 			throw e;
 		}
+		// Extract "data" -> which is a Map now
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		// Extract mergeDsp2Keys from new response
+		List<String> dspKeys = data != null ? (List<String>) data.get("mergeDsp2Keys") : Collections.emptyList();
+		List<String> missingTurns = data != null ? (List<String>) data.get("missingTurns") : Collections.emptyList();
+
 		String[] parts = refId.split("_", 4);
 		String committeeName = parts[3];
 		List<MargeFileDto> files = new LinkedList<>();
@@ -769,7 +796,6 @@ public class ThirdPartyDocGen {
 		docTemplates.forEach(docTemplate -> {
 
 			boolean isHouse = "house".equalsIgnoreCase(committeeName);
-//			AtomicInteger docCounter = new AtomicInteger(1);
 
 			// Decide which template code should be used
 			String expectedCode = isHouse ? "verbatim_hour_gen_header" : "verbatim_hour_non_house_gen_header";
@@ -778,7 +804,6 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 				map.put("meetingDate", parts[1]);
 				map.put("abbr", parts[2]);
-//				map.put("pageNo", String.valueOf(docCounter.getAndIncrement()));
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -787,22 +812,69 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 			} else if (docTemplate.getCode().equals("verbatim_hour_gen_con")) {
-				int[] index = {1}; // to track the current position
-				// data is actually a list of dspKeys
-				List<String> dspKeys = (List<String>) body.get("data");
-				if (dspKeys != null) {
-					dspKeys.forEach(dspKey -> {
-						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-						metadataOpt.ifPresent(metadata -> {
-							ByteArrayResource resourceBody = utils
-									.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-							if (index[0]++ == dspKeys.size()) {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-							} else {
-								files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+
+				try {
+					// Extract turnMap (new structure)
+					List<Map<String, String>> turnMap = data != null ? (List<Map<String, String>>) data.get("turnMap")
+							: Collections.emptyList();
+
+					int total = turnMap.size();
+					int index = 1;
+
+					for (Map<String, String> turnEntry : turnMap) {
+
+						String turn = turnEntry.get("turn"); // formatted: "0900"
+						String dsp2Key = turnEntry.get("dsp2Key"); // uuid OR ""
+
+						boolean isLast = index == total;
+
+						if (dsp2Key != null && !dsp2Key.isBlank()) {
+							// 1️ Add DSP2 FILE
+							try {
+								Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+										.findByDsp2Key(dsp2Key);
+
+								if (metadataOpt.isPresent()) {
+
+									ByteArrayResource resourceBody = utils
+											.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
+											.build());
+								} else {
+									System.err.println("WARN: DSP2Key " + dsp2Key + " not found in metadata table");
+								}
+
+							} catch (Exception e) {
+								System.err.println("ERROR: Failed downloading DSP2 file for key: " + dsp2Key);
+								e.printStackTrace();
 							}
-						});
-					});
+
+						} else {
+							// 2️ Add MISSING TURN PAGE
+							try {
+								Map<String, String> missingTurnMap = new HashMap<>();
+								missingTurnMap.put("missingTurn", turn);
+
+								ByteArrayResource resource = Utils
+										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnMap);
+
+								files.add(
+										MargeFileDto.builder().file(resource.getByteArray()).isBreak(!isLast).build());
+
+							} catch (Exception e) {
+								System.err.println("ERROR: Failed generating missing turn page for " + turn);
+								e.printStackTrace();
+							}
+						}
+
+						index++;
+					}
+
+				} catch (Exception e) {
+					System.err.println("ERROR: Failed processing turnMap block");
+					e.printStackTrace();
+					throw new RuntimeException("Error processing hourly verbatim content", e);
 				}
 			}
 		});
@@ -818,7 +890,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_hour_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging hour verbatim docs: " + e.getMessage());
+			log.error("Error while merging hour verbatim docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -839,7 +911,7 @@ public class ThirdPartyDocGen {
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, null, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling Lok Sabha API: " + e.getMessage());
+			log.error("Error while calling Lok Sabha API: {} ",e.getMessage());
 			throw e;
 		}
 
@@ -879,7 +951,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sow_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging SOW docs: " + e.getMessage());
+			log.error("Error while merging SOW docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -887,7 +959,7 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = dsp2Url + "/synopsis/synopsis/get-synopsis-dspkeys/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}",url);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -902,9 +974,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("API response >>>>> " + body);
+			log.debug("API response >>>>> {}" + body);
 		} catch (Exception e) {
-			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			log.error("Error during API call Synopsis: {}", e.getMessage());
 			throw e;
 		}
 
@@ -940,7 +1012,7 @@ public class ThirdPartyDocGen {
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {}" + e.getMessage());
 			}
 		}
 
@@ -1023,7 +1095,7 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			log.error("Error while merging Synopsis docs: {}", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -1031,7 +1103,7 @@ public class ThirdPartyDocGen {
 	public ResponseEntity<Resource> genMergedSynopsisGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = dsp2Url + "/synopsis/synopsis/get-merged-synopsis-dspkeys/" + refId;
-		System.out.println("url>>>>>>>" + url);
+		log.debug("url>>>>>>> {}", url);
 
 		Map<String, Object> body;
 		if (token == null) {
@@ -1046,9 +1118,9 @@ public class ThirdPartyDocGen {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println("API response >>>>> " + body);
+			log.debug("API response >>>>> {} ", body);
 		} catch (Exception e) {
-			System.err.println("Error during API call Synopsis: " + e.getMessage());
+			log.error("Error during API call Synopsis: {} ", e.getMessage());
 			throw e;
 		}
 
@@ -1083,49 +1155,26 @@ public class ThirdPartyDocGen {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=synopsis_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging Synopsis docs: " + e.getMessage());
+			log.error("Error while merging Synopsis docs: {}" + e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
 
-//    public static byte[] mergeDocxFiles(List<MargeFileDto> margeFileDtos) throws Exception {
-//        WordprocessingMLPackage targetPkg = WordprocessingMLPackage.createPackage();
-//        MainDocumentPart mainPart = targetPkg.getMainDocumentPart();
-//
-//        for (int i = 0; i < margeFileDtos.size(); i++) {
-//            MargeFileDto fileBytes = margeFileDtos.get(i);
-//
-//            AlternativeFormatInputPart afiPart = new AlternativeFormatInputPart(
-//                    new org.docx4j.openpackaging.parts.PartName("/part" + i + ".docx"));
-//            afiPart.setBinaryData(fileBytes.getFile());
-//
-//            afiPart.setContentType(
-//                    new org.docx4j.openpackaging.contenttype.ContentType(
-//                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-//
-//            Relationship altChunkRel = mainPart.addTargetPart(afiPart);
-//
-//            // Insert AltChunk into main document
-//            org.docx4j.wml.CTAltChunk ac =
-//                    Context.getWmlObjectFactory().createCTAltChunk();
-//            ac.setId(altChunkRel.getId());
-//            mainPart.addObject(ac);
-//        }
-//
-//        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-//            targetPkg.save(baos);
-//            return baos.toByteArray();
-//        }
-//    }
+
 private static class IdMaps {
     Map<BigInteger, BigInteger> abstractNumIdMap = new LinkedHashMap<>();
     Map<BigInteger, BigInteger> numIdMap = new LinkedHashMap<>();
 }
-    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
-            throws Docx4JException {
+    /**
+     * Merge numbering of srcPart into targetPart.
+     * Assumes targetPart is NOT null.
+     */
+    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart,
+                                         NumberingDefinitionsPart targetPart) throws Docx4JException {
         IdMaps maps = new IdMaps();
-        if(targetPart==null) return maps;
-
+        if (targetPart == null || srcPart == null) {
+            return maps;
+        }
 
         Numbering targetContent = targetPart.getContents();
         Numbering srcContent = srcPart.getContents();
@@ -1151,7 +1200,21 @@ private static class IdMaps {
         // copy abstractNum entries (deep copy then assign new abstractNumId)
         if (srcContent.getAbstractNum() != null) {
             for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
-                Numbering.AbstractNum copyAbs = (Numbering.AbstractNum) XmlUtils.deepCopy(srcAbs);
+                Numbering.AbstractNum copyAbs = XmlUtils.deepCopy(srcAbs);
+                if (copyAbs.getLvl() != null) {
+                    for (Lvl lvl : copyAbs.getLvl()) {
+                        if (lvl.getIlvl() != null && lvl.getIlvl().intValue() == 0) {
+                            if (lvl.getStart() == null) {
+                                Lvl.Start start = Context.getWmlObjectFactory().createLvlStart();
+                                start.setVal(BigInteger.ONE);
+                                lvl.setStart(start);
+                            } else {
+                                lvl.getStart().setVal(BigInteger.ONE);
+                            }
+
+                        }
+                    }
+                }
                 BigInteger oldAbstractId = srcAbs.getAbstractNumId();
                 BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
                 copyAbs.setAbstractNumId(newAbstractId);
@@ -1163,9 +1226,25 @@ private static class IdMaps {
         // copy num entries (deep copy then assign new numId and remap abstractNumId reference inside num)
         if (srcContent.getNum() != null) {
             for (Numbering.Num srcNum : srcContent.getNum()) {
-                Numbering.Num copyNum = (Numbering.Num) XmlUtils.deepCopy(srcNum);
+                Numbering.Num copyNum = XmlUtils.deepCopy(srcNum);
+
+                copyNum.getLvlOverride().clear();
+
+                Numbering.Num.LvlOverride lvlOverride =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverride();
+                lvlOverride.setIlvl(BigInteger.ZERO);
+
+                Numbering.Num.LvlOverride.StartOverride start =
+                        Context.getWmlObjectFactory().createNumberingNumLvlOverrideStartOverride();
+                start.setVal(BigInteger.ONE);
+
+                lvlOverride.setStartOverride(start);
+                copyNum.getLvlOverride().add(lvlOverride);
+
                 BigInteger oldNumId = srcNum.getNumId();
+
                 BigInteger newNumId = BigInteger.valueOf(++maxNumId);
+                log.debug("oldNumId {} newNumId {}",oldNumId,newNumId);
                 copyNum.setNumId(newNumId);
 
                 // remap abstractNumId inside copyNum if present
@@ -1174,7 +1253,7 @@ private static class IdMaps {
                     BigInteger mappedAbs = maps.abstractNumIdMap.get(oldAbsRef);
                     if (mappedAbs != null) {
                         copyNum.getAbstractNumId().setVal(mappedAbs);
-                    } // else leave as-is (best-effort)
+                    }
                 }
 
                 maps.numIdMap.put(oldNumId, newNumId);
@@ -1184,7 +1263,38 @@ private static class IdMaps {
 
         return maps;
     }
-	public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
+
+
+
+    private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
+
+        if (obj instanceof P) {
+            P p = (P) obj;
+
+            if (p.getPPr() != null &&
+                    p.getPPr().getNumPr() != null &&
+                    p.getPPr().getNumPr().getNumId() != null &&
+                    p.getPPr().getNumPr().getNumId().getVal() != null) {
+
+                BigInteger oldId = p.getPPr().getNumPr().getNumId().getVal();
+
+                if (numIdMap.containsKey(oldId)) {
+                    p.getPPr().getNumPr().getNumId()
+                            .setVal(numIdMap.get(oldId));
+                }
+            }
+        }
+
+        if (obj instanceof ContentAccessor) {
+            for (Object child : ((ContentAccessor) obj).getContent()) {
+                remapNumIdInContent(child, numIdMap);
+            }
+        }
+    }
+
+
+
+    public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
         if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("No files to merge");
         }
@@ -1229,8 +1339,11 @@ private static class IdMaps {
         for (int idx = 1; idx < files.size(); idx++) {
             WordprocessingMLPackage srcPkg = WordprocessingMLPackage
                     .load(new ByteArrayInputStream(files.get(idx).getFile()));
+            if("LANDSCAPE".equalsIgnoreCase(files.get(idx).getOrientation()))
+            {
+                convertToLandscape(srcPkg);
+            }
             MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
-
             // 1) Copy images
             Map<String, String> relIdMapping = new HashMap<>();
             for (Part p : srcPkg.getParts().getParts().values()) {
@@ -1255,6 +1368,8 @@ private static class IdMaps {
             if (srcNumbering != null) {
                 NumberingDefinitionsPart tgtNumbering = targetMain.getNumberingDefinitionsPart();
                 numberingMaps = mergeNumbering(srcNumbering, tgtNumbering);
+//                forceAbstractLevelStartOne(tgtNumbering);
+               // normalizeNumbering(tgtNumbering);
             } else {
                 numberingMaps = new IdMaps(); // empty maps
             }
@@ -1290,7 +1405,7 @@ private static class IdMaps {
             if (srcComments != null && srcComments.getContents() != null) {
                 for (Comments.Comment c : srcComments.getContents().getComment()) {
                     BigInteger oldId = c.getId();
-                    log.info("comment old id {}", oldId);
+                    log.debug("comment old id {}", oldId);
                     BigInteger newId = BigInteger.valueOf(++maxCommentId);
                     c.setId(newId);
                     commentIdMap.put(oldId, newId);
@@ -1341,17 +1456,12 @@ private static class IdMaps {
                         }
 
                     }
-                    // Replace numbering numId references using numberingMaps.numIdMap
-                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
-                        for (Map.Entry<BigInteger, BigInteger> e : numberingMaps.numIdMap.entrySet()) {
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey() + "\"",
-                                    "w:numId w:val=\"" + e.getValue() + "\"");
-                            // Also cover alternative formatting if present
-                            xml = xml.replace("w:numId w:val=\"" + e.getKey().toString() + "\"",
-                                    "w:numId w:val=\"" + e.getValue().toString() + "\"");
-                        }
-                    }
+
+
                     Object fixed = XmlUtils.unmarshalString(xml, Context.jc);
+                    if (numberingMaps != null && numberingMaps.numIdMap != null) {
+                        remapNumIdInContent(fixed, numberingMaps.numIdMap);
+                    }
                     targetMain.getContent().add(fixed);
                 }
             }
@@ -1376,7 +1486,8 @@ private static class IdMaps {
 
             // Optional page break
             if (files.get(idx).isBreak()) {
-                targetMain.getContent().add(createPageBreak());
+//                targetMain.getContent().add(createPageBreak());
+                insertSectionBreak(targetMain, srcMain);
             }
         }
 
@@ -1412,6 +1523,82 @@ private static class IdMaps {
 		p.getContent().add(run);
 		return p;
 	}
+    private static void insertSectionBreak(MainDocumentPart targetMain, MainDocumentPart srcMain) {
+
+        Body srcBody = srcMain.getJaxbElement().getBody();
+
+        if (srcBody == null || srcBody.getSectPr() == null) {
+            return;
+        }
+
+        SectPr srcSectPr = XmlUtils.deepCopy(srcBody.getSectPr());
+
+        P sectionBreakPara = Context.getWmlObjectFactory().createP();
+        PPr ppr = Context.getWmlObjectFactory().createPPr();
+
+        ppr.setSectPr(srcSectPr);
+        sectionBreakPara.setPPr(ppr);
+
+        targetMain.getContent().add(sectionBreakPara);
+    }
+    public static String getOrientation(byte[] file) {
+        String orientation = "PORTRAIT";
+        try {
+            WordprocessingMLPackage pkg = WordprocessingMLPackage
+                    .load(new ByteArrayInputStream(file));
+            Body body = pkg.getMainDocumentPart().getJaxbElement().getBody();
+            SectPr sectPr = body.getSectPr();
+
+            // Default Word behavior: portrait
+
+
+            if (sectPr != null && sectPr.getPgSz() != null) {
+                SectPr.PgSz pgSz = sectPr.getPgSz();
+
+                // Check explicit orientation attribute
+                if (pgSz.getOrient() != null && pgSz.getOrient().value().equals("landscape")) {
+                    orientation = "LANDSCAPE";
+                } else {
+                    // Fallback: check width vs height
+                    if (pgSz.getW().intValue() > pgSz.getH().intValue()) {
+                        orientation = "LANDSCAPE";
+                    }
+                }
+            }
+        } catch (Exception e) {
+            orientation = "PORTRAIT";
+        }
+
+        return orientation;
+    }
+    public static void convertToLandscape(WordprocessingMLPackage pkg) {
+
+        MainDocumentPart mainPart = pkg.getMainDocumentPart();
+        Body body = mainPart.getJaxbElement().getBody();
+
+        if (body.getSectPr() == null) {
+            body.setSectPr(Context.getWmlObjectFactory().createSectPr());
+        }
+
+        SectPr sectPr = body.getSectPr();
+
+        if (sectPr.getPgSz() == null) {
+            sectPr.setPgSz(Context.getWmlObjectFactory().createSectPrPgSz());
+        }
+
+        SectPr.PgSz pgSz = sectPr.getPgSz();
+
+        // Read current dimensions
+        BigInteger width = pgSz.getW();
+        BigInteger height = pgSz.getH();
+
+        // Swap height and width
+        pgSz.setW(height);
+        pgSz.setH(width);
+
+        // Set orientation to landscape
+        pgSz.setOrient(STPageOrientation.LANDSCAPE);
+    }
 
 	// Helper to locate EndnotesPart in a package
 	private static EndnotesPart getEndnotesPart(WordprocessingMLPackage pkg) {
@@ -1547,7 +1734,7 @@ private static class IdMaps {
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=verbatim_merged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 		} catch (Exception e) {
-			System.err.println("Error while merging verbatim docs: " + e.getMessage());
+			log.error("Error while merging verbatim docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -1576,7 +1763,7 @@ private static class IdMaps {
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error during API call-B2 RS: " + e.getMessage());
+			log.error("Error during API call-B2 RS: {}", e.getMessage());
 			throw e;
 		}
 
@@ -1673,7 +1860,7 @@ private static class IdMaps {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response body :- {}",body);
 		} catch (Exception e) {
 			throw e;
 		}
@@ -2374,7 +2561,7 @@ private static class IdMaps {
 										default -> "";
 										};
 										headerMap.put("billsFor", (String) headerText);
-										System.out.println("This is the headerMap for intro: " + headerMap);
+										log.debug("This is the headerMap for intro: {}" + headerMap);
 
 										ByteArrayResource headerRes = Utils.replacePlaceholders(
 												"pmb-ls/pmb_gen_con_header_common.docx", headerMap);
@@ -2455,7 +2642,7 @@ private static class IdMaps {
 	 */
 	public ResponseEntity<Resource> genPMBResolGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("#### here");
+		log.debug("#### here");
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
 		}
@@ -2567,7 +2754,7 @@ private static class IdMaps {
 
 	public ResponseEntity<Resource> genPMBResolGenerationV2(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("#### here");
+		log.debug("#### here");
 		if (token == null) {
 			throw new IllegalStateException("Authorization token is missing");
 		}
@@ -2715,13 +2902,13 @@ private static class IdMaps {
 //			throw e;
 //		}
 
-		String imageUrl="https://dspstg.sansad.in/dms/openkm/dsp1/downloads/900e055f-6420-452e-9546-46059432ee07";
+		String imageUrl=downloadKmUrl+"900e055f-6420-452e-9546-46059432ee07";
 		String base64Img="";
 		try (InputStream in = new URL(imageUrl).openStream()) {
 		    byte[] imageBytes = in.readAllBytes();
 		    String base64 = Base64.getEncoder().encodeToString(imageBytes);
 		     base64Img = "data:image/png;base64," + base64;
-		    System.out.println(base64Img);
+		    log.debug("base64 image:- {}",base64Img);
 		} catch (IOException e) {
 		    e.printStackTrace();
 		}
@@ -2740,7 +2927,7 @@ private static class IdMaps {
 			}
 		});
 		 html = htmlRef.get();
-		log.info("html before replace:- {}",html);
+		log.debug("html before replace:- {}",html);
 		
 		if (html == null) {
 			throw new IllegalStateException("HTML content is missing for provisional calendar");
@@ -2760,13 +2947,13 @@ private static class IdMaps {
 	            .replaceAll("\\s+", " ")
 	            .trim();
 		html = new String(html.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-		log.info("html after replace:- {}",html);
+		log.debug("html after replace:- {}",html);
 		try {
 			// byte[] mergedBytes = mergeDocxFiles(html);
 			
 			ByteArrayResource mergedResource = new ByteArrayResource(convertHtmlToDocx(html));
 			saveOpenKm(dsp2Key, mergedResource);
-			System.out.println("******** after saving openkm resource ***********");
+			log.debug("******** after saving openkm resource ***********");
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pcmerged.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
@@ -2779,9 +2966,9 @@ private static class IdMaps {
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		try {
 			
-			System.out.println("### inside convertUrlToDocx");
+			log.debug("### inside convertUrlToDocx");
 
-			log.info("inside convertUrlToDocx htmlContent:- {}",htmlContent);
+			log.debug("inside convertUrlToDocx htmlContent:- {}",htmlContent);
 			RestTemplate restTemplate = new RestTemplate();
 
 			HttpHeaders headers = new HttpHeaders();
@@ -2797,11 +2984,11 @@ private static class IdMaps {
 //			ResponseEntity<byte[]> response = restTemplate.exchange("http://10.247.128.22:3001/convert-to-odt",
 //					HttpMethod.POST, request, byte[].class);
 
-			System.out.println("#########" + docConvertUrl + "/convert-to-docx");
+			log.debug("######### {}",docConvertUrl,"/convert-to-docx");
 			ResponseEntity<byte[]> response = restTemplate.exchange(docConvertUrl + "/convert-to-docx", HttpMethod.POST,
 					request, byte[].class);
-			System.out.println(" ********converting to odt response *****************");
-			System.out.println(response.getBody());
+			log.debug(" ********converting to odt response *****************");
+			log.debug("response {}",response.getBody());
 			return response.getBody();
 		} catch (Exception e) {
 			throw new RuntimeException("Error converting ODT to DOC via HTTP service", e);
@@ -2824,9 +3011,9 @@ private static class IdMaps {
 			RestTemplate restTemplate = new RestTemplate();
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
-			System.out.println(body);
+			log.debug("Response Body:- {}",body);
 		} catch (Exception e) {
-			System.err.println("Error during API call: " + e.getMessage());
+			log.error("Error during API call: {}", e.getMessage());
 			throw e;
 		}
 
@@ -2838,7 +3025,7 @@ private static class IdMaps {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("dsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("dsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -2848,7 +3035,7 @@ private static class IdMaps {
 
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 							.findByDsp2Key((String) data.get("qbDsp2Key"));
-					System.out.println("searching by dsp2key in only office meta data" + data.get("qbDsp2Key"));
+					log.debug("searching by dsp2key in only office meta data {}", data.get("qbDsp2Key"));
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
@@ -2900,7 +3087,7 @@ private static class IdMaps {
 
 	public ResponseEntity<Resource> genResumeOfWorkGeneration(String key, List<DocTemplate> docTemplates,
 			String refId) {
-		System.out.println("Received refId: " + refId);
+		log.debug("Received refId: {}", refId);
 		String[] refParts = refId.split("-");
 
 		if (refParts.length < 3) {
@@ -2923,14 +3110,14 @@ private static class IdMaps {
 			houseId = Long.parseLong(refParts[2]);
 			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
 					+ "&houseId=" + houseId;
-			System.out.println("Detected RS Flow: " + url);
+			log.debug("Detected RS Flow: {}", url);
 		} else {
 			// LS Flow: EN-87-2-32-432-342-893
 			abbr = refParts[1];
 			houseId = Long.parseLong(refParts[2]);
 			url = lobUrl + "/master/templates/getTemplatePlaceholdersV2?abbr=" + abbr + "&language=" + language
 					+ "&houseId=" + houseId;
-			System.out.println("Detected LS Flow: " + url);
+			log.debug("Detected LS Flow: {}", url);
 		}
 
 		if (token == null) {
@@ -2946,11 +3133,11 @@ private static class IdMaps {
 		Map<String, Object> body;
 		try {
 			RestTemplate restTemplate = new RestTemplate();
-			System.out.println(">>> Calling Placeholder API: " + url);
+			log.debug(">>> Calling Placeholder API: {}", url);
 			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 			body = response.getBody();
 		} catch (Exception e) {
-			System.err.println("Error while calling Placeholder API: " + e.getMessage());
+			log.error("Error while calling Placeholder API: {}", e.getMessage());
 			throw new RuntimeException("Failed to fetch placeholders from API", e);
 		}
 
@@ -2992,7 +3179,7 @@ private static class IdMaps {
 					sakaDate = convertedDate.get(locale);
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {}", e.getMessage());
 			}
 		}
 
@@ -3046,11 +3233,11 @@ private static class IdMaps {
 				}
 			}
 
-			System.out.println("Input IDs for DSP2 call: " + inputIds);
+			log.debug("Input IDs for DSP2 call: {}", inputIds);
 
 			if (!inputIds.isEmpty()) {
 				String dsp2Url = rowUrl + "/get-dsp2keys";
-				System.out.print("calling resume of work :" + dsp2Url);
+				log.debug("calling resume of work : {}", dsp2Url);
 
 				HttpEntity<List<Long>> dsp2Entity = new HttpEntity<>(inputIds, headers);
 				// Call the DSP2 API
@@ -3071,7 +3258,7 @@ private static class IdMaps {
 					rawList.forEach(item -> dsp2Keys.add(item.toString()));
 				}
 
-				System.out.println("DSP2 Keys fetched: " + dsp2Keys);
+				log.debug("DSP2 Keys fetched: {}", dsp2Keys);
 
 				// Fetch documents for each DSP2 key and add to files
 				for (String dspKey : dsp2Keys) {
@@ -3097,7 +3284,7 @@ private static class IdMaps {
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 
 		} catch (Exception e) {
-			System.err.println("Error while merging sessional resume docs: " + e.getMessage());
+			log.error("Error while merging sessional resume docs: {} ", e.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 		}
 	}
@@ -3127,7 +3314,7 @@ private static class IdMaps {
 					sakaDate = convertedDate.get("en");
 				}
 			} catch (Exception e) {
-				System.err.println("Error fetching Saka date: " + e.getMessage());
+				log.error("Error fetching Saka date: {} ", e.getMessage());
 			}
 		}
 		return sakaDate;
