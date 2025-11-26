@@ -161,7 +161,7 @@ public class ThirdPartyDocGen {
 					Map<String, String> map1 = new HashMap<>();
 					map1.put("bulletinNo", map.get("bulletinNo").toString());
 					map1.put("branch", (String) map.get("officeName"));
-					map1.put("subject", map.get("subject").toString().toUpperCase());
+					map1.put("subject", map.get("subject").toString());
 					Map<String, String> mapLine = new HashMap<>();
 					ByteArrayResource resource = null;
 					ByteArrayResource resourceLine = null;
