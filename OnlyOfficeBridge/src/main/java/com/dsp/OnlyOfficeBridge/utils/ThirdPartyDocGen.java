@@ -233,7 +233,7 @@ public class ThirdPartyDocGen {
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				map.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
+				map.put("date", (String) data.get("forDate") + " / " + (String) data.get("forDateSaka"));
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
 
@@ -248,7 +248,31 @@ public class ThirdPartyDocGen {
 				inputList.forEach(map -> {
 					Map<String, String> map1 = new HashMap<>();
 					if (map.get("dsp2Key") != null) {
-						map1.put("subject", String.valueOf(map.get("subjectStr")));
+						
+						String subjectStr = map.get("subjectStr") != null
+				                ? map.get("subjectStr").toString()
+				                : "";
+
+				        Map subjectDTO = (Map) map.get("subjectDTO");
+
+				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
+				                ? Long.parseLong(subjectDTO.get("id").toString())
+				                : null;
+
+				        String finalSubject = subjectStr;
+
+				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
+
+				            Map officeNameDTO = (Map) map.get("officeNameDTO");
+
+				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
+				                String displayName = officeNameDTO.get("displayName").toString();
+				                finalSubject = subjectStr + " " + displayName;
+				            }
+				        }
+
+						
+						map1.put("subject", finalSubject.toUpperCase());
 
 						Map<String, String> mapLine = new HashMap<>();
 						ByteArrayResource resource = null;
@@ -280,8 +304,16 @@ public class ThirdPartyDocGen {
 				ByteArrayResource resource = null;
 				Map<String, String> map = new HashMap<>();
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
-				map.put("footerDate", (String) data.get("createdDate"));
-				map.put("footerSakaDate",(String) data.get("createdDateSaka"));
+				Date todaysDate = new Date();
+				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+				String formattedDate = formatter.format(todaysDate);
+
+				LocalDate todayDate = LocalDate.now();
+				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("MMMM dd, yyyy");
+				String formattedDateDay = todayDate.format(formatterDay);
+				
+				map.put("footerDate", (String) formattedDateDay);
+				map.put("footerSakaDate",(String) convertToSakaDate(formattedDate) + " (Saka)");
 				try {
 //					Map map = new HashMap();
 					resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -738,7 +770,7 @@ public class ThirdPartyDocGen {
 						if (index[0]++ == dspKeys.size()) {
 							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 						} else {
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 						}
 					});
 				});
@@ -839,7 +871,7 @@ public class ThirdPartyDocGen {
 									ByteArrayResource resourceBody = utils
 											.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
+									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
 											.build());
 								} else {
 									System.err.println("WARN: DSP2Key " + dsp2Key + " not found in metadata table");
@@ -860,7 +892,7 @@ public class ThirdPartyDocGen {
 										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnMap);
 
 								files.add(
-										MargeFileDto.builder().file(resource.getByteArray()).isBreak(!isLast).build());
+										MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 
 							} catch (Exception e) {
 								System.err.println("ERROR: Failed generating missing turn page for " + turn);
