@@ -839,7 +839,7 @@ public class ThirdPartyDocGen {
 									ByteArrayResource resourceBody = utils
 											.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
-									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
+									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
 											.build());
 								} else {
 									System.err.println("WARN: DSP2Key " + dsp2Key + " not found in metadata table");
@@ -860,7 +860,7 @@ public class ThirdPartyDocGen {
 										.replacePlaceholders("verbatim/content-missing-hour.docx", missingTurnMap);
 
 								files.add(
-										MargeFileDto.builder().file(resource.getByteArray()).isBreak(!isLast).build());
+										MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 
 							} catch (Exception e) {
 								System.err.println("ERROR: Failed generating missing turn page for " + turn);
