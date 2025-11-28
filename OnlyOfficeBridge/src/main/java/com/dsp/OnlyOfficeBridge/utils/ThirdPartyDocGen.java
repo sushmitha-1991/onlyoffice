@@ -281,7 +281,7 @@ public class ThirdPartyDocGen {
 						ByteArrayResource resourceLine = null;
 						try {
 							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
-							resourceLine = Utils.replacePlaceholders("line.docx", mapLine);
+							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
 
 						} catch (Exception e) {
 //                        e.printStackTrace();
