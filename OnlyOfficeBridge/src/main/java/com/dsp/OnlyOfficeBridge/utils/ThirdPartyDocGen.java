@@ -99,6 +99,8 @@ public class ThirdPartyDocGen {
 	private String cdUrl;
 	@Value("${dsp2.base.url}")
 	private String dsp2Url;
+	@Value("${dsp2.master.url}")
+	private String dsp2MasterUrl;
 	@Value("${prov.calender.service.url}")
 	private String pcUrl;
 	@Value("${doc.convert.url}")
@@ -3335,7 +3337,7 @@ private static class IdMaps {
 				requestPayload.put("dateToConvert", inputDate);
 
 				RestTemplate restTemplate = new RestTemplate();
-				ResponseEntity<Map> response = restTemplate.exchange(dsp2Url + "/master/convert/to-saka-date",
+				ResponseEntity<Map> response = restTemplate.exchange(dsp2MasterUrl + "/master/convert/to-saka-date",
 						HttpMethod.POST, new HttpEntity<>(requestPayload, headers), Map.class);
 
 				Map<String, Object> bodyResp = response.getBody();
