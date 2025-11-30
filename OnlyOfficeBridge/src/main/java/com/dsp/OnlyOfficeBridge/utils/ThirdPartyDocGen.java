@@ -231,10 +231,10 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		docTemplates.forEach(docTemplate -> {
-
+			Map<String, Object> data = (Map<String, Object>) body.get("data");
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
+				
 				map.put("date", (String) data.get("forDate") + " / " + (String) data.get("forDateSaka"));
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -244,8 +244,7 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException(e);
 				}
 
-			} else if (docTemplate.getCode().equals("lob_gen_con")) {
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
+			} else if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
 				List<Map> inputList = (List<Map>) data.get("inputList");
 				inputList.forEach(map -> {
 					Map<String, String> map1 = new HashMap<>();
@@ -305,7 +304,6 @@ public class ThirdPartyDocGen {
 			else {
 				ByteArrayResource resource = null;
 				Map<String, String> map = new HashMap<>();
-				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				Date todaysDate = new Date();
 				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
 				String formattedDate = formatter.format(todaysDate);
