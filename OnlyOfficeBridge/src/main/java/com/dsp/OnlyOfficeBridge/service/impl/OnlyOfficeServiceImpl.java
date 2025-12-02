@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.dsp.OnlyOfficeBridge.entity.Acronym;
+import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
+import com.dsp.OnlyOfficeBridge.utils.WordMLToHtml;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
@@ -133,6 +136,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	DocTemplateRepository docTemplateRepository;
 	@Autowired
 	ThirdPartyDocGen thirdPartyDocGen;
+    @Autowired
+    AcronymRepository acronymRepository;
 
 	@Value("${verbatim.gen.full.day.ls.template.id}")
 	private String verbatimFullDayLSTemplateId;
@@ -194,10 +199,12 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-
+        document.put("options", Map.of("spellcheck", true,"lang","en-US"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
+        editorConfig.put("lang", "en-US");
+        editorConfig.put("features", Map.of("spellcheck", true));
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
 		
@@ -706,5 +713,19 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             log.error("Error converting DOCX to TEXT for DSP Key: {}", dspKey, e);
             return null;
         }
+    }
+    public void convertHtml()
+    {
+        List<Acronym> acronymList = acronymRepository.findAll();
+        acronymList.forEach(acronym -> {
+            try {
+                String html = WordMLToHtml.convert(acronym.getFullText());
+                acronym.setFullText(html);
+                acronymRepository.save(acronym);
+                log.info("save {}",acronym.getAbbr());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
 }
