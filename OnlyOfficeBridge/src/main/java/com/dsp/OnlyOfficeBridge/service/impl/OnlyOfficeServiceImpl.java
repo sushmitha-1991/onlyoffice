@@ -199,11 +199,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-        document.put("options", Map.of("spellcheck", true,"lang","en-US"));
+        document.put("options", Map.of("spellcheck", true,"lang","en-IN"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
-        editorConfig.put("lang", "en-US");
+        editorConfig.put("lang", "en-IN");
         editorConfig.put("features", Map.of("spellcheck", true));
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
