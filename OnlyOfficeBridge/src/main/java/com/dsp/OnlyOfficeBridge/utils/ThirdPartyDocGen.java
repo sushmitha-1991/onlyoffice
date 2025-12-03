@@ -1324,7 +1324,27 @@ private static class IdMaps {
         }
     }
 
+    private static void ensureNumberingPartExists(WordprocessingMLPackage pkg) throws Docx4JException {
 
+        MainDocumentPart mdp = pkg.getMainDocumentPart();
+
+        // Check if numbering part already exists
+        NumberingDefinitionsPart numberingPart = mdp.getNumberingDefinitionsPart();
+
+        if (numberingPart == null) {
+            // Create new numbering part
+            numberingPart = new NumberingDefinitionsPart();
+
+            // Attach to the package
+            mdp.addTargetPart(numberingPart);
+
+            // Create empty numbering.xml content
+            Numbering numbering = Context.getWmlObjectFactory().createNumbering();
+            numberingPart.setContents(numbering);
+
+            System.out.println("Created empty numbering part.");
+        }
+    }
 
     public static byte[] mergeDocxFiles(List<MargeFileDto> files) throws Exception {
         if (files == null || files.isEmpty()) {
@@ -1335,10 +1355,13 @@ private static class IdMaps {
         WordprocessingMLPackage targetPkg = WordprocessingMLPackage
                 .load(new ByteArrayInputStream(files.get(0).getFile()));
         MainDocumentPart targetMain = targetPkg.getMainDocumentPart();
+        ensureNumberingPartExists(targetPkg);
         if(files.get(0).isBreak())
         {
             targetMain.getContent().add(createPageBreak());
         }
+
+
         // Ensure footnotes, endnotes, comments exist
         FootnotesPart targetFootnotes = targetMain.getFootnotesPart();
         if (targetFootnotes == null) {
@@ -1403,6 +1426,7 @@ private static class IdMaps {
 //                forceAbstractLevelStartOne(tgtNumbering);
                // normalizeNumbering(tgtNumbering);
             } else {
+
                 numberingMaps = new IdMaps(); // empty maps
             }
             // 2) Merge Footnotes
