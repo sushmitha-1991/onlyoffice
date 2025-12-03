@@ -116,6 +116,19 @@
             <artifactId>docx4j-core</artifactId>
             <version>11.5.4</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpmime</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+
+
 
         <!-- JAXB Reference Implementation (for Java 17) -->
         <dependency>
@@ -123,6 +136,7 @@
             <artifactId>docx4j-JAXB-ReferenceImpl</artifactId>
             <version>11.5.4</version>
         </dependency>
+
 <!--        <dependency>-->
 <!--            <groupId>org.jodconverter</groupId>-->
 <!--            <artifactId>jodconverter-remote</artifactId>-->
