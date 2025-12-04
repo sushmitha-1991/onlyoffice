@@ -737,8 +737,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Override
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		// sanitize unsafe characters
-		String sanitizedHtml = sanitizeHtml(htmlContent);
-		return thirdPartyDocGen.convertHtmlToDocx(sanitizedHtml);
+		htmlContent = sanitizeHtml(htmlContent);
+		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
 	}
 
 	public static String sanitizeHtml(String html) {
@@ -746,14 +746,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		if (html == null)
 			return null;
 
-		// Normalize Unicode (fix smart quotes, weird dashes)
-		String cleaned = Normalizer.normalize(html, Normalizer.Form.NFKC);
+		String cleaned = html;
+		// Smart quotes
+		cleaned = cleaned.replace("‘", "'").replace("’", "'").replace("“", "\"").replace("”", "\"");
 
-		// Use JSoup to repair HTML properly
-		Document doc = Jsoup.parse(cleaned);
-		doc.outputSettings().prettyPrint(false);
+		// Dashes
+		cleaned = cleaned.replace("–", "-").replace("—", "-");
 
-		return doc.html();
+		// Ellipsis
+		cleaned = cleaned.replace("…", "...");
+		return cleaned;
 	}
 
 }
