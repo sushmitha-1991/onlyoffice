@@ -203,11 +203,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-        document.put("options", Map.of("spellcheck", true,"lang","en-IN"));
+        document.put("options", Map.of("spellcheck", true,"lang","en-GB"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
-        editorConfig.put("lang", "en-IN");
+        editorConfig.put("lang", "en-GB");
         editorConfig.put("features", Map.of("spellcheck", true));
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
@@ -215,8 +215,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 //		, "zoom", 198 fit to width commented for now
 		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",Map.of("mode",true)));
 //		set default editor language to english-India
-//		editorConfig.put("lang", "en-IN");
-//        editorConfig.put("language","en-IN");
+//		editorConfig.put("lang", "en-GB");
+//        editorConfig.put("language","en-GB");
 //        editorConfig.put("region","IN");
 
 		// Final response
