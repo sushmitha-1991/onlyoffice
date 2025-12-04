@@ -714,6 +714,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             return null;
         }
     }
+	
     public void convertHtml()
     {
         List<Acronym> acronymList = acronymRepository.findAll();
@@ -728,4 +729,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             }
         });
     }
+
+	@Override
+	public byte[] convertHtmlToDocx(String htmlContent) {
+		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+	}
 }
