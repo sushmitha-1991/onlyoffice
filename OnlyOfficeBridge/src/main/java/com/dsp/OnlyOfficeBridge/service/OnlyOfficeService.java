@@ -27,4 +27,6 @@ public interface OnlyOfficeService {
 
 	ResponseEntity<Map<String, Object>> handleCallback(String dsp2Key,String applicationId, Map<String, Object> payload);
 
+	byte[] convertHtmlToDocx(String htmlContent);
+
 }

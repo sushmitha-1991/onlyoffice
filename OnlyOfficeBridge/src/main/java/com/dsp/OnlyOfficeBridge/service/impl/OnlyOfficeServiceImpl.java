@@ -707,4 +707,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             return null;
         }
     }
+
+	@Override
+	public byte[] convertHtmlToDocx(String htmlContent) {
+		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+	}
 }
