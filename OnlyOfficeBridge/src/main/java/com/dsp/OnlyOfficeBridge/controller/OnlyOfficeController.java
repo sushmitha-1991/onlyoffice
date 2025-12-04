@@ -154,4 +154,18 @@ public class OnlyOfficeController {
              return ResponseEntity.ok(response);
         }
 	}
+    
+	@PostMapping(value = "/convert-html-to-docx", produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	public ResponseEntity<byte[]> convertHtmlToDocx(@RequestBody String htmlContent) {
+
+		try {
+			byte[] docBytes = onlyOfficeService.convertHtmlToDocx(htmlContent);
+
+			return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=converted.docx")
+					.body(docBytes);
+
+		} catch (Exception e) {
+			throw new RuntimeException("HTML → DOCX conversion failed: " + e.getMessage(), e);
+		}
+	}
 }
