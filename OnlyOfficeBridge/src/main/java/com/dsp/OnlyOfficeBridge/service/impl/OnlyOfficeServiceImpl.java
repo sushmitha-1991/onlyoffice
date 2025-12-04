@@ -49,6 +49,10 @@ import com.dsp.OnlyOfficeBridge.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import java.text.Normalizer;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -743,7 +747,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			return null;
 
 		String cleaned = html;
-
 		// Smart quotes
 		cleaned = cleaned.replace("‘", "'").replace("’", "'").replace("“", "\"").replace("”", "\"");
 
@@ -752,17 +755,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		// Ellipsis
 		cleaned = cleaned.replace("…", "...");
-
-		// Non-breaking space
-		cleaned = cleaned.replace("\u00A0", " ");
-
-		// Special characters that break XML/HTML
-		cleaned = cleaned.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-				.replace("'", "&#39;");
-
-		// Remove invisible zero-width characters
-		cleaned = cleaned.replace("\u200B", "").replace("\u200C", "").replace("\u200D", "").replace("\uFEFF", "");
-
 		return cleaned;
 	}
 
