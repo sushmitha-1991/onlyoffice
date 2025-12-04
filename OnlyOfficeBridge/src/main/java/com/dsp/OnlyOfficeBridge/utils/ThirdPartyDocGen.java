@@ -361,8 +361,11 @@ public class ThirdPartyDocGen {
 
 		List<MargeFileDto> files = new LinkedList<>();
 
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		String parentGenDsp2Key = (String) data.get("genDsp2Key")!=null?(String) data.get("genDsp2Key"):null;
+		
+		if(parentGenDsp2Key == null) {
 		docTemplates.forEach(docTemplate -> {
-			Map<String, Object> data = (Map<String, Object>) body.get("data");
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
 				
@@ -376,7 +379,6 @@ public class ThirdPartyDocGen {
 				}
 
 			} else if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
-				String parentGenDsp2Key = (String) data.get("genDsp2Key");
 				List<Map> inputList = (List<Map>) data.get("inputList");
 				inputList.forEach(map -> {
 					Map<String, String> map1 = new HashMap<>();
@@ -456,6 +458,18 @@ public class ThirdPartyDocGen {
 
 			}
 		});
+		}
+		else
+		{
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+					.findByDsp2Key(parentGenDsp2Key);
+
+			ByteArrayResource resourceBody = utils
+					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+			files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+			
+		}
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
@@ -2231,20 +2245,21 @@ private static class IdMaps {
 				if (timePart != null) {
 					// Convert "03:11PM" → "03:11 PM"
 					String normalized = timePart.replace(" ", "").toUpperCase();
+					 normalized = normalized.replaceAll("(AM|PM)$", " $1");
 					if (normalized.endsWith("AM")) {
 				        normalized = normalized.replace("AM", "A.M.");
 				    } else if (normalized.endsWith("PM")) {
 				        normalized = normalized.replace("PM", "P.M.");
 				    }
 //					String formattedTime = timePart.replaceAll("(?i)(AM|PM)", " $1").toUpperCase().trim();
-					map.put("currentTime", normalized);
+					map.put("currentTime", normalized.trim());
 				} else {
 					// fallback to system time
 					DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
 					String sysTime = LocalTime.now().format(timeFormatter).toUpperCase();
 					sysTime = sysTime.replace("AM", "A.M.").replace("PM", "P.M.");
 //					map.put("currentTime", LocalTime.now().format(timeFormatter));
-					map.put("currentTime", sysTime);
+					map.put("currentTime", sysTime.trim());
 				}
 
 				try {
