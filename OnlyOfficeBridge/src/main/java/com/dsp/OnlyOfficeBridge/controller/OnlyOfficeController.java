@@ -50,6 +50,11 @@ public class OnlyOfficeController {
 		Map<String, Object> response = onlyOfficeService.getEditorConfig(payload);
 		return ResponseEntity.ok(response);
 	}
+    @GetMapping("/convertHtml")
+    public ResponseEntity<String> convertHtml() {
+        onlyOfficeService.convertHtml();
+        return ResponseEntity.ok("response");
+    }
 
 	@GetMapping("/download/{key}/{templateId}/{refId}")
 	public ResponseEntity<Resource> downloadByKey(@PathVariable String key,@PathVariable String templateId,@PathVariable String refId) {
