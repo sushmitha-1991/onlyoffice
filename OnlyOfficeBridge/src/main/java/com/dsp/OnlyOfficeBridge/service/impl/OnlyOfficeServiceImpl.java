@@ -207,13 +207,13 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
-        editorConfig.put("lang", "en-GB");
+        editorConfig.put("lang", "en-IN");
         editorConfig.put("features", Map.of("spellcheck", true));
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
 		
 //		, "zoom", 198 fit to width commented for now
-		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",Map.of("mode",true)));
+		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",true));
 //		set default editor language to english-India
 //		editorConfig.put("lang", "en-GB");
 //        editorConfig.put("language","en-GB");
