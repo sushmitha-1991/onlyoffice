@@ -49,6 +49,10 @@ import com.dsp.OnlyOfficeBridge.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import java.text.Normalizer;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -199,7 +203,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-        document.put("options", Map.of("spellcheck", true,"lang","en-IN"));
+        //document.put("options", Map.of("spellcheck", true,"lang","en-GB"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
@@ -209,10 +213,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
 		
 //		, "zoom", 198 fit to width commented for now
-		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"spellcheck",true));
+		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",true));
 //		set default editor language to english-India
-//		editorConfig.put("lang", "en-IN");
-//        editorConfig.put("language","en-IN");
+//		editorConfig.put("lang", "en-GB");
+//        editorConfig.put("language","en-GB");
 //        editorConfig.put("region","IN");
 
 		// Final response
@@ -714,6 +718,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             return null;
         }
     }
+	
     public void convertHtml()
     {
         List<Acronym> acronymList = acronymRepository.findAll();
@@ -728,4 +733,29 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
             }
         });
     }
+
+	@Override
+	public byte[] convertHtmlToDocx(String htmlContent) {
+		// sanitize unsafe characters
+		htmlContent = sanitizeHtml(htmlContent);
+		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+	}
+
+	public static String sanitizeHtml(String html) {
+
+		if (html == null)
+			return null;
+
+		String cleaned = html;
+		// Smart quotes
+		cleaned = cleaned.replace("‘", "'").replace("’", "'").replace("“", "\"").replace("”", "\"");
+
+		// Dashes
+		cleaned = cleaned.replace("–", "-").replace("—", "-");
+
+		// Ellipsis
+		cleaned = cleaned.replace("…", "...");
+		return cleaned;
+	}
+
 }
