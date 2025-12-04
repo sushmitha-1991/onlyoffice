@@ -49,6 +49,10 @@ import com.dsp.OnlyOfficeBridge.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import java.text.Normalizer;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -733,8 +737,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	@Override
 	public byte[] convertHtmlToDocx(String htmlContent) {
 		// sanitize unsafe characters
-		htmlContent = sanitizeHtml(htmlContent);
-		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+		String sanitizedHtml = sanitizeHtml(htmlContent);
+		return thirdPartyDocGen.convertHtmlToDocx(sanitizedHtml);
 	}
 
 	public static String sanitizeHtml(String html) {
@@ -742,28 +746,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		if (html == null)
 			return null;
 
-		String cleaned = html;
+		// Normalize Unicode (fix smart quotes, weird dashes)
+		String cleaned = Normalizer.normalize(html, Normalizer.Form.NFKC);
 
-		// Smart quotes
-		cleaned = cleaned.replace("‘", "'").replace("’", "'").replace("“", "\"").replace("”", "\"");
+		// Use JSoup to repair HTML properly
+		Document doc = Jsoup.parse(cleaned);
+		doc.outputSettings().prettyPrint(false);
 
-		// Dashes
-		cleaned = cleaned.replace("–", "-").replace("—", "-");
-
-		// Ellipsis
-		cleaned = cleaned.replace("…", "...");
-
-		// Non-breaking space
-		cleaned = cleaned.replace("\u00A0", " ");
-
-		// Special characters that break XML/HTML
-		cleaned = cleaned.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-				.replace("'", "&#39;");
-
-		// Remove invisible zero-width characters
-		cleaned = cleaned.replace("\u200B", "").replace("\u200C", "").replace("\u200D", "").replace("\uFEFF", "");
-
-		return cleaned;
+		return doc.html();
 	}
 
 }
