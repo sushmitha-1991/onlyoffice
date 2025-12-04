@@ -732,6 +732,38 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Override
 	public byte[] convertHtmlToDocx(String htmlContent) {
+		// sanitize unsafe characters
+		htmlContent = sanitizeHtml(htmlContent);
 		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
 	}
+
+	public static String sanitizeHtml(String html) {
+
+		if (html == null)
+			return null;
+
+		String cleaned = html;
+
+		// Smart quotes
+		cleaned = cleaned.replace("‘", "'").replace("’", "'").replace("“", "\"").replace("”", "\"");
+
+		// Dashes
+		cleaned = cleaned.replace("–", "-").replace("—", "-");
+
+		// Ellipsis
+		cleaned = cleaned.replace("…", "...");
+
+		// Non-breaking space
+		cleaned = cleaned.replace("\u00A0", " ");
+
+		// Special characters that break XML/HTML
+		cleaned = cleaned.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+				.replace("'", "&#39;");
+
+		// Remove invisible zero-width characters
+		cleaned = cleaned.replace("\u200B", "").replace("\u200C", "").replace("\u200D", "").replace("\uFEFF", "");
+
+		return cleaned;
+	}
+
 }
