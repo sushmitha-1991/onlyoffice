@@ -203,7 +203,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-        document.put("options", Map.of("spellcheck", true,"lang","en-IN"));
+        //document.put("options", Map.of("spellcheck", true,"lang","en-GB"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
@@ -213,10 +213,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
 		
 //		, "zoom", 198 fit to width commented for now
-		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",Map.of("mode",true)));
+		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",true));
 //		set default editor language to english-India
-//		editorConfig.put("lang", "en-IN");
-//        editorConfig.put("language","en-IN");
+//		editorConfig.put("lang", "en-GB");
+//        editorConfig.put("language","en-GB");
 //        editorConfig.put("region","IN");
 
 		// Final response
@@ -245,7 +245,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					return thirdPartyDocGen.genBulletin2RsGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobTemplateId)) {
-					return thirdPartyDocGen.genLobGeneration(key, docTemplates, refId);
+					return thirdPartyDocGen.genLobGenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobRsTemplateId)) {
 					return thirdPartyDocGen.genLobRsGeneration(key, docTemplates, refId);
