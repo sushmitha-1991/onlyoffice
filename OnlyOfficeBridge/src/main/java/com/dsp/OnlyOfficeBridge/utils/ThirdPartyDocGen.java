@@ -362,10 +362,7 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String parentGenDsp2Key = (String) data.get("genDsp2Key")!=null?(String) data.get("genDsp2Key"):null;
-		 List<Long> newInputIds = (List<Long>) data.get("newInputIds");
-		 Map<String,String> newInputKeys = (Map<String,String>) data.get("newInputKeys");
-		 
+		String parentGenDsp2Key = (String) data.get("prevGenDsp2Key")!=null?(String) data.get("prevGenDsp2Key"):null;
 		if(parentGenDsp2Key == null) {
 		docTemplates.forEach(docTemplate -> {
 			if (docTemplate.getCode().equals("lob_gen_header")) {
@@ -470,38 +467,65 @@ public class ThirdPartyDocGen {
 					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 
 			files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-			 
-			if (newInputIds != null && !newInputIds.isEmpty()) {
+			
+			docTemplates.forEach(docTemplate -> {
+			if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
+				List<Map> inputList = (List<Map>) data.get("newInputList");
+				inputList.forEach(map -> {
+					Map<String, String> map1 = new HashMap<>();
+					if (map.get("dsp2Key") != null) {
+						
+						String subjectStr = map.get("subjectStr") != null
+				                ? map.get("subjectStr").toString()
+				                : "";
 
-		            for (Long id : newInputIds) {
-		                String dspKey = newInputKeys.get(String.valueOf(id));
-		                if(dspKey != null)
-		                {
-		                	
-		                	Map<String, String> mapLine = new HashMap<>();
-							ByteArrayResource resource = null;
-							ByteArrayResource resourceLine = null;
-							try {
-								resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
+				        Map subjectDTO = (Map) map.get("subjectDTO");
 
-							} catch (Exception e) {
-//	                        e.printStackTrace();
-								throw new RuntimeException(e);
-							}
-							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
+				                ? Long.parseLong(subjectDTO.get("id").toString())
+				                : null;
 
-							 metadataOpt = onlyOfficeMetadataRepository
-									.findByDsp2Key(dspKey);
+				        String finalSubject = subjectStr;
 
-							 resourceBody = utils
-									.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
 
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-							files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
-		                	
-		                }
-		            } 	
-		}
+				            Map officeNameDTO = (Map) map.get("officeNameDTO");
+
+				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
+				                String displayName = officeNameDTO.get("displayName").toString();
+				                finalSubject = subjectStr + " " + displayName;
+				            }
+				        }
+
+						
+						map1.put("subject", finalSubject.toUpperCase());
+
+						Map<String, String> mapLine = new HashMap<>();
+						ByteArrayResource resource = null;
+						ByteArrayResource resourceLine = null;
+						try {
+							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
+
+						} catch (Exception e) {
+//                        e.printStackTrace();
+							throw new RuntimeException(e);
+						}
+						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+
+						Optional<OnlyOfficeMetadata> metadataOpt1 = onlyOfficeMetadataRepository
+								.findByDsp2Key((String) map.get("dsp2Key"));
+
+						ByteArrayResource resourceBody1 = utils
+								.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
+
+						files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false).build());
+						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
+					}
+				});
+				
+			}
+			});
 		}
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
