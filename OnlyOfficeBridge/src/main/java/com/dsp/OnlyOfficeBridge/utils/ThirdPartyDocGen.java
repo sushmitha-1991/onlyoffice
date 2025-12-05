@@ -1618,9 +1618,17 @@ private static class IdMaps {
                     List<Integer> currIdFootnote = getMapKeyList(xml, "w:footnoteReference[^>]*w:id=\"(\\d+)\"");
                     for (Map.Entry<BigInteger, BigInteger> e : footnoteIdMap.entrySet()) {
                         if (currIdFootnote.contains(e.getKey().intValue())) {
-                            xml = xml.replace("w:footnoteReference w:id=\"" + e.getKey() + "\"",
-                                    "w:footnoteReference w:id=\"" + e.getValue() + "\"");
-                            currIdFootnote.remove(Integer.getInteger(e.getKey().toString()));
+
+                            log.debug("Before replace footnote id {} >>> {}", e.getKey(), xml);
+
+                            xml = xml.replaceAll(
+                                    "<w:footnoteReference([^>]*)w:id=\"" + e.getKey() + "\"",
+                                    "<w:footnoteReference$1w:id=\"" + e.getValue() + "\""
+                            );
+
+                            log.debug("After replace id {} with {} >>> {}", e.getKey(), e.getValue(), xml);
+
+                            currIdFootnote.remove(Integer.valueOf(e.getKey().toString()));
                         }
                     }
                     // Replace endnote IDs
