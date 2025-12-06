@@ -336,7 +336,6 @@ public class Utils {
 			System.out.println(">>> referenceId - " + referenceId);
 			System.out.println(">>> referenceType - " + referenceType);
 			System.out.println(">>> applicationNo - " + applicationNo);
-            System.out.println(">>> pdfFile - " + pdfFile);
 
 			// The JWT token is automatically added by the RestTemplate interceptor
 			HttpHeaders headers = new HttpHeaders();
@@ -344,7 +343,6 @@ public class Utils {
 
 			// Create a FileSystemResource from the file
 			FileSystemResource fileResource = new FileSystemResource(pdfFile);
-            System.out.println(">>> fileResource - " + fileResource);
 
 			// Prepare the body with all required fields
 			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -361,10 +359,9 @@ public class Utils {
 			// Prepare the request entity with headers and body
 			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 			System.out.println(requestEntity);
-			String uploadUrl = "http://10.247.128.11:32246/dms/openkm/dsp1/document/upload";
-
-			System.out.println(">>> NEW uploadUrl - " + uploadUrl);
-			ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.POST, requestEntity,
+//			String uploadUrl = "https://dspstg.sansad.in/dms/openkm/dsp1/document/upload";
+			System.out.println(">>> NEW uploadUrl - " + uploadOkmUrl);
+			ResponseEntity<String> response = restTemplate.exchange(uploadOkmUrl, HttpMethod.POST, requestEntity,
 					String.class);
 
 			// Return the response body as a string

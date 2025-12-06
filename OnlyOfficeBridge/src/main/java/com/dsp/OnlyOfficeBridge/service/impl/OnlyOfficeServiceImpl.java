@@ -592,7 +592,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
                 System.out.println(">>> fileUrl - "+ fileUrl);
                 System.out.println(">>> key - "+ key + " dspkey >>> "  + dsp2Key );
-                String ports[] = {"8087","8086"};
+                String ports[] = {"8087","8086","8080"};
                 String url = "";
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for (String port : ports) {
