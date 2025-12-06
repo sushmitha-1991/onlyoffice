@@ -596,7 +596,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for(int i=0;i<ports.size();i++)
                 {
-                    String url = "http://10.247.128.22:"+ports.get(0);
+                    String url = "http://10.247.128.22:"+ports.get(i);
                     fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc",url);
                     try (InputStream in = new URL(fileUrl).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
