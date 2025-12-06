@@ -598,9 +598,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 {
                     String url = "http://10.247.128.22:"+ports.get(i);
                     fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc",url);
+
                     try (InputStream in = new URL(fileUrl).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
                         in.transferTo(out);
+                        System.out.println(">>> fileUrl replace - "+ fileUrl);
                         break;
                     }
                     catch (Exception e)
@@ -614,7 +616,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				String documentName = key + ".docx";
 
 				log.debug(">>> documentName - {}", documentName);
-                System.out.println(">>> fileUrl replace - "+ fileUrl);
+
 				// 2. Upload to OpenKM
 				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231",
 						"51303", "ApplicationInstance", "1");
