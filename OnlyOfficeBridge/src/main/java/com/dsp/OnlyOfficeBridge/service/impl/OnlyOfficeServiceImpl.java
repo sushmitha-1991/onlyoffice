@@ -605,7 +605,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                     }
                     catch (Exception e)
                     {
-                        e.printStackTrace();
+                        System.out.println(">>> fileUrl exception - "+ fileUrl + " what "+ e.getMessage());
                     }
                 }
 				// 1. Download file from OnlyOffice
