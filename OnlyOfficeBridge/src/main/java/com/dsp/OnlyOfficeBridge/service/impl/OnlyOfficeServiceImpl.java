@@ -593,9 +593,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 System.out.println(">>> fileUrl - "+ fileUrl);
                 System.out.println(">>> key - "+ key + " dspkey >>> "  + dsp2Key );
                 String ports[] = {"8087","8086"};
+                String url = "";
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for (String port : ports) {
-                    String url = "http://10.247.128.22:" + port;
+                    url = "http://10.247.128.22:" + port;
+                    System.out.println("yuuuuuuurl >>> " + url);
                     fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc", url);
 
                     try (InputStream in = new URL(fileUrl).openStream();
