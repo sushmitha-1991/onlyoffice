@@ -591,7 +591,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				String key = (String) payload.get("key");
 
                 System.out.println(">>> fileUrl - "+ fileUrl);
-                System.out.println(">>> key - "+ key);
+                System.out.println(">>> key - "+ key + " dspkey >>> "  + dsp2Key );
                 List<String> ports = List.of("8086","8087");
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for(int i=0;i<ports.size();i++)
