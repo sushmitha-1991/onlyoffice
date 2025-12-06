@@ -592,22 +592,19 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
                 System.out.println(">>> fileUrl - "+ fileUrl);
                 System.out.println(">>> key - "+ key + " dspkey >>> "  + dsp2Key );
-                List<String> ports = List.of("8087","8086");
+                String ports[] = {"8087","8086"};
                 File tempFile = File.createTempFile("edited-doc", ".docx");
-                for(int i=0;i<ports.size();i++)
-                {
-                    String url = "http://10.247.128.22:"+ports.get(i);
-                    fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc",url);
+                for (String port : ports) {
+                    String url = "http://10.247.128.22:" + port;
+                    fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc", url);
 
                     try (InputStream in = new URL(fileUrl).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
                         in.transferTo(out);
-                        System.out.println(">>> fileUrl replace - "+ fileUrl);
+                        System.out.println(">>> fileUrl replace - " + fileUrl);
                         break;
-                    }
-                    catch (Exception e)
-                    {
-                        System.out.println(">>> fileUrl exception - "+ fileUrl + " what "+ e.getMessage());
+                    } catch (Exception e) {
+                        System.out.println(">>> fileUrl exception - " + fileUrl + " what " + e.getMessage());
                     }
                 }
 				// 1. Download file from OnlyOffice
