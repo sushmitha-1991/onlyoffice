@@ -336,6 +336,7 @@ public class Utils {
 			System.out.println(">>> referenceId - " + referenceId);
 			System.out.println(">>> referenceType - " + referenceType);
 			System.out.println(">>> applicationNo - " + applicationNo);
+            System.out.println(">>> pdfFile - " + pdfFile);
 
 			// The JWT token is automatically added by the RestTemplate interceptor
 			HttpHeaders headers = new HttpHeaders();
@@ -343,6 +344,7 @@ public class Utils {
 
 			// Create a FileSystemResource from the file
 			FileSystemResource fileResource = new FileSystemResource(pdfFile);
+            System.out.println(">>> fileResource - " + fileResource);
 
 			// Prepare the body with all required fields
 			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();

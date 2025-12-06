@@ -584,14 +584,14 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		try {
 			int status = (int) payload.get("status");
 
-			log.debug(">>> status - {}", status);
+            System.out.println(">>> status - "+ status);
 
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
 
-				log.debug(">>> fileUrl - {}", fileUrl);
-				log.debug(">>> key - {}", key);
+                System.out.println(">>> fileUrl - "+ fileUrl);
+                System.out.println(">>> key - "+ key);
 
 				// 1. Download file from OnlyOffice
 				File tempFile = File.createTempFile("edited-doc", ".docx");
