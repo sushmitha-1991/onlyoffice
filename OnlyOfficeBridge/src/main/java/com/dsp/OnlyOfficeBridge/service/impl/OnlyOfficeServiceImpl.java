@@ -598,15 +598,15 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 for (String port : ports) {
                     url = "http://10.247.128.22:" + port;
                     System.out.println("yuuuuuuurl >>> " + url);
-                    fileUrl = fileUrl.replaceAll("https://dspstg.sansad.in/doc", url);
+                    String fileUrlString = fileUrl.replaceAll("https://dspstg.sansad.in/doc", url);
 
-                    try (InputStream in = new URL(fileUrl).openStream();
+                    try (InputStream in = new URL(fileUrlString).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
                         in.transferTo(out);
-                        System.out.println(">>> fileUrl replace - " + fileUrl);
+                        System.out.println(">>> fileUrl replace - " + fileUrlString);
                         break;
                     } catch (Exception e) {
-                        System.out.println(">>> fileUrl exception - " + fileUrl + " what " + e.getMessage());
+                        System.out.println(">>> fileUrl exception - " + fileUrlString + " what " + e.getMessage());
                     }
                 }
 				// 1. Download file from OnlyOffice
