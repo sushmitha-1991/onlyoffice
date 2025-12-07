@@ -133,7 +133,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	
 	@Value("${translation.version.template.id}")
 	String newVersionTranslationTemplateId;
-	
+    @Value("${only.office.cache.list}")
+	String onlyOfficeCacheList;
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -584,29 +585,24 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		try {
 			int status = (int) payload.get("status");
 
-            System.out.println(">>> status - "+ status);
 
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
 
-                System.out.println(">>> fileUrl - "+ fileUrl);
-                System.out.println(">>> key - "+ key + " dspkey >>> "  + dsp2Key );
-                String ports[] = {"8087","8086","8080"};
+                String ports[] = onlyOfficeCacheList.split(",");
                 String url = "";
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for (String port : ports) {
-                    url = "http://10.247.128.22:" + port;
-                    System.out.println("yuuuuuuurl >>> " + url);
-                    String fileUrlString = fileUrl.replaceAll("https://dspstg.sansad.in/doc", url);
+
+                    String fileUrlString = fileUrl.replaceAll("https://dspstg.sansad.in/doc", port);
 
                     try (InputStream in = new URL(fileUrlString).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
                         in.transferTo(out);
-                        System.out.println(">>> fileUrl replace - " + fileUrlString);
                         break;
                     } catch (Exception e) {
-                        System.out.println(">>> fileUrl exception - " + fileUrlString + " what " + e.getMessage());
+                        log.info(">>> fileUrl exception -{} what {} " , fileUrlString ,  e.getMessage());
                     }
                 }
 				// 1. Download file from OnlyOffice
