@@ -207,138 +207,7 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
-//	public ResponseEntity<Resource> genLobGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
-//		String url = lobUrl + "/lob/generate-doc-id/" + refId;
-//		Map<String, Object> body;
-//		if (token == null) {
-//			throw new IllegalStateException("Authorization token is missing");
-//		}
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.set("Authorization", "Bearer " + token);
-//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-//		HttpEntity<Void> entity = new HttpEntity<>(headers);
-//
-//		try {
-//			RestTemplate restTemplate = new RestTemplate();
-//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-//			body = response.getBody();
-//			log.debug("Response Body : {}",body);
-//		} catch (Exception e) {
-//			log.error("Error during API call: " + e.getMessage());
-//			throw e;
-//		}
-//
-//		List<MargeFileDto> files = new LinkedList<>();
-//
-//		docTemplates.forEach(docTemplate -> {
-//			Map<String, Object> data = (Map<String, Object>) body.get("data");
-//			if (docTemplate.getCode().equals("lob_gen_header")) {
-//				Map<String, String> map = new HashMap<>();
-//				
-//				map.put("date", (String) data.get("forDate") + " / " + (String) data.get("forDateSaka"));
-//				try {
-//					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-//
-//					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-//				} catch (Exception e) {
-//					throw new RuntimeException(e);
-//				}
-//
-//			} else if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
-//				List<Map> inputList = (List<Map>) data.get("inputList");
-//				inputList.forEach(map -> {
-//					Map<String, String> map1 = new HashMap<>();
-//					if (map.get("dsp2Key") != null) {
-//						
-//						String subjectStr = map.get("subjectStr") != null
-//				                ? map.get("subjectStr").toString()
-//				                : "";
-//
-//				        Map subjectDTO = (Map) map.get("subjectDTO");
-//
-//				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
-//				                ? Long.parseLong(subjectDTO.get("id").toString())
-//				                : null;
-//
-//				        String finalSubject = subjectStr;
-//
-//				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
-//
-//				            Map officeNameDTO = (Map) map.get("officeNameDTO");
-//
-//				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
-//				                String displayName = officeNameDTO.get("displayName").toString();
-//				                finalSubject = subjectStr + " " + displayName;
-//				            }
-//				        }
-//
-//						
-//						map1.put("subject", finalSubject.toUpperCase());
-//
-//						Map<String, String> mapLine = new HashMap<>();
-//						ByteArrayResource resource = null;
-//						ByteArrayResource resourceLine = null;
-//						try {
-//							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
-//							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
-//
-//						} catch (Exception e) {
-////                        e.printStackTrace();
-//							throw new RuntimeException(e);
-//						}
-//						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-//
-//						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-//								.findByDsp2Key((String) map.get("dsp2Key"));
-//
-//						ByteArrayResource resourceBody = utils
-//								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-//
-//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-//						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
-//					}
-//				});
-//
-//			}
-//
-//			else {
-//				ByteArrayResource resource = null;
-//				Map<String, String> map = new HashMap<>();
-//				Date todaysDate = new Date();
-//				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-//				String formattedDate = formatter.format(todaysDate);
-//
-//				LocalDate todayDate = LocalDate.now();
-//				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("MMMM dd, yyyy");
-//				String formattedDateDay = todayDate.format(formatterDay);
-//				
-//				map.put("footerDate", (String) formattedDateDay);
-//				map.put("footerSakaDate",(String) convertToSakaDate(formattedDate) + " (Saka)");
-//				try {
-////					Map map = new HashMap();
-//					resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-//				} catch (Exception e) {
-//					throw new RuntimeException(e);
-//				}
-//				files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-//
-//			}
-//		});
-//		try {
-//			byte[] mergedBytes = mergeDocxFiles(files);
-//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
-//			saveOpenKm(dsp2Key, mergedResource);
-//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
-//					.contentLength(mergedResource.contentLength()).body(mergedResource);
-//		} catch (Exception e) {
-//
-//		}
-//		return null;
-//	}
-
-	
-	public ResponseEntity<Resource> genLobGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+	public ResponseEntity<Resource> genLobGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = lobUrl + "/lob/generate-doc-id/" + refId;
 		Map<String, Object> body;
 		if (token == null) {
@@ -361,10 +230,8 @@ public class ThirdPartyDocGen {
 
 		List<MargeFileDto> files = new LinkedList<>();
 
-		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String parentGenDsp2Key = (String) data.get("prevGenDsp2Key")!=null?(String) data.get("prevGenDsp2Key"):null;
-		if(parentGenDsp2Key == null) {
 		docTemplates.forEach(docTemplate -> {
+			Map<String, Object> data = (Map<String, Object>) body.get("data");
 			if (docTemplate.getCode().equals("lob_gen_header")) {
 				Map<String, String> map = new HashMap<>();
 				
@@ -457,76 +324,6 @@ public class ThirdPartyDocGen {
 
 			}
 		});
-		}
-		else
-		{
-			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
-					.findByDsp2Key(parentGenDsp2Key);
-
-			ByteArrayResource resourceBody = utils
-					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-
-			files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-			
-			docTemplates.forEach(docTemplate -> {
-			if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
-				List<Map> inputList = (List<Map>) data.get("newInputList");
-				inputList.forEach(map -> {
-					Map<String, String> map1 = new HashMap<>();
-					if (map.get("dsp2Key") != null) {
-						
-						String subjectStr = map.get("subjectStr") != null
-				                ? map.get("subjectStr").toString()
-				                : "";
-
-				        Map subjectDTO = (Map) map.get("subjectDTO");
-
-				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
-				                ? Long.parseLong(subjectDTO.get("id").toString())
-				                : null;
-
-				        String finalSubject = subjectStr;
-
-				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
-
-				            Map officeNameDTO = (Map) map.get("officeNameDTO");
-
-				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
-				                String displayName = officeNameDTO.get("displayName").toString();
-				                finalSubject = subjectStr + " " + displayName;
-				            }
-				        }
-
-						
-						map1.put("subject", finalSubject.toUpperCase());
-
-						Map<String, String> mapLine = new HashMap<>();
-						ByteArrayResource resource = null;
-						ByteArrayResource resourceLine = null;
-						try {
-							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
-							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
-
-						} catch (Exception e) {
-//                        e.printStackTrace();
-							throw new RuntimeException(e);
-						}
-						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-
-						Optional<OnlyOfficeMetadata> metadataOpt1 = onlyOfficeMetadataRepository
-								.findByDsp2Key((String) map.get("dsp2Key"));
-
-						ByteArrayResource resourceBody1 = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
-
-						files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false).build());
-						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
-					}
-				});
-				
-			}
-			});
-		}
 		try {
 			byte[] mergedBytes = mergeDocxFiles(files);
 			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
@@ -539,6 +336,209 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
+
+	
+//	public ResponseEntity<Resource> genLobGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
+//		String url = lobUrl + "/lob/generate-doc-id/" + refId;
+//		Map<String, Object> body;
+//		if (token == null) {
+//			throw new IllegalStateException("Authorization token is missing");
+//		}
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.set("Authorization", "Bearer " + token);
+//		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+//		HttpEntity<Void> entity = new HttpEntity<>(headers);
+//
+//		try {
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+//			body = response.getBody();
+//			log.debug("Response Body : {}",body);
+//		} catch (Exception e) {
+//			log.error("Error during API call: " + e.getMessage());
+//			throw e;
+//		}
+//
+//		List<MargeFileDto> files = new LinkedList<>();
+//
+//		Map<String, Object> data = (Map<String, Object>) body.get("data");
+//		String parentGenDsp2Key = (String) data.get("prevGenDsp2Key")!=null?(String) data.get("prevGenDsp2Key"):null;
+//		if(parentGenDsp2Key == null) {
+//		docTemplates.forEach(docTemplate -> {
+//			if (docTemplate.getCode().equals("lob_gen_header")) {
+//				Map<String, String> map = new HashMap<>();
+//				
+//				map.put("date", (String) data.get("forDate") + " / " + (String) data.get("forDateSaka"));
+//				try {
+//					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+//
+//					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+//				} catch (Exception e) {
+//					throw new RuntimeException(e);
+//				}
+//
+//			} else if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
+//				List<Map> inputList = (List<Map>) data.get("inputList");
+//				inputList.forEach(map -> {
+//					Map<String, String> map1 = new HashMap<>();
+//					if (map.get("dsp2Key") != null) {
+//						
+//						String subjectStr = map.get("subjectStr") != null
+//				                ? map.get("subjectStr").toString()
+//				                : "";
+//
+//				        Map subjectDTO = (Map) map.get("subjectDTO");
+//
+//				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
+//				                ? Long.parseLong(subjectDTO.get("id").toString())
+//				                : null;
+//
+//				        String finalSubject = subjectStr;
+//
+//				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
+//
+//				            Map officeNameDTO = (Map) map.get("officeNameDTO");
+//
+//				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
+//				                String displayName = officeNameDTO.get("displayName").toString();
+//				                finalSubject = subjectStr + " " + displayName;
+//				            }
+//				        }
+//
+//						
+//						map1.put("subject", finalSubject.toUpperCase());
+//
+//						Map<String, String> mapLine = new HashMap<>();
+//						ByteArrayResource resource = null;
+//						ByteArrayResource resourceLine = null;
+//						try {
+//							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+//							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
+//
+//						} catch (Exception e) {
+////                        e.printStackTrace();
+//							throw new RuntimeException(e);
+//						}
+//						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+//
+//						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+//								.findByDsp2Key((String) map.get("dsp2Key"));
+//
+//						ByteArrayResource resourceBody = utils
+//								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+//
+//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+//						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
+//					}
+//				});
+//
+//			}
+//
+//			else {
+//				ByteArrayResource resource = null;
+//				Map<String, String> map = new HashMap<>();
+//				Date todaysDate = new Date();
+//				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+//				String formattedDate = formatter.format(todaysDate);
+//
+//				LocalDate todayDate = LocalDate.now();
+//				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("MMMM dd, yyyy");
+//				String formattedDateDay = todayDate.format(formatterDay);
+//				
+//				map.put("footerDate", (String) formattedDateDay);
+//				map.put("footerSakaDate",(String) convertToSakaDate(formattedDate) + " (Saka)");
+//				try {
+////					Map map = new HashMap();
+//					resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+//				} catch (Exception e) {
+//					throw new RuntimeException(e);
+//				}
+//				files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+//
+//			}
+//		});
+//		}
+//		else
+//		{
+//			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+//					.findByDsp2Key(parentGenDsp2Key);
+//
+//			ByteArrayResource resourceBody = utils
+//					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+//
+//			files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+//			
+//			docTemplates.forEach(docTemplate -> {
+//			if (docTemplate.getCode().equals("lob_gen_con") && data!=null) {
+//				List<Map> inputList = (List<Map>) data.get("newInputList");
+//				inputList.forEach(map -> {
+//					Map<String, String> map1 = new HashMap<>();
+//					if (map.get("dsp2Key") != null) {
+//						
+//						String subjectStr = map.get("subjectStr") != null
+//				                ? map.get("subjectStr").toString()
+//				                : "";
+//
+//				        Map subjectDTO = (Map) map.get("subjectDTO");
+//
+//				        Long subjectId = subjectDTO != null && subjectDTO.get("id") != null
+//				                ? Long.parseLong(subjectDTO.get("id").toString())
+//				                : null;
+//
+//				        String finalSubject = subjectStr;
+//
+//				        if (subjectId != null && (subjectId == 88 || subjectId == 90)) {
+//
+//				            Map officeNameDTO = (Map) map.get("officeNameDTO");
+//
+//				            if (officeNameDTO != null && officeNameDTO.get("displayName") != null) {
+//				                String displayName = officeNameDTO.get("displayName").toString();
+//				                finalSubject = subjectStr + " " + displayName;
+//				            }
+//				        }
+//
+//						
+//						map1.put("subject", finalSubject.toUpperCase());
+//
+//						Map<String, String> mapLine = new HashMap<>();
+//						ByteArrayResource resource = null;
+//						ByteArrayResource resourceLine = null;
+//						try {
+//							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+//							resourceLine = Utils.replacePlaceholders("lob/line.docx", mapLine);
+//
+//						} catch (Exception e) {
+////                        e.printStackTrace();
+//							throw new RuntimeException(e);
+//						}
+//						files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+//
+//						Optional<OnlyOfficeMetadata> metadataOpt1 = onlyOfficeMetadataRepository
+//								.findByDsp2Key((String) map.get("dsp2Key"));
+//
+//						ByteArrayResource resourceBody1 = utils
+//								.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
+//
+//						files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false).build());
+//						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
+//					}
+//				});
+//				
+//			}
+//			});
+//		}
+//		try {
+//			byte[] mergedBytes = mergeDocxFiles(files);
+//			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+//			saveOpenKm(dsp2Key, mergedResource);
+//			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+//					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+//					.contentLength(mergedResource.contentLength()).body(mergedResource);
+//		} catch (Exception e) {
+//
+//		}
+//		return null;
+//	}
 	
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
