@@ -133,7 +133,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	
 	@Value("${translation.version.template.id}")
 	String newVersionTranslationTemplateId;
-    @Value("${only.office.cache.list}")
+    @Value("${doc.office.cache.list}")
 	String onlyOfficeCacheList;
 	@Autowired
 	private Utils utils;
@@ -149,6 +149,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${verbatim.gen.full.day.rs.template.id}")
 	private String verbatimFullDayRSTemplateId;
+    @Value("${doc.ofc.server.url}")
+    String onlyOfcServerUrl;
 
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
@@ -595,7 +597,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
                 File tempFile = File.createTempFile("edited-doc", ".docx");
                 for (String port : ports) {
 
-                    String fileUrlString = fileUrl.replaceAll("https://dspstg.sansad.in/doc", port);
+                    String fileUrlString = fileUrl.replaceAll(onlyOfcServerUrl, port);
 
                     try (InputStream in = new URL(fileUrlString).openStream();
                          FileOutputStream out = new FileOutputStream(tempFile)) {
