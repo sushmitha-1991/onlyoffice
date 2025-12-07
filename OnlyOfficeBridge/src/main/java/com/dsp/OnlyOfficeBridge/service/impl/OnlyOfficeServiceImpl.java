@@ -133,7 +133,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	
 	@Value("${translation.version.template.id}")
 	String newVersionTranslationTemplateId;
-	
+    @Value("${doc.office.cache.list}")
+	String onlyOfficeCacheList;
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -148,6 +149,8 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${verbatim.gen.full.day.rs.template.id}")
 	private String verbatimFullDayRSTemplateId;
+    @Value("${doc.ofc.server.url}")
+    String onlyOfcServerUrl;
 
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
@@ -245,7 +248,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					return thirdPartyDocGen.genBulletin2RsGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobTemplateId)) {
-					return thirdPartyDocGen.genLobGeneration(key, docTemplates, refId);
+					return thirdPartyDocGen.genLobGenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobRsTemplateId)) {
 					return thirdPartyDocGen.genLobRsGeneration(key, docTemplates, refId);
@@ -584,21 +587,28 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		try {
 			int status = (int) payload.get("status");
 
-			log.debug(">>> status - {}", status);
 
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
 
-				log.debug(">>> fileUrl - {}", fileUrl);
-				log.debug(">>> key - {}", key);
+                String ports[] = onlyOfficeCacheList.split(",");
+                String url = "";
+                File tempFile = File.createTempFile("edited-doc", ".docx");
+                for (String port : ports) {
 
+                    String fileUrlString = fileUrl.replaceAll(onlyOfcServerUrl, port);
+
+                    try (InputStream in = new URL(fileUrlString).openStream();
+                         FileOutputStream out = new FileOutputStream(tempFile)) {
+                        in.transferTo(out);
+                        break;
+                    } catch (Exception e) {
+                        log.info(">>> fileUrl exception -{} what {} " , fileUrlString ,  e.getMessage());
+                    }
+                }
 				// 1. Download file from OnlyOffice
-				File tempFile = File.createTempFile("edited-doc", ".docx");
-				try (InputStream in = new URL(fileUrl).openStream();
-						FileOutputStream out = new FileOutputStream(tempFile)) {
-					in.transferTo(out);
-				}
+
 
 				String documentName = key + ".docx";
 
