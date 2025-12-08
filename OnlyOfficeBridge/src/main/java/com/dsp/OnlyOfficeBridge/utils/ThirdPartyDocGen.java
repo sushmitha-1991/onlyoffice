@@ -3806,7 +3806,13 @@ public class ThirdPartyDocGen {
 	 */
 	public ResponseEntity<Resource> genCreationOfNoticesGeneration(String key, List<DocTemplate> docTemplates,
 			String refId) {
-		String url = creationOfNoticesUrl + refId;
+
+		String[] refParts = refId.split("-");
+
+		String url = creationOfNoticesUrl + refParts[0];
+		String div = refParts[1];
+		String date = refParts[2];
+
 		// Call API
 		Map<String, Object> body = null;
 		try {
@@ -3830,6 +3836,13 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 
 				map.put("content", (String) data.get("noticeContent"));
+				map.put("lokSabha", (String) data.get("lokSabhaNumber"));
+				map.put("session", (String) data.get("sessionNumber"));
+				map.put("memberName", (String) data.get("memberName"));
+				map.put("party", (String) data.get("partyName"));
+				map.put("icNo", (String) data.get("icNo"));
+				map.put("divNo", div);
+				map.put("date", date);
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
@@ -3843,6 +3856,13 @@ public class ThirdPartyDocGen {
 				Map<String, String> map = new HashMap<>();
 
 				map.put("content", (String) data.get("modifiedNoticeContent"));
+				map.put("lokSabha", (String) data.get("lokSabhaNumber"));
+				map.put("session", (String) data.get("sessionNumber"));
+				map.put("memberName", (String) data.get("memberName"));
+				map.put("party", (String) data.get("partyName"));
+				map.put("icNo", (String) data.get("icNo"));
+				map.put("divNo", div);
+				map.put("date", date);
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
