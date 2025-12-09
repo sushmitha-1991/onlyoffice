@@ -248,7 +248,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					return thirdPartyDocGen.genBulletin2RsGeneration(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobTemplateId)) {
-					return thirdPartyDocGen.genLobGeneration(key, docTemplates, refId);
+					return thirdPartyDocGen.genLobGenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(lobRsTemplateId)) {
 					return thirdPartyDocGen.genLobRsGeneration(key, docTemplates, refId);
