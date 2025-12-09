@@ -32,6 +32,7 @@ import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jakarta.xml.bind.JAXBElement;
 import org.apache.commons.lang3.StringUtils;
 import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
@@ -1502,8 +1503,10 @@ private static class IdMaps {
 
 
     private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
-
-        if (obj instanceof P) {
+        if (obj instanceof JAXBElement<?>) {
+            obj = ((JAXBElement<?>) obj).getValue();
+        }
+        else if (obj instanceof P ) {
             P p = (P) obj;
 
             if (p.getPPr() != null &&
@@ -1526,7 +1529,7 @@ private static class IdMaps {
             }
         }
     }
-
+    
     private static void ensureNumberingPartExists(WordprocessingMLPackage pkg) throws Docx4JException {
 
         MainDocumentPart mdp = pkg.getMainDocumentPart();
