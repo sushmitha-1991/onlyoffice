@@ -66,6 +66,7 @@ import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.xml.bind.JAXBElement;
 import lombok.extern.slf4j.Slf4j;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -1498,6 +1499,9 @@ private static class IdMaps {
 
     private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
 
+    	if (obj instanceof JAXBElement<?>) {
+    	    obj = ((JAXBElement<?>) obj).getValue();
+    	}
         if (obj instanceof P) {
             P p = (P) obj;
 
