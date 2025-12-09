@@ -89,6 +89,8 @@ import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.JAXBElement;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -1513,8 +1515,6 @@ public class ThirdPartyDocGen {
 
 		return maps;
 	}
-
-
 
     private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
         if (obj instanceof JAXBElement<?>) {
