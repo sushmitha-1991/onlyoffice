@@ -32,6 +32,7 @@ import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jakarta.xml.bind.JAXBElement;
 import org.apache.commons.lang3.StringUtils;
 import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
@@ -1515,13 +1516,12 @@ public class ThirdPartyDocGen {
 		return maps;
 	}
 
-	private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
-		
-		if (obj instanceof JAXBElement<?>) {
-    	    obj = ((JAXBElement<?>) obj).getValue();
-    	}
-		if (obj instanceof P) {
-			P p = (P) obj;
+    private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
+        if (obj instanceof JAXBElement<?>) {
+            obj = ((JAXBElement<?>) obj).getValue();
+        }
+        else if (obj instanceof P ) {
+            P p = (P) obj;
 
 			if (p.getPPr() != null && p.getPPr().getNumPr() != null && p.getPPr().getNumPr().getNumId() != null
 					&& p.getPPr().getNumPr().getNumId().getVal() != null) {
@@ -1534,14 +1534,14 @@ public class ThirdPartyDocGen {
 			}
 		}
 
-		if (obj instanceof ContentAccessor) {
-			for (Object child : ((ContentAccessor) obj).getContent()) {
-				remapNumIdInContent(child, numIdMap);
-			}
-		}
-	}
+        if (obj instanceof ContentAccessor) {
+            for (Object child : ((ContentAccessor) obj).getContent()) {
+                remapNumIdInContent(child, numIdMap);
+            }
+        }
+    }
 
-	private static void ensureNumberingPartExists(WordprocessingMLPackage pkg) throws Docx4JException {
+    private static void ensureNumberingPartExists(WordprocessingMLPackage pkg) throws Docx4JException {
 
 		MainDocumentPart mdp = pkg.getMainDocumentPart();
 
