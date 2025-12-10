@@ -1419,100 +1419,66 @@ public class ThirdPartyDocGen {
 	/**
 	 * Merge numbering of srcPart into targetPart. Assumes targetPart is NOT null.
 	 */
-	private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
-			throws Docx4JException {
-		IdMaps maps = new IdMaps();
-		if (targetPart == null || srcPart == null) {
-			return maps;
-		}
+    private static IdMaps mergeNumbering(NumberingDefinitionsPart srcPart, NumberingDefinitionsPart targetPart)
+            throws Docx4JException {
 
-		Numbering targetContent = targetPart.getContents();
-		Numbering srcContent = srcPart.getContents();
+        IdMaps maps = new IdMaps();
+        if (targetPart == null || srcPart == null) return maps;
 
-		int maxAbstractNumId = 0;
-		if (targetContent.getAbstractNum() != null && !targetContent.getAbstractNum().isEmpty()) {
-			for (Numbering.AbstractNum an : targetContent.getAbstractNum()) {
-				if (an.getAbstractNumId() != null) {
-					maxAbstractNumId = Math.max(maxAbstractNumId, an.getAbstractNumId().intValue());
-				}
-			}
-		}
+        Numbering targetContent = targetPart.getContents();
+        Numbering srcContent = srcPart.getContents();
 
-		int maxNumId = 0;
-		if (targetContent.getNum() != null && !targetContent.getNum().isEmpty()) {
-			for (Numbering.Num n : targetContent.getNum()) {
-				if (n.getNumId() != null) {
-					maxNumId = Math.max(maxNumId, n.getNumId().intValue());
-				}
-			}
-		}
+        int maxAbstractNumId = targetContent.getAbstractNum().stream()
+                .map(an -> an.getAbstractNumId() != null ? an.getAbstractNumId().intValue() : 0)
+                .max(Integer::compare).orElse(0);
 
-		// copy abstractNum entries (deep copy then assign new abstractNumId)
-		if (srcContent.getAbstractNum() != null) {
-			for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
-				Numbering.AbstractNum copyAbs = XmlUtils.deepCopy(srcAbs);
-				if (copyAbs.getLvl() != null) {
-					for (Lvl lvl : copyAbs.getLvl()) {
-						if (lvl.getIlvl() != null && lvl.getIlvl().intValue() == 0) {
-							if (lvl.getStart() == null) {
-								Lvl.Start start = Context.getWmlObjectFactory().createLvlStart();
-								start.setVal(BigInteger.ONE);
-								lvl.setStart(start);
-							} else {
-								lvl.getStart().setVal(BigInteger.ONE);
-							}
+        int maxNumId = targetContent.getNum().stream()
+                .map(n -> n.getNumId() != null ? n.getNumId().intValue() : 0)
+                .max(Integer::compare).orElse(0);
 
-						}
-					}
-				}
-				BigInteger oldAbstractId = srcAbs.getAbstractNumId();
-				BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
-				copyAbs.setAbstractNumId(newAbstractId);
-				maps.abstractNumIdMap.put(oldAbstractId, newAbstractId);
-				targetContent.getAbstractNum().add(copyAbs);
-			}
-		}
+        // ---- COPY ABSTRACT NUMs ----
+        if (srcContent.getAbstractNum() != null) {
+            for (Numbering.AbstractNum srcAbs : srcContent.getAbstractNum()) {
 
-		// copy num entries (deep copy then assign new numId and remap abstractNumId
-		// reference inside num)
-		if (srcContent.getNum() != null) {
-			for (Numbering.Num srcNum : srcContent.getNum()) {
-				Numbering.Num copyNum = XmlUtils.deepCopy(srcNum);
+                Numbering.AbstractNum copyAbs = XmlUtils.deepCopy(srcAbs);
 
-				copyNum.getLvlOverride().clear();
+                BigInteger oldAbstractId = srcAbs.getAbstractNumId();
+                BigInteger newAbstractId = BigInteger.valueOf(++maxAbstractNumId);
 
-				Numbering.Num.LvlOverride lvlOverride = Context.getWmlObjectFactory().createNumberingNumLvlOverride();
-				lvlOverride.setIlvl(BigInteger.ZERO);
+                copyAbs.setAbstractNumId(newAbstractId);
 
-				Numbering.Num.LvlOverride.StartOverride start = Context.getWmlObjectFactory()
-						.createNumberingNumLvlOverrideStartOverride();
-				start.setVal(BigInteger.ONE);
+                maps.abstractNumIdMap.put(oldAbstractId, newAbstractId);
+                targetContent.getAbstractNum().add(copyAbs);
+            }
+        }
 
-				lvlOverride.setStartOverride(start);
-				copyNum.getLvlOverride().add(lvlOverride);
+        // ---- COPY NUMs ----
+        if (srcContent.getNum() != null) {
+            for (Numbering.Num srcNum : srcContent.getNum()) {
 
-				BigInteger oldNumId = srcNum.getNumId();
+                Numbering.Num copyNum = XmlUtils.deepCopy(srcNum);
 
-				BigInteger newNumId = BigInteger.valueOf(++maxNumId);
-				log.debug("oldNumId {} newNumId {}", oldNumId, newNumId);
-				copyNum.setNumId(newNumId);
+                BigInteger oldNumId = srcNum.getNumId();
+                BigInteger newNumId = BigInteger.valueOf(++maxNumId);
 
-				// remap abstractNumId inside copyNum if present
-				if (copyNum.getAbstractNumId() != null && copyNum.getAbstractNumId().getVal() != null) {
-					BigInteger oldAbsRef = copyNum.getAbstractNumId().getVal();
-					BigInteger mappedAbs = maps.abstractNumIdMap.get(oldAbsRef);
-					if (mappedAbs != null) {
-						copyNum.getAbstractNumId().setVal(mappedAbs);
-					}
-				}
+                copyNum.setNumId(newNumId);
 
-				maps.numIdMap.put(oldNumId, newNumId);
-				targetContent.getNum().add(copyNum);
-			}
-		}
+                // Remap abstractNum reference
+                if (copyNum.getAbstractNumId() != null) {
+                    BigInteger oldAbs = copyNum.getAbstractNumId().getVal();
+                    if (maps.abstractNumIdMap.containsKey(oldAbs)) {
+                        copyNum.getAbstractNumId().setVal(maps.abstractNumIdMap.get(oldAbs));
+                    }
+                }
 
-		return maps;
-	}
+                maps.numIdMap.put(oldNumId, newNumId);
+                targetContent.getNum().add(copyNum);
+            }
+        }
+
+        return maps;
+    }
+
 
 
 
