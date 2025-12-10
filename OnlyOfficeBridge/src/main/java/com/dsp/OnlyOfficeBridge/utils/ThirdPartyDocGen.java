@@ -387,7 +387,7 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String parentGenDsp2Key = (String) data.get("prevGenDsp2Key") != null ? (String) data.get("prevGenDsp2Key")
+		String genDsp2Key = (String) data.get("genDsp2Key") != null ? (String) data.get("genDsp2Key")
 				: null;
 		Boolean isRegenerate = (Boolean) data.get("isRegenerate") != null ? (Boolean) data.get("isRegenerate")
 				: null;
@@ -483,7 +483,7 @@ public class ThirdPartyDocGen {
 				}
 			});
 		} else {
-			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(parentGenDsp2Key);
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(genDsp2Key);
 
 			ByteArrayResource resourceBody = utils
 					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
