@@ -8,6 +8,7 @@ package com.dsp.OnlyOfficeBridge.controller;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -134,17 +135,14 @@ public class OnlyOfficeController {
 		}
 	}
 
-	@PostMapping(value = "/convert-html-to-docx", produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	public ResponseEntity<byte[]> convertHtmlToDocx(@RequestBody ConvertHtmlToDocxRequest request) {
-
-		try {
-			byte[] docBytes = onlyOfficeService.convertHtmlToDocx(request);
-
-			return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=converted.docx")
-					.body(docBytes);
-
-		} catch (Exception e) {
-			throw new RuntimeException("HTML → DOCX conversion failed: " + e.getMessage(), e);
+	@PostMapping("/convert-html-to-docx")
+	public ResponseEntity<?> convertHtmlToDocx(@RequestBody ConvertHtmlToDocxRequest request) {
+		GenericResponse<byte[]> response = onlyOfficeService.convertHtmlToDocx(request);
+		if (response.isSuccess() && response.getData() != null) {
+		    return ResponseEntity.ok()
+		            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=converted.docx")
+		            .body(response.getData());
 		}
+		return ResponseEntity.ok(response);
 	}
 }
