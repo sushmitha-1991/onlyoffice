@@ -10,6 +10,8 @@ import java.util.Map;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
+import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
+
 /**
  * 
  */
@@ -29,5 +31,5 @@ public interface OnlyOfficeService {
     
 	void convertHtml();
 
-	byte[] convertHtmlToDocx(String htmlContent);
+	byte[] convertHtmlToDocx(ConvertHtmlToDocxRequest request);
 }
