@@ -20,10 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
-import com.dsp.OnlyOfficeBridge.entity.Acronym;
-import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
-import com.dsp.OnlyOfficeBridge.utils.WordMLToHtml;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
@@ -38,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
 import com.dsp.OnlyOfficeBridge.entity.Acronym;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
