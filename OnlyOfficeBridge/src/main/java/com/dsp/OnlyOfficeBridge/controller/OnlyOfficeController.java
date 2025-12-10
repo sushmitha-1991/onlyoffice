@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
 import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.LibreOfficeDocxReplacer;
@@ -134,10 +135,10 @@ public class OnlyOfficeController {
 	}
 
 	@PostMapping(value = "/convert-html-to-docx", produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	public ResponseEntity<byte[]> convertHtmlToDocx(@RequestBody String htmlContent) {
+	public ResponseEntity<byte[]> convertHtmlToDocx(@RequestBody ConvertHtmlToDocxRequest request) {
 
 		try {
-			byte[] docBytes = onlyOfficeService.convertHtmlToDocx(htmlContent);
+			byte[] docBytes = onlyOfficeService.convertHtmlToDocx(request);
 
 			return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=converted.docx")
 					.body(docBytes);

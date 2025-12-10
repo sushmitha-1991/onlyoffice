@@ -34,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
 import com.dsp.OnlyOfficeBridge.entity.Acronym;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
@@ -41,6 +42,7 @@ import com.dsp.OnlyOfficeBridge.generator.DocGeneratorFactory;
 import com.dsp.OnlyOfficeBridge.generator.IDocGenerator;
 import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
+import com.dsp.OnlyOfficeBridge.repository.NoticeDetailsRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
@@ -63,6 +65,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
 	private DocGeneratorFactory docGenFactory;
+	
+	@Autowired
+	private NoticeDetailsRepository noticeDetailsRepository;
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
@@ -744,7 +749,19 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	public byte[] convertHtmlToDocx(String htmlContent) {
+	public byte[] convertHtmlToDocx(ConvertHtmlToDocxRequest request) {
+
+		String htmlContent = request.getHtmlContent();
+
+		// If user did NOT provide raw HTML -> fetch using ID
+		if ((htmlContent == null || htmlContent.isBlank()) && request.getNoticeDetailsId() != null) {
+			htmlContent = noticeDetailsRepository.findHtmlById(request.getNoticeDetailsId()).orElseThrow(
+					() -> new RuntimeException("No HTML found for NoticeDetailsId: " + request.getNoticeDetailsId()));
+		}
+
+		if (htmlContent == null || htmlContent.isBlank()) {
+			throw new RuntimeException("HTML content is missing. Provide htmlContent or noticeDetailsId.");
+		}
 		// sanitize unsafe characters
 		htmlContent = sanitizeHtml(htmlContent);
 		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
