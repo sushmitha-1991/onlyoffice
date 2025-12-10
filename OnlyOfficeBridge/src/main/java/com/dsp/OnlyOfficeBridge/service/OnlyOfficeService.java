@@ -11,6 +11,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
 import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
+import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 
 /**
  * 
@@ -31,5 +32,5 @@ public interface OnlyOfficeService {
     
 	void convertHtml();
 
-	byte[] convertHtmlToDocx(ConvertHtmlToDocxRequest request);
+	GenericResponse<byte[]> convertHtmlToDocx(ConvertHtmlToDocxRequest request);
 }

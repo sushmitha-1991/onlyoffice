@@ -44,6 +44,7 @@ import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
 import com.dsp.OnlyOfficeBridge.repository.NoticeDetailsRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
@@ -749,22 +750,43 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	public byte[] convertHtmlToDocx(ConvertHtmlToDocxRequest request) {
+	public GenericResponse<byte[]> convertHtmlToDocx(ConvertHtmlToDocxRequest request) {
 
 		String htmlContent = request.getHtmlContent();
 
-		// If user did NOT provide raw HTML -> fetch using ID
-		if ((htmlContent == null || htmlContent.isBlank()) && request.getNoticeDetailsId() != null) {
-			htmlContent = noticeDetailsRepository.findHtmlById(request.getNoticeDetailsId()).orElseThrow(
-					() -> new RuntimeException("No HTML found for NoticeDetailsId: " + request.getNoticeDetailsId()));
-		}
+		try {
+			// Load HTML if not provided
+			if ((htmlContent == null || htmlContent.isBlank()) && request.getNoticeDetailsId() != null) {
 
-		if (htmlContent == null || htmlContent.isBlank()) {
-			throw new RuntimeException("HTML content is missing. Provide htmlContent or noticeDetailsId.");
+				Optional<String> htmlOpt = noticeDetailsRepository.findHtmlById(request.getNoticeDetailsId());
+
+				if (htmlOpt.isEmpty()) {
+					return new GenericResponse<>(HttpStatus.OK.value(), false,
+							"No HTML found for NoticeDetailsId: " + request.getNoticeDetailsId(), null);
+				}
+
+				htmlContent = htmlOpt.get();
+			}
+
+			// Validate HTML presence
+			if (htmlContent == null || htmlContent.isBlank()) {
+				return new GenericResponse<>(HttpStatus.OK.value(), false,
+						"HTML content missing. Provide htmlContent or noticeDetailsId.", null);
+			}
+
+			// Sanitize unsafe characters
+			htmlContent = sanitizeHtml(htmlContent);
+
+			// Convert to DOCX
+			byte[] docBytes = thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+
+			return new GenericResponse<>(HttpStatus.OK.value(), true, "Document converted successfully", docBytes);
+
+		} catch (Exception ex) {
+
+			return new GenericResponse<>(HttpStatus.OK.value(), // still 200 OK
+					false, "Failed to convert HTML to DOCX: " + ex.getMessage(), null);
 		}
-		// sanitize unsafe characters
-		htmlContent = sanitizeHtml(htmlContent);
-		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
 	}
 
 	public static String sanitizeHtml(String html) {
