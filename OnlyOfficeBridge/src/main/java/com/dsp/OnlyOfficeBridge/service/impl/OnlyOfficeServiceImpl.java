@@ -38,22 +38,21 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.dsp.OnlyOfficeBridge.entity.Acronym;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
 import com.dsp.OnlyOfficeBridge.generator.DocGeneratorFactory;
 import com.dsp.OnlyOfficeBridge.generator.IDocGenerator;
+import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
 import com.dsp.OnlyOfficeBridge.repository.NoticeDetailsRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
+import com.dsp.OnlyOfficeBridge.utils.WordMLToHtml;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import java.text.Normalizer;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -123,36 +122,45 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Value("${pmb.resol.gen.template.id}")
 	String pmbResolTemplateId;
-	
+
 	@Value("${pc.gen.template.id}")
 	String pcTemplateId;
-	
+
 	@Value("${pc.merge.gen.template.id}")
 	String pcMergeTemplateId;
 
 	@Value("${sessional.resume.gen.template.id}")
 	String sessionalResumeTemplateId;
-	
+
 	@Value("${resume.of.work.gen.template.id}")
 	String resumeOfWorkTemplateId;
-	
+
+	@Value("${notices.content}")
+	String noticeContentTemplateId;
+
+	@Value("${notices.content.modified}")
+	String noticesModifiedContentId;
+
 	@Value("${translation.version.template.id}")
 	String newVersionTranslationTemplateId;
-	
+	@Value("${doc.office.cache.list}")
+	String onlyOfficeCacheList;
 	@Autowired
 	private Utils utils;
 	@Autowired
 	DocTemplateRepository docTemplateRepository;
 	@Autowired
 	ThirdPartyDocGen thirdPartyDocGen;
-    @Autowired
-    AcronymRepository acronymRepository;
+	@Autowired
+	AcronymRepository acronymRepository;
 
 	@Value("${verbatim.gen.full.day.ls.template.id}")
 	private String verbatimFullDayLSTemplateId;
 
 	@Value("${verbatim.gen.full.day.rs.template.id}")
 	private String verbatimFullDayRSTemplateId;
+	@Value("${doc.ofc.server.url}")
+	String onlyOfcServerUrl;
 
 	@Override
 	public Map<String, Object> getEditorConfig(Map<String, String> payload) {
@@ -189,7 +197,6 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				String refId = payload.get("refId") == null ? "0" : payload.get("refId");
 				downloadUrl = onlyOfficeUrl + "/only-office/download/" + dsp2Key + "/" + templateId + "/" + refId;
 			}
-			
 
 			// download-empty-docx
 			title = "Document-" + keyToUse + ".odt";
@@ -208,17 +215,18 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		document.put("title", title);
 		document.put("url", downloadUrl);
 		document.put("permissions", Map.of("edit", canEdit));
-        //document.put("options", Map.of("spellcheck", true,"lang","en-GB"));
+		// document.put("options", Map.of("spellcheck", true,"lang","en-GB"));
 		// Editor config
 		Map<String, Object> editorConfig = new HashMap<>();
 		editorConfig.put("mode", "edit");
-        editorConfig.put("lang", "en-IN");
-        editorConfig.put("features", Map.of("spellcheck", true));
+		editorConfig.put("lang", "en-IN");
+		editorConfig.put("features", Map.of("spellcheck", true));
 		editorConfig.put("callbackUrl", callbackUrl);
 		editorConfig.put("coEditing", Map.of("mode", "fast", "change", true));
-		
+
 //		, "zoom", 198 fit to width commented for now
-		editorConfig.put("customization", Map.of("forcesave", true, "save", true,"languages",false,"spellcheck",true));
+		editorConfig.put("customization",
+				Map.of("forcesave", true, "save", true, "languages", false, "spellcheck", true));
 //		set default editor language to english-India
 //		editorConfig.put("lang", "en-GB");
 //        editorConfig.put("language","en-GB");
@@ -311,6 +319,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (templateId.equals(synopsisMergeTemplateId)) {
 					return thirdPartyDocGen.genMergedSynopsisGeneration(key, docTemplates, refId);
 				}
+				if (templateId.equals(noticeContentTemplateId) || templateId.equals(noticesModifiedContentId)) {
+					return thirdPartyDocGen.genCreationOfNoticesGeneration(key, docTemplates, refId);
+				}
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
@@ -329,9 +340,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
-	
+
 	@Override
-	public ResponseEntity<Resource> downloadByKeyPc(String key, String templateId, String refId,String content) {
+	public ResponseEntity<Resource> downloadByKeyPc(String key, String templateId, String refId, String content) {
 		String[] keys = key.split(",");
 
 		try {
@@ -339,9 +350,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				List<DocTemplate> docTemplates = docTemplateRepository
 						.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId), Long.parseLong(templateId));
 				if (templateId.equals(pcTemplateId)) {
-					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId,content);
+					return thirdPartyDocGen.genProvisionalCalenderGeneration(key, docTemplates, refId, content);
 				}
-				
+
 			} else {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
@@ -589,21 +600,26 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 		try {
 			int status = (int) payload.get("status");
 
-			log.debug(">>> status - {}", status);
-
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
 				String key = (String) payload.get("key");
 
-				log.debug(">>> fileUrl - {}", fileUrl);
-				log.debug(">>> key - {}", key);
-
-				// 1. Download file from OnlyOffice
+				String ports[] = onlyOfficeCacheList.split(",");
+				String url = "";
 				File tempFile = File.createTempFile("edited-doc", ".docx");
-				try (InputStream in = new URL(fileUrl).openStream();
-						FileOutputStream out = new FileOutputStream(tempFile)) {
-					in.transferTo(out);
+				for (String port : ports) {
+
+					String fileUrlString = fileUrl.replaceAll(onlyOfcServerUrl, port);
+
+					try (InputStream in = new URL(fileUrlString).openStream();
+							FileOutputStream out = new FileOutputStream(tempFile)) {
+						in.transferTo(out);
+						break;
+					} catch (Exception e) {
+						log.info(">>> fileUrl exception -{} what {} ", fileUrlString, e.getMessage());
+					}
 				}
+				// 1. Download file from OnlyOffice
 
 				String documentName = key + ".docx";
 
@@ -663,33 +679,30 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	public Boolean convertDocxToText(String dspKey) {
-        try {
-            log.info("Converting DOCX to HTML for DSP Key: {}", dspKey);
- 
-            Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-            if (metadataOpt.isEmpty()) {
-                log.warn("No metadata found for DSP Key: {}", dspKey);
-                return null;
-            }
-            OnlyOfficeMetadata metadata = metadataOpt.get();
-            ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
- 
-            if (resourceBody == null || resourceBody.getByteArray().length == 0) {
-                log.warn("Downloaded file is empty for DSP Key: {}", dspKey);
-                return null;
-            }
- 
-            // Convert DOCX bytes to TXT
-            try (ByteArrayInputStream bis = new ByteArrayInputStream(resourceBody.getByteArray());
-            	     XWPFDocument document = new XWPFDocument(bis)) {
-            	if(document.getParagraphs().size()>0)
-            	{
-            		return true;
-            	}
-            	else
-            	{
-            		return false;
-            	}
+		try {
+			log.info("Converting DOCX to HTML for DSP Key: {}", dspKey);
+
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+			if (metadataOpt.isEmpty()) {
+				log.warn("No metadata found for DSP Key: {}", dspKey);
+				return null;
+			}
+			OnlyOfficeMetadata metadata = metadataOpt.get();
+			ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+			if (resourceBody == null || resourceBody.getByteArray().length == 0) {
+				log.warn("Downloaded file is empty for DSP Key: {}", dspKey);
+				return null;
+			}
+
+			// Convert DOCX bytes to TXT
+			try (ByteArrayInputStream bis = new ByteArrayInputStream(resourceBody.getByteArray());
+					XWPFDocument document = new XWPFDocument(bis)) {
+				if (document.getParagraphs().size() > 0) {
+					return true;
+				} else {
+					return false;
+				}
 //            	    StringBuilder textBuilder = new StringBuilder();
 
 //            	    log.warn("paragraph before loop: {}", document.getParagraphs());
@@ -714,30 +727,29 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 //            	        return docText;
 //            	    }
 
-            	} catch (IOException e) {
-            	    log.error("Error reading DOCX bytes for DSP Key: {}", dspKey, e);
-            	    throw new RuntimeException("Failed to process DOCX file", e);
-            	}
-        } catch (Exception e) {
-            log.error("Error converting DOCX to TEXT for DSP Key: {}", dspKey, e);
-            return null;
-        }
-    }
-	
-    public void convertHtml()
-    {
-        List<Acronym> acronymList = acronymRepository.findAll();
-        acronymList.forEach(acronym -> {
-            try {
-                String html = WordMLToHtml.convert(acronym.getFullText());
-                acronym.setFullText(html);
-                acronymRepository.save(acronym);
-                log.info("save {}",acronym.getAbbr());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
+			} catch (IOException e) {
+				log.error("Error reading DOCX bytes for DSP Key: {}", dspKey, e);
+				throw new RuntimeException("Failed to process DOCX file", e);
+			}
+		} catch (Exception e) {
+			log.error("Error converting DOCX to TEXT for DSP Key: {}", dspKey, e);
+			return null;
+		}
+	}
+
+	public void convertHtml() {
+		List<Acronym> acronymList = acronymRepository.findAll();
+		acronymList.forEach(acronym -> {
+			try {
+				String html = WordMLToHtml.convert(acronym.getFullText());
+				acronym.setFullText(html);
+				acronymRepository.save(acronym);
+				log.info("save {}", acronym.getAbbr());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		});
+	}
 
 	@Override
 	public byte[] convertHtmlToDocx(ConvertHtmlToDocxRequest request) {
