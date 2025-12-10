@@ -42,8 +42,8 @@ import com.dsp.OnlyOfficeBridge.generator.DocGeneratorFactory;
 import com.dsp.OnlyOfficeBridge.generator.IDocGenerator;
 import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
-import com.dsp.OnlyOfficeBridge.repository.NoticeDetailsRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.dsp.OnlyOfficeBridge.repository.Statement377Repository;
 import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
@@ -68,7 +68,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	private DocGeneratorFactory docGenFactory;
 	
 	@Autowired
-	private NoticeDetailsRepository noticeDetailsRepository;
+	private Statement377Repository statement377Repository;
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
@@ -758,7 +758,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			// Load HTML if not provided
 			if ((htmlContent == null || htmlContent.isBlank()) && request.getNoticeDetailsId() != null) {
 
-				Optional<String> htmlOpt = noticeDetailsRepository.findHtmlById(request.getNoticeDetailsId());
+				Optional<String> htmlOpt = statement377Repository.findHtmlById(request.getNoticeDetailsId());
 
 				if (htmlOpt.isEmpty()) {
 					return new GenericResponse<>(HttpStatus.OK.value(), false,
