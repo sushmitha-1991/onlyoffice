@@ -138,7 +138,7 @@ public class OnlyOfficeController {
 	@PostMapping("/convert-html-to-docx")
 	public ResponseEntity<?> convertHtmlToDocx(@RequestBody ConvertHtmlToDocxRequest request) {
 		GenericResponse<byte[]> response = onlyOfficeService.convertHtmlToDocx(request);
-		if (response.isSuccess() && response.getData() != null) {
+		if (response.getStatusCode() == 200 && response.getData() != null) {
 		    return ResponseEntity.ok()
 		            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=converted.docx")
 		            .body(response.getData());
