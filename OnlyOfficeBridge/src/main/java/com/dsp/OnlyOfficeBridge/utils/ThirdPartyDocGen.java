@@ -391,6 +391,7 @@ public class ThirdPartyDocGen {
 				: null;
 		Boolean isRegenerate = (Boolean) data.get("isRegenerate") != null ? (Boolean) data.get("isRegenerate")
 				: null;
+		
 		if (isRegenerate == true) {
 			docTemplates.forEach(docTemplate -> {
 				if (docTemplate.getCode().equals("lob_gen_header")) {
