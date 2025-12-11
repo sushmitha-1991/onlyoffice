@@ -206,7 +206,7 @@ public class ThirdPartyDocGen {
 
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
 							.orientation(orientation).build());
-					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true)
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false)
 							.orientation(orientation).build());
 				});
 
@@ -1575,6 +1575,13 @@ public class ThirdPartyDocGen {
 		for (int idx = 1; idx < files.size(); idx++) {
 			WordprocessingMLPackage srcPkg = WordprocessingMLPackage
 					.load(new ByteArrayInputStream(files.get(idx).getFile()));
+			try {
+				if (!files.get(idx + 1).getOrientation().equalsIgnoreCase(files.get(idx).getOrientation())) {
+					files.get(idx).setBreak(true);
+				}
+			} catch (Exception ignored) {
+
+			}
 			if ("LANDSCAPE".equalsIgnoreCase(files.get(idx).getOrientation())) {
 				convertToLandscape(srcPkg);
 			}
