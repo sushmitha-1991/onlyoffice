@@ -90,7 +90,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.xml.bind.JAXBElement;
-import jakarta.xml.bind.JAXBElement;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -235,6 +234,7 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+	/**
 	public ResponseEntity<Resource> genLobGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		String url = lobUrl + "/lob/generate-doc-id/" + refId;
 		Map<String, Object> body;
@@ -361,6 +361,7 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
+**/
 
 	public ResponseEntity<Resource> genLobGenerationV2(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
 		log.info("*****calling lob v2 service*********");
@@ -387,10 +388,11 @@ public class ThirdPartyDocGen {
 		List<MargeFileDto> files = new LinkedList<>();
 
 		Map<String, Object> data = (Map<String, Object>) body.get("data");
-		String parentGenDsp2Key = (String) data.get("prevGenDsp2Key") != null ? (String) data.get("prevGenDsp2Key")
+		String prevGenDsp2Key = (String) data.get("prevGenDsp2Key") != null ? (String) data.get("prevGenDsp2Key")
 				: null;
 		Boolean isRegenerate = (Boolean) data.get("isRegenerate") != null ? (Boolean) data.get("isRegenerate")
 				: null;
+		
 		if (isRegenerate == true) {
 			docTemplates.forEach(docTemplate -> {
 				if (docTemplate.getCode().equals("lob_gen_header")) {
@@ -483,7 +485,7 @@ public class ThirdPartyDocGen {
 				}
 			});
 		} else {
-			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(parentGenDsp2Key);
+			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(prevGenDsp2Key);
 
 			ByteArrayResource resourceBody = utils
 					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
@@ -559,6 +561,8 @@ public class ThirdPartyDocGen {
 		return null;
 	}
 
+
+	
 	public ResponseEntity<Resource> genTranslationGeneration(String dsp2Key, List<DocTemplate> docTemplates,
 			String refId) {
 		String url = translationUrl + "/inputs/input-tab-view-status?status=Submitted&id=" + refId;
@@ -1482,7 +1486,7 @@ public class ThirdPartyDocGen {
     }
 
 
-    private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
+	private static void remapNumIdInContent(Object obj, Map<BigInteger, BigInteger> numIdMap) {
         if (obj instanceof JAXBElement<?>) {
             obj = ((JAXBElement<?>) obj).getValue();
         }
@@ -1506,6 +1510,7 @@ public class ThirdPartyDocGen {
             }
         }
     }
+
 
     private static void ensureNumberingPartExists(WordprocessingMLPackage pkg) throws Docx4JException {
 

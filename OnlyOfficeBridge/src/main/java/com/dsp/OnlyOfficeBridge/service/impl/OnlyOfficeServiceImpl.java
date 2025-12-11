@@ -34,6 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.dsp.OnlyOfficeBridge.dto.ConvertHtmlToDocxRequest;
 import com.dsp.OnlyOfficeBridge.entity.Acronym;
 import com.dsp.OnlyOfficeBridge.entity.DocTemplate;
 import com.dsp.OnlyOfficeBridge.entity.OnlyOfficeMetadata;
@@ -42,6 +43,8 @@ import com.dsp.OnlyOfficeBridge.generator.IDocGenerator;
 import com.dsp.OnlyOfficeBridge.repository.AcronymRepository;
 import com.dsp.OnlyOfficeBridge.repository.DocTemplateRepository;
 import com.dsp.OnlyOfficeBridge.repository.OnlyOfficeMetadataRepository;
+import com.dsp.OnlyOfficeBridge.repository.Statement377Repository;
+import com.dsp.OnlyOfficeBridge.response.GenericResponse;
 import com.dsp.OnlyOfficeBridge.service.OnlyOfficeService;
 import com.dsp.OnlyOfficeBridge.utils.ThirdPartyDocGen;
 import com.dsp.OnlyOfficeBridge.utils.Utils;
@@ -63,6 +66,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 	@Autowired
 	private DocGeneratorFactory docGenFactory;
+	
+	@Autowired
+	private Statement377Repository statement377Repository;
 
 	@Value("${onlyoffice.url}")
 	private String onlyOfficeUrl;
@@ -744,10 +750,43 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	}
 
 	@Override
-	public byte[] convertHtmlToDocx(String htmlContent) {
-		// sanitize unsafe characters
-		htmlContent = sanitizeHtml(htmlContent);
-		return thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+	public GenericResponse<byte[]> convertHtmlToDocx(ConvertHtmlToDocxRequest request) {
+
+		String htmlContent = request.getHtmlContent();
+
+		try {
+			// Load HTML if not provided
+			if ((htmlContent == null || htmlContent.isBlank()) && request.getNoticeDetailsId() != null) {
+
+				Optional<String> htmlOpt = statement377Repository.findHtmlById(request.getNoticeDetailsId());
+
+				if (htmlOpt.isEmpty()) {
+					return new GenericResponse<>(HttpStatus.OK.value(), false,
+							"No HTML found for NoticeDetailsId: " + request.getNoticeDetailsId(), null);
+				}
+
+				htmlContent = htmlOpt.get();
+			}
+
+			// Validate HTML presence
+			if (htmlContent == null || htmlContent.isBlank()) {
+				return new GenericResponse<>(HttpStatus.OK.value(), false,
+						"HTML content missing. Provide htmlContent or noticeDetailsId.", null);
+			}
+
+			// Sanitize unsafe characters
+			htmlContent = sanitizeHtml(htmlContent);
+
+			// Convert to DOCX
+			byte[] docBytes = thirdPartyDocGen.convertHtmlToDocx(htmlContent);
+
+			return new GenericResponse<>(HttpStatus.OK.value(), true, "Document converted successfully", docBytes);
+
+		} catch (Exception ex) {
+
+			return new GenericResponse<>(HttpStatus.OK.value(), // still 200 OK
+					false, "Failed to convert HTML to DOCX: " + ex.getMessage(), null);
+		}
 	}
 
 	public static String sanitizeHtml(String html) {
