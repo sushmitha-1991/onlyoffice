@@ -3038,7 +3038,7 @@ public class ThirdPartyDocGen {
 			if (headerTemplateCode.equals(docTemplate.getCode())) {
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
 				} catch (Exception e) {
 					throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
 				}
