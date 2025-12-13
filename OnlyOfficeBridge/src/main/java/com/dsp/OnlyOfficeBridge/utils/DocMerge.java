@@ -76,9 +76,9 @@ public class DocMerge {
             } catch (Exception ignored) {
 
             }
-            if ("LANDSCAPE".equalsIgnoreCase(files.get(idx).getOrientation())) {
-                convertToLandscape(srcPkg);
-            }
+//            if ("LANDSCAPE".equalsIgnoreCase(files.get(idx).getOrientation())) {
+//                convertToLandscape(srcPkg);
+//            }
             MainDocumentPart srcMain = srcPkg.getMainDocumentPart();
             // 1) Copy images
             Map<String, String> relIdMapping = new HashMap<>();

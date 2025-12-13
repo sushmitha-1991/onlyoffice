@@ -161,14 +161,30 @@ public class ThirdPartyDocGen {
 
 		docTemplates.forEach(docTemplate -> {
 			log.debug("header uuid >>>>", docTemplate.getDocUuid());
-
+			String[] lastOrientation= {""};
 			if (docTemplate.getCode().equals("bull2_gen_header")) {
 				Map<String, String> map = new HashMap<>();
 				Map<String, Object> data = (Map<String, Object>) body.get("data");
 				map.put("range", (Integer) data.get("startNum") + " - " + (Integer) data.get("endNum"));
 				map.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
 				try {
-					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					List<Map> inputList = (List<Map>) data.get("inputList");
+					Map m = inputList.get(0);
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) m.get("dsp2Key"));
+
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
+					ByteArrayResource resource;
+					if("LANDSCAPE".equals(orientation)) {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map);
+					}
+					else   {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
+
+
 
 					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 				} catch (Exception e) {
@@ -185,6 +201,7 @@ public class ThirdPartyDocGen {
 					ByteArrayResource resourceBody = utils
 							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
 					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
+					lastOrientation[0] = orientation;
 					Map<String, String> map1 = new HashMap<>();
 					map1.put("bulletinNo", map.get("bulletinNo").toString());
 					map1.put("branch", (String) map.get("officeName"));
@@ -193,8 +210,14 @@ public class ThirdPartyDocGen {
 					ByteArrayResource resource = null;
 					ByteArrayResource resourceLine = null;
 					try {
-						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
-						resourceLine = Utils.replacePlaceholders("line.docx", mapLine);
+						if("LANDSCAPE".equals(orientation)){
+							resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map1);
+							resourceLine = Utils.replacePlaceholders("b2/line-landscape.docx", mapLine);
+						}
+						else {
+							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+							resourceLine = Utils.replacePlaceholders("b2/line.docx", mapLine);
+						}
 
 					} catch (Exception e) {
 //                        e.printStackTrace();
@@ -215,7 +238,14 @@ public class ThirdPartyDocGen {
 				ByteArrayResource resource = null;
 				try {
 					Map map = new HashMap();
-					resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					if("LANDSCAPE".equals(lastOrientation[0]))
+					{
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map);
+					}
+					else {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
+
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
