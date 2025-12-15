@@ -250,7 +250,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				List<DocTemplate> docTemplates = docTemplateRepository
 						.findByIdOrParentIdOrderBySeq(Long.valueOf(templateId), Long.parseLong(templateId));
 				if (templateId.equals(bulletin2TemplateId)) {
-					return thirdPartyDocGen.genBulletin2Generation(key, docTemplates, refId);
+					return thirdPartyDocGen.genBulletin2GenerationV2(key, docTemplates, refId);
 				}
 				if (templateId.equals(bulletin2RsTemplateId)) {
 					return thirdPartyDocGen.genBulletin2RsGeneration(key, docTemplates, refId);
