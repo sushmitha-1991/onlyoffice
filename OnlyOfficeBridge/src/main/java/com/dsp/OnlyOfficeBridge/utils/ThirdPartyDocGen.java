@@ -431,7 +431,7 @@ public class ThirdPartyDocGen {
 							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false)
 									.orientation(orientation).build());
 
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
+							files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false)
 									.orientation(orientation).build());
 							files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false)
 									.orientation(orientation).build());
