@@ -3019,6 +3019,8 @@ public class ThirdPartyDocGen {
 		// Extract placeholders
 		String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
 		String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
+		String sessionNumberStr = placeholders.getOrDefault("sessionNumberStr", "").toString();
+		String sessionNumberRoman = placeholders.getOrDefault("sessionNumberRoman", "").toString();
 
 		Map<String, String> map = new HashMap<>();
 		map.put("sessionNumber", sessionNumber);
@@ -3026,6 +3028,8 @@ public class ThirdPartyDocGen {
 		map.put("displayDate", displayDate);
 		map.put("todaysDate", monthYear);
 		map.put("sakaDate", sakaDate != null ? sakaDate : "");
+		map.put("ssnNumbStr", sessionNumberStr);
+		map.put("ssnNumbRoman", sessionNumberRoman);
 
 		// Initialize file list
 		List<MargeFileDto> files = new LinkedList<>();
