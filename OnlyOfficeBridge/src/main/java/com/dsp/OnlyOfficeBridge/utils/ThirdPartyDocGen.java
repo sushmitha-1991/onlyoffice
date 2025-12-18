@@ -3090,14 +3090,15 @@ public class ThirdPartyDocGen {
 				}
 				log.debug("DSP2 Keys fetched with subjects: {}", subjectToDsp2Key);
 				int arr[] = { 1 };
+				int i = 1;
 				// Fetch documents for each DSP2 key
 				for (Map.Entry<String, String> entry : subjectToDsp2Key.entrySet()) {
 
-					String subject = entry.getKey();
+					String subjectNum = i++ +". " +entry.getKey();
 					String dspKey = entry.getValue();
 					
 					Map<String, String> mapSubject = new HashMap<>();
-					mapSubject.put("subject", subject);
+					mapSubject.put("subject", subjectNum);
 					ByteArrayResource resource = null;
 					try {
 						resource = Utils.replacePlaceholders("resume-of-work/resume-of-work-subject.docx", mapSubject);
@@ -3117,7 +3118,7 @@ public class ThirdPartyDocGen {
 							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
 						}
 //						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
-						log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {}", subject, dspKey);
+						log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {}", subjectNum, dspKey);
 					});
 				}
 			}
