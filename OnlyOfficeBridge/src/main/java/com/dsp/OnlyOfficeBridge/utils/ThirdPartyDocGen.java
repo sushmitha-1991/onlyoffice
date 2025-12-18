@@ -3077,22 +3077,47 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException("Failed to fetch DSP2 keys: " + e.getMessage(), e);
 				}
 
-				// Extract "data" directly as List<String>
-				List<String> dsp2Keys = new ArrayList<>();
-				if (dsp2Body != null && dsp2Body.get("data") instanceof List) {
-					List<?> rawList = (List<?>) dsp2Body.get("data");
-					rawList.forEach(item -> dsp2Keys.add(item.toString()));
+				// Extract "data" as Map<subject, dsp2Key>
+				Map<String, String> subjectToDsp2Key = new LinkedHashMap<>();
+
+				if (dsp2Body != null && dsp2Body.get("data") instanceof Map) {
+					Map<?, ?> rawMap = (Map<?, ?>) dsp2Body.get("data");
+					rawMap.forEach((subject, dsp2Key) -> {
+						if (subject != null && dsp2Key != null) {
+							subjectToDsp2Key.put(subject.toString(), dsp2Key.toString());
+						}
+					});
 				}
+				log.debug("DSP2 Keys fetched with subjects: {}", subjectToDsp2Key);
+				int arr[] = { 1 };
+				// Fetch documents for each DSP2 key
+				for (Map.Entry<String, String> entry : subjectToDsp2Key.entrySet()) {
 
-				log.debug("DSP2 Keys fetched: {}", dsp2Keys);
+					String subject = entry.getKey();
+					String dspKey = entry.getValue();
+					
+					Map<String, String> mapSubject = new HashMap<>();
+					mapSubject.put("subject", subject);
+					ByteArrayResource resource = null;
+					try {
+						resource = Utils.replacePlaceholders("resume-of-work/resume-of-work-subject.docx", mapSubject);
 
-				// Fetch documents for each DSP2 key and add to files
-				for (String dspKey : dsp2Keys) {
+					} catch (Exception e) {
+//                e.printStackTrace();
+						throw new RuntimeException(e);
+					}
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 					metadataOpt.ifPresent(metadata -> {
 						ByteArrayResource resourceBody = utils
 								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+						if (arr[0]++ == subjectToDsp2Key.size()) {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+						} else {
+							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+						}
+//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+						log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {}", subject, dspKey);
 					});
 				}
 			}
@@ -3106,7 +3131,7 @@ public class ThirdPartyDocGen {
 			saveOpenKm(key, mergedResource);
 
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_merged.docx")
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 
 		} catch (Exception e) {
