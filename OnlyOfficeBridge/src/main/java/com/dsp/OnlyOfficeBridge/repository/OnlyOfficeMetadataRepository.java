@@ -31,7 +31,7 @@ public interface OnlyOfficeMetadataRepository extends JpaRepository<OnlyOfficeMe
 	 */
 	Optional<OnlyOfficeMetadata> findByDsp2Key(String key);
 	
-	@Query(value="select id FROM corrected_debate.history where allocation_input_id=:refId",nativeQuery=true)
+	@Query(value="select id FROM corrected_debate.history where allocation_input_id=:refId order by created_at desc limit 1",nativeQuery=true)
 	Long getHistoryId(String refId);
 	
 	@Query(value="select lok_sabha_number from master.lok_sabha_masters where id=:id",nativeQuery=true)
