@@ -1078,6 +1078,7 @@ public class ThirdPartyDocGen {
 				String lokSabhaSessionNo = onlyOfficeMetadataRepository
 						.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
 
+				String debateDate =result.get("uncorrectedDebateDate").toString();
 				String currYear = String.valueOf(LocalDate.now().getYear());
 
 				Map<String, String> mapinput = new HashMap<>();
@@ -1088,6 +1089,10 @@ public class ThirdPartyDocGen {
 				LocalDate todayDate = LocalDate.now();
 				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
 				String formattedDateDay = todayDate.format(formatterDay);
+				
+				DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+				LocalDate date=LocalDate.parse(debateDate,inputFormatter);
+				String formattedDebateDate=date.format(formatterDay);
 
 				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate) + " (Saka)");
 				mapinput.put("loksabhanoinwords", NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
@@ -1097,9 +1102,7 @@ public class ThirdPartyDocGen {
 				mapinput.put("year", currYear);
 				mapinput.put("lokSabhaNo", lokSabhaNo);
 				mapinput.put("docDate",
-						applicationInstanceDTO.get("documentDate") != null
-								? applicationInstanceDTO.get("documentDate").toString()
-								: null);
+						formattedDebateDate + " / " + convertToSakaDate(debateDate) + " (Saka)");
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
