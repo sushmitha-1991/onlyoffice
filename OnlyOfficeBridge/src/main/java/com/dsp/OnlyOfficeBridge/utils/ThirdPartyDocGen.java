@@ -3256,13 +3256,16 @@ public class ThirdPartyDocGen {
 
 		// Determine correct header template based on flow
 		String headerTemplateCode = isRsFlow ? "sessional_resume_gen_header" : "resume_of_work_gen_header";
+		Map<String, String> mapLine = new HashMap<>();
 
 		// Replace placeholders in the header template
 		docTemplates.forEach(docTemplate -> {
 			if (headerTemplateCode.equals(docTemplate.getCode())) {
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					ByteArrayResource resourceLine = Utils.replacePlaceholders("resume-of-work/line.docx", mapLine);
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
 				} catch (Exception e) {
 					throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
 				}
@@ -3314,32 +3317,47 @@ public class ThirdPartyDocGen {
 				// Fetch documents for each DSP2 key
 				for (Map.Entry<String, String> entry : subjectToDsp2Key.entrySet()) {
 
-					String subjectNum = i++ +". " +entry.getKey();
+					String subjectNum = i++ + ". " + entry.getKey();
 					String dspKey = entry.getValue();
-					
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+
+					if (metadataOpt.isEmpty()) {
+						continue;
+					}
+
+					// 1️ Download DSP first
+					OnlyOfficeMetadata metadata = metadataOpt.get();
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+					// 2️ Detect DSP orientation
+					String dspOrientation = DocMerge.getOrientation(resourceBody.getByteArray());
+
+					// 3️ Create Subject DOCX
 					Map<String, String> mapSubject = new HashMap<>();
 					mapSubject.put("subject", subjectNum);
-					ByteArrayResource resource = null;
-					try {
-						resource = Utils.replacePlaceholders("resume-of-work/resume-of-work-subject.docx", mapSubject);
 
+					ByteArrayResource subjectResource;
+					try {
+						subjectResource = Utils.replacePlaceholders("resume-of-work/resume-of-work-subject.docx",
+								mapSubject);
 					} catch (Exception e) {
-//                e.printStackTrace();
 						throw new RuntimeException(e);
 					}
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-					metadataOpt.ifPresent(metadata -> {
-						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-						if (arr[0]++ == subjectToDsp2Key.size()) {
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
-						} else {
-							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
-						}
-//						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
-						log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {}", subjectNum, dspKey);
-					});
+
+					// 4️ Apply DSP orientation to Subject
+					files.add(MargeFileDto.builder().file(subjectResource.getByteArray()).isBreak(false)
+							.orientation(dspOrientation).build());
+
+					// 5️ Add DSP with SAME orientation
+					boolean isLast = arr[0]++ == subjectToDsp2Key.size();
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
+							.orientation(dspOrientation).build());
+
+					log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {} | Orientation: {}", subjectNum, dspKey,
+							dspOrientation);
 				}
 			}
 		}
