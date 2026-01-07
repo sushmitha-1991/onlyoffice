@@ -670,9 +670,9 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				}
 
 				onlyOfficeMetadataRepository.save(metadata);
-				log.debug(">>> before save");
+				log.info(">>> before save");
 				utils.uploadPdfToFilelocation(tempFile,dsp2Key);
-				log.debug(">>> save completed");
+				log.info(">>> save completed");
 
 				// Clean up
 //				tempFile.delete();
