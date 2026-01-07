@@ -263,6 +263,193 @@ public class ThirdPartyDocGen {
 		}
 		return null;
 	}
+	
+	public ResponseEntity<Resource> genBulletin2GenerationV2(String dsp2Key, List<DocTemplate> docTemplates,
+			String refId) {
+		String url = bulletin2Url + "/get-generate-doc/" + refId;
+
+		Map<String, Object> body;
+		if (token == null) {
+			throw new IllegalStateException("Authorization token is missing");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + token);
+		headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+		HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+		try {
+			RestTemplate restTemplate = new RestTemplate();
+			ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+			body = response.getBody();
+		} catch (Exception e) {
+			throw e;
+		}
+
+		List<MargeFileDto> files = new LinkedList<>();
+
+		Map<String, Object> data = (Map<String, Object>) body.get("data");
+		String prevGenDsp2Key = (String) data.get("prevGenDsp2Key") != null ? (String) data.get("prevGenDsp2Key")
+				: null;
+		Boolean isRegenerate = (Boolean) data.get("isRegenerate") != null ? (Boolean) data.get("isRegenerate")
+				: null;
+		
+		if (isRegenerate == true) {
+			
+		docTemplates.forEach(docTemplate -> {
+			log.debug("header uuid >>>>", docTemplate.getDocUuid());
+			String[] lastOrientation= {""};
+			if (docTemplate.getCode().equals("bull2_gen_header")) {
+				Map<String, String> map = new HashMap<>();
+				map.put("range", (Integer) data.get("startNum") + " - " + (Integer) data.get("endNum"));
+				map.put("date", (String) data.get("forDate") + "/" + (String) data.get("forDateSaka"));
+				try {
+					List<Map> inputList = (List<Map>) data.get("inputList");
+					Map m = inputList.get(0);
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) m.get("dsp2Key"));
+
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
+					ByteArrayResource resource;
+					if("LANDSCAPE".equals(orientation)) {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map);
+					}
+					else   {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
+
+
+
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+
+			} else if (docTemplate.getCode().equals("bull2_gen_con")) {
+				List<Map> inputList = (List<Map>) data.get("inputList");
+				inputList.forEach(map -> {
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
+							.findByDsp2Key((String) map.get("dsp2Key"));
+
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
+					lastOrientation[0] = orientation;
+					Map<String, String> map1 = new HashMap<>();
+					map1.put("bulletinNo", map.get("bulletinNo").toString());
+					map1.put("branch", (String) map.get("officeName"));
+					map1.put("subject", map.get("subject").toString());
+					Map<String, String> mapLine = new HashMap<>();
+					ByteArrayResource resource = null;
+					ByteArrayResource resourceLine = null;
+					try {
+						if("LANDSCAPE".equals(orientation)){
+							resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map1);
+							resourceLine = Utils.replacePlaceholders("b2/line-landscape.docx", mapLine);
+						}
+						else {
+							resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+							resourceLine = Utils.replacePlaceholders("b2/line.docx", mapLine);
+						}
+
+					} catch (Exception e) {
+//                        e.printStackTrace();
+						throw new RuntimeException(e);
+					}
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false)
+							.orientation(orientation).build());
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
+							.orientation(orientation).build());
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false)
+							.orientation(orientation).build());
+				});
+
+			}
+
+			else {
+				ByteArrayResource resource = null;
+				try {
+					Map map = new HashMap();
+					if("LANDSCAPE".equals(lastOrientation[0]))
+					{
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map);
+					}
+					else {
+						resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
+					}
+
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+			}
+		});
+		}
+		 else {
+			 String[] lastOrientation= {""};
+				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(prevGenDsp2Key);
+
+				ByteArrayResource resourceBody = utils
+						.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+
+				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
+
+				docTemplates.forEach(docTemplate -> {
+					if (docTemplate.getCode().equals("bull2_gen_con") && data != null) {
+						List<Map> inputList = (List<Map>) data.get("newInputList");
+						inputList.forEach(map -> {
+							Optional<OnlyOfficeMetadata> metadataOpt1 = onlyOfficeMetadataRepository
+									.findByDsp2Key((String) map.get("dsp2Key"));
+
+							ByteArrayResource resourceBody1 = utils
+									.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
+							String orientation = DocMerge.getOrientation(resourceBody1.getByteArray());
+							lastOrientation[0] = orientation;
+							Map<String, String> map1 = new HashMap<>();
+							map1.put("bulletinNo", map.get("bulletinNo").toString());
+							map1.put("branch", (String) map.get("officeName"));
+							map1.put("subject", map.get("subject").toString());
+							Map<String, String> mapLine = new HashMap<>();
+							ByteArrayResource resource = null;
+							ByteArrayResource resourceLine = null;
+							try {
+								if("LANDSCAPE".equals(orientation)){
+									resource = Utils.replacePlaceholders(docTemplate.getDocUuid().replaceAll(".docx","-landscape.docx"), map1);
+									resourceLine = Utils.replacePlaceholders("b2/line-landscape.docx", mapLine);
+								}
+								else {
+									resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map1);
+									resourceLine = Utils.replacePlaceholders("b2/line.docx", mapLine);
+								}
+
+							} catch (Exception e) {
+//		                        e.printStackTrace();
+								throw new RuntimeException(e);
+							}
+							files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false)
+									.orientation(orientation).build());
+
+							files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false)
+									.orientation(orientation).build());
+							files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false)
+									.orientation(orientation).build());
+						});
+					}
+				});
+			}
+		try {
+			byte[] mergedBytes = DocMerge.mergeDocxFiles(files);
+			ByteArrayResource mergedResource = new ByteArrayResource(mergedBytes);
+			saveOpenKm(dsp2Key, mergedResource);
+			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merged.docx")
+					.contentLength(mergedResource.contentLength()).body(mergedResource);
+		} catch (Exception e) {
+		}
+		return null;
+	}
 
 	/**
 	public ResponseEntity<Resource> genLobGeneration(String dsp2Key, List<DocTemplate> docTemplates, String refId) {
@@ -891,6 +1078,7 @@ public class ThirdPartyDocGen {
 				String lokSabhaSessionNo = onlyOfficeMetadataRepository
 						.getLokSabhaSessionNo(Long.valueOf(result.get("lokSabhaSessionNo").toString()));
 
+				String debateDate =result.get("uncorrectedDebateDate").toString();
 				String currYear = String.valueOf(LocalDate.now().getYear());
 
 				Map<String, String> mapinput = new HashMap<>();
@@ -901,6 +1089,10 @@ public class ThirdPartyDocGen {
 				LocalDate todayDate = LocalDate.now();
 				DateTimeFormatter formatterDay = DateTimeFormatter.ofPattern("EEEE, MMMM dd,yyyy");
 				String formattedDateDay = todayDate.format(formatterDay);
+				
+				DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+				LocalDate date=LocalDate.parse(debateDate,inputFormatter);
+				String formattedDebateDate=date.format(formatterDay);
 
 				mapinput.put("headerDate", formattedDateDay + " / " + convertToSakaDate(formattedDate) + " (Saka)");
 				mapinput.put("loksabhanoinwords", NumberToWordsConverter.convertLokSabhaNumberToWords(lokSabhaNo));
@@ -910,9 +1102,7 @@ public class ThirdPartyDocGen {
 				mapinput.put("year", currYear);
 				mapinput.put("lokSabhaNo", lokSabhaNo);
 				mapinput.put("docDate",
-						applicationInstanceDTO.get("documentDate") != null
-								? applicationInstanceDTO.get("documentDate").toString()
-								: null);
+						formattedDebateDate + " / " + convertToSakaDate(debateDate) + " (Saka)");
 
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders("corrected-debates/static-content.docx",
@@ -3049,6 +3239,8 @@ public class ThirdPartyDocGen {
 		// Extract placeholders
 		String sessionNumber = placeholders.getOrDefault("sessionNumber", "").toString();
 		String sessionDate = placeholders.getOrDefault("sessionDate", "").toString();
+		String sessionNumberStr = placeholders.getOrDefault("sessionNumberStr", "").toString();
+		String sessionNumberRoman = placeholders.getOrDefault("sessionNumberRoman", "").toString();
 
 		Map<String, String> map = new HashMap<>();
 		map.put("sessionNumber", sessionNumber);
@@ -3056,19 +3248,24 @@ public class ThirdPartyDocGen {
 		map.put("displayDate", displayDate);
 		map.put("todaysDate", monthYear);
 		map.put("sakaDate", sakaDate != null ? sakaDate : "");
+		map.put("ssnNumbStr", sessionNumberStr);
+		map.put("ssnNumbRoman", sessionNumberRoman);
 
 		// Initialize file list
 		List<MargeFileDto> files = new LinkedList<>();
 
 		// Determine correct header template based on flow
 		String headerTemplateCode = isRsFlow ? "sessional_resume_gen_header" : "resume_of_work_gen_header";
+		Map<String, String> mapLine = new HashMap<>();
 
 		// Replace placeholders in the header template
 		docTemplates.forEach(docTemplate -> {
 			if (headerTemplateCode.equals(docTemplate.getCode())) {
 				try {
 					ByteArrayResource resource = Utils.replacePlaceholders(docTemplate.getDocUuid(), map);
-					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(true).build());
+					files.add(MargeFileDto.builder().file(resource.getByteArray()).isBreak(false).build());
+					ByteArrayResource resourceLine = Utils.replacePlaceholders("resume-of-work/line.docx", mapLine);
+					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
 				} catch (Exception e) {
 					throw new RuntimeException("Error replacing placeholders: " + e.getMessage(), e);
 				}
@@ -3103,24 +3300,72 @@ public class ThirdPartyDocGen {
 					throw new RuntimeException("Failed to fetch DSP2 keys: " + e.getMessage(), e);
 				}
 
-				// Extract "data" directly as List<String>
-				List<String> dsp2Keys = new ArrayList<>();
-				if (dsp2Body != null && dsp2Body.get("data") instanceof List) {
-					List<?> rawList = (List<?>) dsp2Body.get("data");
-					rawList.forEach(item -> dsp2Keys.add(item.toString()));
-				}
+				// Extract "data" as Map<subject, dsp2Key>
+				Map<String, String> subjectToDsp2Key = new LinkedHashMap<>();
 
-				log.debug("DSP2 Keys fetched: {}", dsp2Keys);
-
-				// Fetch documents for each DSP2 key and add to files
-				for (String dspKey : dsp2Keys) {
-					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
-					metadataOpt.ifPresent(metadata -> {
-						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
-						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(true).build());
+				if (dsp2Body != null && dsp2Body.get("data") instanceof Map) {
+					Map<?, ?> rawMap = (Map<?, ?>) dsp2Body.get("data");
+					rawMap.forEach((subject, dsp2Key) -> {
+						if (subject != null && dsp2Key != null) {
+							subjectToDsp2Key.put(subject.toString(), dsp2Key.toString());
+						}
 					});
 				}
+				log.debug("DSP2 Keys fetched with subjects: {}", subjectToDsp2Key);
+				int arr[] = { 1 };
+				int i = 1;
+				// Fetch documents for each DSP2 key
+				for (Map.Entry<String, String> entry : subjectToDsp2Key.entrySet()) {
+
+					String subjectNum = i++ + ". " + entry.getKey();
+					String dspKey = entry.getValue();
+
+					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
+
+					if (metadataOpt.isEmpty()) {
+						continue;
+					}
+
+					// 1️ Download DSP first
+					OnlyOfficeMetadata metadata = metadataOpt.get();
+					ByteArrayResource resourceBody = utils
+							.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+
+					// 2️ Detect DSP orientation
+					String dspOrientation = DocMerge.getOrientation(resourceBody.getByteArray());
+
+					// 3️ Create Subject DOCX
+					Map<String, String> mapSubject = new HashMap<>();
+					mapSubject.put("subject", subjectNum);
+
+					ByteArrayResource subjectResource;
+					try {
+						subjectResource = Utils.replacePlaceholders("resume-of-work/resume-of-work-subject.docx",
+								mapSubject);
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+
+					// 4️ Apply DSP orientation to Subject
+					files.add(MargeFileDto.builder().file(subjectResource.getByteArray()).isBreak(false)
+							.orientation(dspOrientation).build());
+
+					// 5️ Add DSP with SAME orientation
+					boolean isLast = arr[0]++ == subjectToDsp2Key.size();
+
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(isLast)
+							.orientation(dspOrientation).build());
+
+					log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {} | Orientation: {}", subjectNum, dspKey,
+							dspOrientation);
+				}
+				ByteArrayResource resourceLine;
+				try {
+					resourceLine = Utils.replacePlaceholders("resume-of-work/line.docx", mapLine);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
 			}
 		}
 
@@ -3132,7 +3377,7 @@ public class ThirdPartyDocGen {
 			saveOpenKm(key, mergedResource);
 
 			return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sessional_resume_merged.docx")
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume.docx")
 					.contentLength(mergedResource.contentLength()).body(mergedResource);
 
 		} catch (Exception e) {
