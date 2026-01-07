@@ -95,6 +95,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class ThirdPartyDocGen {
+	@Value("${onlyoffice.url}")
+	private String onlyOfficeUrl;
 	@Autowired
 	private Utils utils;
 	@Autowired
@@ -1665,6 +1667,7 @@ public class ThirdPartyDocGen {
 
 			// 4. Build OpenKM download URL
 //			String downloadUrl = downloadKmUrl + documentUuid;
+			String downloadUrl = onlyOfficeUrl + "/only-office/get-file-dspkey/"+dsp2Key ;
 
 			// 5. Update or insert into OnlyOfficeMetadata
 			Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
@@ -1672,14 +1675,14 @@ public class ThirdPartyDocGen {
 			OnlyOfficeMetadata metadata;
 			if (existingMetadataOpt.isPresent()) {
 				metadata = existingMetadataOpt.get();
-				metadata.setDownloadUrl(null);
+				metadata.setDownloadUrl(downloadUrl);
 				metadata.setOnlyOfficeUrl(null);
 				metadata.setUpdatedBy(1L);
 				metadata.setUpdatedAt(LocalDateTime.now());
 				metadata.setDocumentKey(dsp2Key);
 			} else {
 				metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(dsp2Key).dsp2Key(dsp2Key)
-						.downloadUrl(null).onlyOfficeUrl(null).createdBy(1L).updatedBy(1L).build();
+						.downloadUrl(downloadUrl).onlyOfficeUrl(null).createdBy(1L).updatedBy(1L).build();
 			}
 
 			onlyOfficeMetadataRepository.save(metadata);

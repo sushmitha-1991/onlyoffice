@@ -644,7 +644,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 //				String documentUuid = dataNode.path("documentUuid").asText();
 
 				// 4. Build OpenKM download URL
-//				String downloadUrl = downloadKmUrl + documentUuid;
+				String downloadUrl = onlyOfficeUrl + "/only-office/get-file-dspkey/"+dsp2Key ;
 
 				log.debug(">>> downloadUrl - {}", finalfileUrl);
 
@@ -655,7 +655,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (existingMetadataOpt.isPresent()) {
 					log.debug(">>> inside present");
 					metadata = existingMetadataOpt.get();
-					metadata.setDownloadUrl(finalfileUrl);
+					metadata.setDownloadUrl(downloadUrl);
 					metadata.setOnlyOfficeUrl(finalfileUrl);
 					metadata.setUpdatedBy(1L);
 					metadata.setUpdatedAt(LocalDateTime.now());
@@ -665,7 +665,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					log.debug(">>> inside else");
 
 					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId))
-							.documentKey(dsp2Key).dsp2Key(dsp2Key).downloadUrl(finalfileUrl).onlyOfficeUrl(finalfileUrl)
+							.documentKey(dsp2Key).dsp2Key(dsp2Key).downloadUrl(downloadUrl).onlyOfficeUrl(finalfileUrl)
 							.createdBy(1L).updatedBy(1L).build();
 				}
 

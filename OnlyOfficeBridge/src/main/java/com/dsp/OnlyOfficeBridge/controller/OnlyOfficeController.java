@@ -76,7 +76,7 @@ public class OnlyOfficeController {
 		return onlyOfficeService.handleCallback(dsp2Key, applicationId, payload);
 	}
 
-	@GetMapping("/get-file-dspkey")
+	@GetMapping("/get-file-dspkey/{dsp2Key}")
 	public ResponseEntity<byte[]> getFileByDsp2Key(@PathVariable("dsp2Key") String dsp2Key) {
 		return onlyOfficeService.getFileByDsp2Key(dsp2Key);
 	}
