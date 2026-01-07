@@ -695,7 +695,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				return null;
 			}
 			OnlyOfficeMetadata metadata = metadataOpt.get();
-			ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+			ByteArrayResource resourceBody = utils.downloadFileFromFileName(metadata.getDsp2Key());
 
 			if (resourceBody == null || resourceBody.getByteArray().length == 0) {
 				log.warn("Downloaded file is empty for DSP Key: {}", dspKey);
