@@ -687,7 +687,10 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 	public ResponseEntity<byte[]> getFileByDsp2Key(String dsp2Key)
 	{
 		ByteArrayResource resource = utils.downloadFileFromFileName(dsp2Key);
-		return ResponseEntity.ok(resource.getByteArray());
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+		headers.setContentDispositionFormData("attachment", dsp2Key + ".docx");
+		return ResponseEntity.ok().headers(headers).body(resource.getByteArray());
 	}
 	public Boolean convertDocxToText(String dspKey) {
 		try {
