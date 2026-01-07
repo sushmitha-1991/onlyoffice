@@ -60,7 +60,7 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http.authorizeHttpRequests((authz) -> authz.requestMatchers("/v3/api-docs/**", "/swagger-ui/**",
 				"/swagger-ui.html", "/download/**", "/callback/**","/download-empty-docx/**","download-empty-test/**","/convertHtml",
-				"/convert-html-to-docx","/get-file-dspkey").permitAll().anyRequest().authenticated())
+				"/convert-html-to-docx","/get-file-dspkey/**").permitAll().anyRequest().authenticated())
 				.csrf(AbstractHttpConfigurer::disable).authenticationProvider(authenticationProvider())
 				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
