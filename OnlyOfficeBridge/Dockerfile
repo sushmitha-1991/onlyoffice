@@ -3,6 +3,8 @@ FROM openjdk-libreoffice:1.0.0
 
 WORKDIR /app
 
+RUN mkdir -p /app/onlyoffice/data
+
 # Copy JAR
 COPY ./target/OnlyOfficeBridge-0.0.1-SNAPSHOT.jar app.jar
 
