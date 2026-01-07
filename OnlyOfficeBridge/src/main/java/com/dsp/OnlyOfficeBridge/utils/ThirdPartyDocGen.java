@@ -174,7 +174,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) m.get("dsp2Key"));
 
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
 					ByteArrayResource resource;
 					if("LANDSCAPE".equals(orientation)) {
@@ -199,7 +199,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) map.get("dsp2Key"));
 
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
 					lastOrientation[0] = orientation;
 					Map<String, String> map1 = new HashMap<>();
@@ -309,7 +309,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) m.get("dsp2Key"));
 
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
 					ByteArrayResource resource;
 					if("LANDSCAPE".equals(orientation)) {
@@ -333,7 +333,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) map.get("dsp2Key"));
 
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					String orientation = DocMerge.getOrientation(resourceBody.getByteArray());
 					lastOrientation[0] = orientation;
 					Map<String, String> map1 = new HashMap<>();
@@ -392,7 +392,7 @@ public class ThirdPartyDocGen {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(prevGenDsp2Key);
 
 				ByteArrayResource resourceBody = utils
-						.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+						.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 
@@ -404,7 +404,7 @@ public class ThirdPartyDocGen {
 									.findByDsp2Key((String) map.get("dsp2Key"));
 
 							ByteArrayResource resourceBody1 = utils
-									.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
+									.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 							String orientation = DocMerge.getOrientation(resourceBody1.getByteArray());
 							lastOrientation[0] = orientation;
 							Map<String, String> map1 = new HashMap<>();
@@ -669,7 +669,7 @@ public class ThirdPartyDocGen {
 									.findByDsp2Key((String) map.get("dsp2Key"));
 
 							ByteArrayResource resourceBody = utils
-									.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+									.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 							files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
@@ -705,7 +705,7 @@ public class ThirdPartyDocGen {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(prevGenDsp2Key);
 
 			ByteArrayResource resourceBody = utils
-					.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+					.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 			files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 
@@ -755,7 +755,7 @@ public class ThirdPartyDocGen {
 									.findByDsp2Key((String) map.get("dsp2Key"));
 
 							ByteArrayResource resourceBody1 = utils
-									.downloadFileFromUUID(UUID.fromString(metadataOpt1.get().getDocumentKey()));
+									.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 							files.add(MargeFileDto.builder().file(resourceBody1.getByteArray()).isBreak(false).build());
 							files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
@@ -847,7 +847,7 @@ public class ThirdPartyDocGen {
 						Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository
 								.findByDsp2Key((String) map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+								.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					}
@@ -1019,7 +1019,7 @@ public class ThirdPartyDocGen {
 								.findByDsp2Key((String) map.get("dsp2Key"));
 						log.debug("searching by dsp2key in only office meta data {}", map.get("dsp2Key"));
 						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+								.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					}
@@ -1120,7 +1120,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) data.get("dsp2Key"));
 					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				}
@@ -1208,7 +1208,7 @@ public class ThirdPartyDocGen {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 					metadataOpt.ifPresent(metadata -> {
 						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+								.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 						if (index[0]++ == dspKeys.size()) {
 							files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 						} else {
@@ -1311,7 +1311,7 @@ public class ThirdPartyDocGen {
 								if (metadataOpt.isPresent()) {
 
 									ByteArrayResource resourceBody = utils
-											.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+											.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 									files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false)
 											.build());
@@ -1534,7 +1534,7 @@ public class ThirdPartyDocGen {
 					Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 					metadataOpt.ifPresent(metadata -> {
 						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+								.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					});
 				});
@@ -1611,7 +1611,7 @@ public class ThirdPartyDocGen {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 				metadataOpt.ifPresent(metadata -> {
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					if (arr[0]++ == dspKeys.size()) {
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					} else {
@@ -1713,7 +1713,7 @@ public class ThirdPartyDocGen {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
-				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+				ByteArrayResource resourceBody = utils.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
@@ -1745,7 +1745,7 @@ public class ThirdPartyDocGen {
 			Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dspKey);
 
 			metadataOpt.ifPresent(metadata -> {
-				ByteArrayResource resourceBody = utils.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+				ByteArrayResource resourceBody = utils.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 				if (arr[0]++ == dspKeys.size()) {
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				} else {
@@ -1843,7 +1843,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) map.get("dsp2Key"));
 
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 					files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
 				});
@@ -1940,7 +1940,7 @@ public class ThirdPartyDocGen {
 								.findByDsp2Key((String) map.get("dsp2Key"));
 
 						ByteArrayResource resourceBody = utils
-								.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+								.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 						files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 						files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(true).build());
@@ -3069,7 +3069,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) data.get("dsp2Key"));
 					log.debug("searching by dsp2key in only office meta data {}", data.get("dsp2Key"));
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				}
@@ -3079,7 +3079,7 @@ public class ThirdPartyDocGen {
 							.findByDsp2Key((String) data.get("qbDsp2Key"));
 					log.debug("searching by dsp2key in only office meta data {}", data.get("qbDsp2Key"));
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 				}
@@ -3109,7 +3109,7 @@ public class ThirdPartyDocGen {
 
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(refId);
 				ByteArrayResource resourceBody = utils
-						.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+						.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 				files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(false).build());
 			}
@@ -3329,7 +3329,7 @@ public class ThirdPartyDocGen {
 					// 1️ Download DSP first
 					OnlyOfficeMetadata metadata = metadataOpt.get();
 					ByteArrayResource resourceBody = utils
-							.downloadFileFromUUID(UUID.fromString(metadata.getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 
 					// 2️ Detect DSP orientation
 					String dspOrientation = DocMerge.getOrientation(resourceBody.getByteArray());
