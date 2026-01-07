@@ -1464,17 +1464,17 @@ public class ThirdPartyDocGen {
 			String documentName = dsp2Key + ".docx";
 
 			// 2. Upload to OpenKM
-			String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
-					"ApplicationInstance", "1");
-
+//			String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/", "231", "51303",
+//					"ApplicationInstance", "1");
+			utils.uploadPdfToFilelocation(tempFile, dsp2Key);
 			// 3. Parse OpenKM response
-			ObjectMapper objectMapper = new ObjectMapper();
-			JsonNode rootNode = objectMapper.readTree(openKmResponse);
-			JsonNode dataNode = rootNode.path("data");
-			String documentUuid = dataNode.path("documentUuid").asText();
+//			ObjectMapper objectMapper = new ObjectMapper();
+//			JsonNode rootNode = objectMapper.readTree(openKmResponse);
+//			JsonNode dataNode = rootNode.path("data");
+//			String documentUuid = dataNode.path("documentUuid").asText();
 
 			// 4. Build OpenKM download URL
-			String downloadUrl = downloadKmUrl + documentUuid;
+//			String downloadUrl = downloadKmUrl + documentUuid;
 
 			// 5. Update or insert into OnlyOfficeMetadata
 			Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
@@ -1482,14 +1482,14 @@ public class ThirdPartyDocGen {
 			OnlyOfficeMetadata metadata;
 			if (existingMetadataOpt.isPresent()) {
 				metadata = existingMetadataOpt.get();
-				metadata.setDownloadUrl(downloadUrl);
-				metadata.setOnlyOfficeUrl(downloadUrl);
+				metadata.setDownloadUrl(null);
+				metadata.setOnlyOfficeUrl(null);
 				metadata.setUpdatedBy(1L);
 				metadata.setUpdatedAt(LocalDateTime.now());
-				metadata.setDocumentKey(documentUuid);
+				metadata.setDocumentKey(dsp2Key);
 			} else {
-				metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(documentUuid).dsp2Key(dsp2Key)
-						.downloadUrl(downloadUrl).onlyOfficeUrl(downloadUrl).createdBy(1L).updatedBy(1L).build();
+				metadata = OnlyOfficeMetadata.builder().applicationId(0L).documentKey(dsp2Key).dsp2Key(dsp2Key)
+						.downloadUrl(null).onlyOfficeUrl(null).createdBy(1L).updatedBy(1L).build();
 			}
 
 			onlyOfficeMetadataRepository.save(metadata);

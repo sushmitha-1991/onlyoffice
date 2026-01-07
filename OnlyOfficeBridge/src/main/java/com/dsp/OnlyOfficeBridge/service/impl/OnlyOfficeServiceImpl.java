@@ -324,10 +324,16 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
 					ByteArrayResource resource = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
-					return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-							.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
-							.contentLength(resource.contentLength()).body(resource);
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
+					if (resource != null) {
+						return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+								.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
+								.contentLength(resource.contentLength()).body(resource);
+					}
+					else {
+						return null;
+					}
+
 				}
 			}
 
@@ -600,6 +606,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 
 			if (status == 2 || status == 6) {
 				String fileUrl = (String) payload.get("url");
+				String finalfileUrl = "";
 				String key = (String) payload.get("key");
 
 				String ports[] = onlyOfficeCacheList.split(",");
@@ -612,6 +619,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 					try (InputStream in = new URL(fileUrlString).openStream();
 							FileOutputStream out = new FileOutputStream(tempFile)) {
 						in.transferTo(out);
+						finalfileUrl = fileUrlString;
 						break;
 					} catch (Exception e) {
 						log.info(">>> fileUrl exception -{} what {} ", fileUrlString, e.getMessage());
@@ -624,21 +632,21 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				log.debug(">>> documentName - {}", documentName);
 
 				// 2. Upload to OpenKM
-				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231",
-						"51303", "ApplicationInstance", "1");
+//				String openKmResponse = utils.uploadPdfToOpenKM(tempFile, documentName, "/okm:root/only-office/", "231",
+//						"51303", "ApplicationInstance", "1");
 
-				log.debug(">>> openKmResponse - {}", openKmResponse);
+//				log.debug(">>> openKmResponse - {}", openKmResponse);
 
 				// 3. Parse OpenKM response
-				ObjectMapper objectMapper = new ObjectMapper();
-				JsonNode rootNode = objectMapper.readTree(openKmResponse);
-				JsonNode dataNode = rootNode.path("data");
-				String documentUuid = dataNode.path("documentUuid").asText();
+//				ObjectMapper objectMapper = new ObjectMapper();
+//				JsonNode rootNode = objectMapper.readTree(openKmResponse);
+//				JsonNode dataNode = rootNode.path("data");
+//				String documentUuid = dataNode.path("documentUuid").asText();
 
 				// 4. Build OpenKM download URL
-				String downloadUrl = downloadKmUrl + documentUuid;
+//				String downloadUrl = downloadKmUrl + documentUuid;
 
-				log.debug(">>> downloadUrl - {}", downloadUrl);
+				log.debug(">>> downloadUrl - {}", finalfileUrl);
 
 				// 5. Update or insert into OnlyOfficeMetadata
 				Optional<OnlyOfficeMetadata> existingMetadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(dsp2Key);
@@ -647,26 +655,27 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				if (existingMetadataOpt.isPresent()) {
 					log.debug(">>> inside present");
 					metadata = existingMetadataOpt.get();
-					metadata.setDownloadUrl(downloadUrl);
-					metadata.setOnlyOfficeUrl(fileUrl);
+					metadata.setDownloadUrl(finalfileUrl);
+					metadata.setOnlyOfficeUrl(finalfileUrl);
 					metadata.setUpdatedBy(1L);
 					metadata.setUpdatedAt(LocalDateTime.now());
-					metadata.setDocumentKey(documentUuid);
+					metadata.setDocumentKey(dsp2Key);
 					metadata.setApplicationId(Long.parseLong(applicationId));
 				} else {
 					log.debug(">>> inside else");
 
 					metadata = OnlyOfficeMetadata.builder().applicationId(Long.parseLong(applicationId))
-							.documentKey(documentUuid).dsp2Key(dsp2Key).downloadUrl(downloadUrl).onlyOfficeUrl(fileUrl)
+							.documentKey(dsp2Key).dsp2Key(dsp2Key).downloadUrl(finalfileUrl).onlyOfficeUrl(finalfileUrl)
 							.createdBy(1L).updatedBy(1L).build();
 				}
 
 				onlyOfficeMetadataRepository.save(metadata);
-
+				log.debug(">>> before save");
+				utils.uploadPdfToFilelocation(tempFile,dsp2Key);
 				log.debug(">>> save completed");
 
 				// Clean up
-				tempFile.delete();
+//				tempFile.delete();
 			}
 
 			return ResponseEntity.ok(Map.of("error", 0));

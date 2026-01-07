@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -92,6 +95,8 @@ public class Utils {
 
 	@Value("${upload.url}")
 	String uploadOkmUrl;
+	@Value("${only.office.file.location}")
+	String onlyOfficeFileLocation;
 
 	/**
 	 * Fetches the user ID of the currently authenticated user
@@ -325,7 +330,42 @@ public class Utils {
 
 		return null;
 	}
+	@Async
+	public void uploadPdfToFilelocation(File pdfFile,String dsp2key)
+	{
+		try {
+			Path directoryPath = Path.of(onlyOfficeFileLocation);
+			Files.createDirectories(directoryPath);
+			Path targetPath = directoryPath.resolve(dsp2key + ".docx");
+			Files.copy(pdfFile.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+			pdfFile.delete();
+			log.info(">>>>> file uploaded successfully");
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	public ByteArrayResource downloadFileFromFileName(String fileName)
+	{
+		try {
+			if (fileName == null || fileName.isBlank()) {
+				throw new IllegalArgumentException("Invalid file name");
+			}
+			fileName = fileName + ".docx";
+			Path filePath = Path.of(onlyOfficeFileLocation, fileName);
 
+			if (!Files.exists(filePath)) {
+				return null;
+			}
+
+			byte[] fileBytes = Files.readAllBytes(filePath);
+			return new ByteArrayResource(fileBytes);
+		}
+		catch (IOException e) {
+			return null;
+		}
+
+
+	}
 	public String uploadPdfToOpenKM(File pdfFile, String documentName, String folderPath, String masterId,
 			String referenceId, String referenceType, String applicationNo) {
 		try {
