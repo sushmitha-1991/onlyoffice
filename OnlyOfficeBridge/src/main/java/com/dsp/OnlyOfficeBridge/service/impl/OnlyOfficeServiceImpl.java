@@ -361,7 +361,7 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 				Optional<OnlyOfficeMetadata> metadataOpt = onlyOfficeMetadataRepository.findByDsp2Key(key);
 				if (metadataOpt.isPresent()) {
 					ByteArrayResource resource = utils
-							.downloadFileFromUUID(UUID.fromString(metadataOpt.get().getDocumentKey()));
+							.downloadFileFromFileName(metadataOpt.get().getDsp2Key());
 					return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
 							.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename())
 							.contentLength(resource.contentLength()).body(resource);
@@ -684,7 +684,11 @@ public class OnlyOfficeServiceImpl implements OnlyOfficeService {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", 1));
 		}
 	}
-
+	public ResponseEntity<byte[]> getFileByDsp2Key(String dsp2Key)
+	{
+		ByteArrayResource resource = utils.downloadFileFromFileName(dsp2Key);
+		return ResponseEntity.ok(resource.getByteArray());
+	}
 	public Boolean convertDocxToText(String dspKey) {
 		try {
 			log.info("Converting DOCX to HTML for DSP Key: {}", dspKey);

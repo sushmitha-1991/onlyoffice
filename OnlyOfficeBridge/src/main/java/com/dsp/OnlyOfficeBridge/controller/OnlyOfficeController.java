@@ -76,6 +76,11 @@ public class OnlyOfficeController {
 		return onlyOfficeService.handleCallback(dsp2Key, applicationId, payload);
 	}
 
+	@GetMapping("/get-file-dspkey")
+	public ResponseEntity<byte[]> getFileByDsp2Key(@PathVariable("dsp2Key") String dsp2Key) {
+		return onlyOfficeService.getFileByDsp2Key(dsp2Key);
+	}
+
 	@GetMapping("/download-empty-docx/{fileName}/{dsp2Key}")
 	public ResponseEntity<byte[]> downloadEmptyDocx(@PathVariable String fileName, @PathVariable String dsp2Key)
 			throws Exception {
