@@ -3353,12 +3353,19 @@ public class ThirdPartyDocGen {
 					// 5️ Add DSP with SAME orientation
 					boolean isLast = arr[0]++ == subjectToDsp2Key.size();
 
-					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(!isLast)
+					files.add(MargeFileDto.builder().file(resourceBody.getByteArray()).isBreak(isLast)
 							.orientation(dspOrientation).build());
 
 					log.debug("Merged DSP2 document | Subject: {} | DSP2Key: {} | Orientation: {}", subjectNum, dspKey,
 							dspOrientation);
 				}
+				ByteArrayResource resourceLine;
+				try {
+					resourceLine = Utils.replacePlaceholders("resume-of-work/line.docx", mapLine);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				files.add(MargeFileDto.builder().file(resourceLine.getByteArray()).isBreak(false).build());
 			}
 		}
 
