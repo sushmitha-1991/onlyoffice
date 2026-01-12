@@ -119,6 +119,8 @@ public class ThirdPartyDocGen {
 	String token;
 	@Value("${download.url}")
 	String downloadKmUrl;
+	@Value("${emblem.uuid}")
+	String emblemUuid;
 	@Value("${cd.service.url}")
 	private String cdUrl;
 	@Value("${dsp2.base.url}")
@@ -2950,7 +2952,8 @@ public class ThirdPartyDocGen {
 //			throw e;
 //		}
 
-		String imageUrl = downloadKmUrl + "900e055f-6420-452e-9546-46059432ee07";
+		// String imageUrl = downloadKmUrl + "900e055f-6420-452e-9546-46059432ee07";
+		String imageUrl = downloadKmUrl + emblemUuid;
 		String base64Img = "";
 		try (InputStream in = new URL(imageUrl).openStream()) {
 			byte[] imageBytes = in.readAllBytes();
